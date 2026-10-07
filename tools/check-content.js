@@ -296,6 +296,7 @@ const conjOfFam = { are: "are", cg: "are", iare: "are", ere: "ere", erepp: "ere"
 const REVIEWED = {
   sciare: "keeps its stressed i: scii, scierò",
   cucire: "keeps the i so the c stays soft: cucio, cuciono",
+  sedere: "e becomes ie in the stressed forms (siedo, mi siedo); future siederò or sederò",
 };
 
 function compareRegular(where, inf, conj, tense, forms, note = "") {
@@ -342,6 +343,17 @@ for (const v of VERB_GYM) {
     if (t === "passato_prossimo") checkCompound(where, v.it, v.f[i], t, v.pp, v.aux);
     else if (conjOfFam[v.fam]) compareRegular(where, v.it, conjOfFam[v.fam], t, v.f[i]);
   });
+}
+
+// (a2) Reflexive verbs, and compound verbs labelled -ere or -ire: the verb inside the pronouns
+// follows the rules of its conjugation too (an -ire verb may take -isc-, as its io form shows).
+for (const v of VERB_GYM) {
+  const comp = v.fam === "comp" && conjOfGroup[v.group];
+  if (v.fam !== "refl" && !comp) continue;
+  const base = baseInf(v.it);
+  const io = strip(v.f[0][0], isPron(v.it));
+  const conj = comp ? conjOfGroup[v.group] : /are$/.test(base) ? "are" : /ere$/.test(base) ? "ere" : /isco$/.test(io) ? "isc" : "ire";
+  VG_TENSES.forEach((t, i) => { if (t !== "passato_prossimo" && v.f[i]) compareRegular(`Verbs section: ${v.it}`, v.it, conj, t, v.f[i], v.note); });
 }
 
 // (b) The units: agree with the Verbs section, follow the rules, and the derived tenses
