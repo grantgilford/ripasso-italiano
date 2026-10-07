@@ -114,6 +114,11 @@ for (const it of allItems) {
     const cz = it.cloze;
     if (!cz) continue;
     if (!/\{[^}]+\}/.test(cz.text || "")) { problem("Cloze without a blank", where); continue; }
+    { // the cloze, filled with its first answer, is one of the sentence's own versions
+      const pc = app.parseCloze(cz.text);
+      const filled = normalize(pc.parts.map((p, i) => p + (i < pc.blanks.length ? pc.blanks[i][0] : "")).join(""));
+      if (!arr(it.it).some(s => normalize(s) === filled)) problem("Clozes that don't match their sentence", `${where}: “${cz.text}” filled in isn't among ${arr(it.it).map(s => "“" + s + "”").join(", ")}`);
+    }
     if (!Array.isArray(cz.options)) continue;
     const parsed = app.parseCloze(cz.text);
     const first = parsed.blanks[0].map(normalize);
@@ -134,6 +139,7 @@ for (const it of allItems) {
   if (it.type === "transform") {
     count("transforms");
     if (!it.explanation) problem("Missing explanations", `${where}: transform has no explanation`);
+    if (arr(it.answer).some(a => normalize(a) === normalize(it.it))) problem("Transforms whose answer is the sentence unchanged", `${where}: “${it.it}”`);
   }
 }
 
@@ -346,6 +352,23 @@ for (const v of VERB_GYM) {
     if (t === "passato_prossimo") checkCompound(where, v.it, v.f[i], t, v.pp, v.aux);
     else if (conjOfFam[v.fam]) compareRegular(where, v.it, conjOfFam[v.fam], t, v.f[i]);
   });
+}
+
+// (a1) The Verbs section's English: the From English drill shows a verb's first gloss and accepts every verb
+// that lists it, so verbs sharing a first gloss must be true synonyms. Pairs checked by hand:
+const SAME_FIRST_GLOSS = new Set(["buttare/lanciare", "capire/comprendere", "chiedere/domandare", "cominciare/iniziare", "credere/ritenere",
+  "cucinare/cuocere", "dimenticare/dimenticarsi", "mandare/inviare", "notare/accorgersi", "restituire/rendere", "ricordare/ricordarsi",
+  "spostare/muovere", "stare/restare/rimanere"]);
+{
+  const byGloss = {};
+  for (const v of VERB_GYM) {
+    const en0 = String(arr(v.en)[0] || "");
+    if (!/^to /.test(en0)) problem("Verbs section glosses", `${v.it}: the first gloss “${en0}” should start with “to” (it is the From English prompt)`);
+    (byGloss[en0.toLowerCase()] = byGloss[en0.toLowerCase()] || []).push(v.it);
+    // a verb flagged as taking both auxiliaries is skipped by the essere-or-avere question, so its note must say when each is used
+    if (v.both && !(/essere/.test(v.note || "") && /avere/.test(v.note || ""))) problem("Verbs section glosses", `${v.it}: takes both auxiliaries, but its note doesn't say when essere and when avere`);
+  }
+  for (const [g, list] of Object.entries(byGloss)) if (list.length > 1 && !SAME_FIRST_GLOSS.has(list.join("/"))) look("Verbs sharing a first gloss (From English accepts both)", `“${g}”: ${list.join(", ")}; if they aren't true synonyms, add a bracket to one gloss, otherwise add them to SAME_FIRST_GLOSS`);
 }
 
 // (a2) Reflexive verbs, and compound verbs labelled -ere or -ire: the verb inside the pronouns
