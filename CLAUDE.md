@@ -8,6 +8,7 @@ This repo is the workshop for Grant's personal Italian practice app. Read this f
 - `docs/italian-app-spec.md` — the original build spec: goals, principles, exercise types, spaced repetition, screens.
 - `docs/italian-app-content-guide.md` — **the standard for all content work**. Every unit, item, explanation and lesson must meet it. Read it in full before touching content.
 - `tools/check-content.js` — the content checks (`node tools/check-content.js`, add `--verbose` for every finding). Reads `index.html` and changes nothing.
+- `tools/test-progress.js` — the progress safety test (`node tools/test-progress.js`, about a minute; needs Playwright and Chromium). Runs the real app in a headless browser and checks that saved progress, in the browser and in the synced copy, survives loading, aliases, practice sessions, syncing and a new device. `tools/item-ids.txt` lists every id that may hold progress.
 
 ## How the app reaches Grant
 
@@ -25,7 +26,7 @@ The live app is a private claude.ai artifact (https://claude.ai/artifact/1d1Zqo9
 
 1. Work on a new branch, never directly on `main`. Grant reviews and merges.
 2. Bump `APP_VERSION` (7.2 → 7.3, and so on) for any change that will be republished, and update the version mentioned in the content guide's first paragraph if the guide changes.
-3. Before finishing, run `node tools/check-content.js`. It checks that the script parses and runs the content checks the guide describes (lesson links resolve, every wrong option has a note, verb forms agree with `VERB_GYM` and the regular rules, and more). It must report no problems; read its "worth a look" list and deal with anything your change added. Where a check isn't scripted yet, add it to that script (or a new one under `tools/`) and commit it, so the next session can reuse it.
+3. Before finishing, run `node tools/check-content.js`. It checks that the script parses and runs the content checks the guide describes (lesson links resolve, every wrong option has a note, verb forms agree with `VERB_GYM` and the regular rules, and more). It must report no problems; read its "worth a look" list and deal with anything your change added. Then run `node tools/test-progress.js`: every check must pass. If you add items, run it with `--update-ids` to add their ids to `tools/item-ids.txt`; if it reports a missing id, an item was removed or renamed without an `ID_ALIASES` entry, so add one rather than editing the list. If you deliberately change a storage format, write the migration first and then update the test to the new format in the same branch. Where a check isn't scripted yet, add it to these scripts (or a new one under `tools/`) and commit it, so the next session can reuse it.
 4. If a change alters how the app treats content, update `docs/italian-app-content-guide.md` in the same branch.
 5. End with a short summary for Grant: what changed, the new version number, and anything he should check on his phone.
 
