@@ -259,6 +259,8 @@ const P6 = ["io", "tu", "lui/lei", "noi", "voi", "loro"];
 const vg = {}; for (const v of VERB_GYM) vg[v.it] = v;
 const vgForms = (v, tense) => v.f[VG_TENSES.indexOf(tense)];
 const AUX_PP = { a: ["ho", "hai", "ha", "abbiamo", "avete", "hanno"], e: ["sono", "sei", "è", "siamo", "siete", "sono"] };
+// The auxiliary of each compound tense: the passato prossimo takes the present, the trapassato prossimo the imperfetto.
+const AUX_OF = { passato_prossimo: AUX_PP, trapassato_prossimo: { a: ["avevo", "avevi", "aveva", "avevamo", "avevate", "avevano"], e: ["ero", "eri", "era", "eravamo", "eravate", "erano"] } };
 
 // Pronominal verbs (alzarsi, metterci, andarsene, farcela) put pronouns in front of each form;
 // strip them to check the verb itself: "mi alzo" → "alzo", "se n'è andato" → "è andato".
@@ -320,16 +322,17 @@ function compareRegular(where, inf, conj, tense, forms, note = "") {
 // Compound tenses: the auxiliary fits the person, and the participle is the same in all six,
 // agreeing where the auxiliary is essere.
 function checkCompound(where, inf, forms, tense, pp, aux) {
+  const AUX = AUX_OF[tense];
   forms.forEach((f, p) => {
     if (f === "—") return;
     count("compound forms checked");
     const bare = strip(f, isPron(inf));
     const sp = bare.indexOf(" ");
     const a = bare.slice(0, sp), part = bare.slice(sp + 1);
-    if (![AUX_PP.a[p], AUX_PP.e[p]].includes(a) || (aux && a !== AUX_PP[aux][p])) { problem("Compound tenses with the wrong auxiliary", `${where} ${tense} ${P6[p]}: “${f}”`); return; }
+    if (![AUX.a[p], AUX.e[p]].includes(a) || (aux && a !== AUX[aux][p])) { problem("Compound tenses with the wrong auxiliary", `${where} ${tense} ${P6[p]}: “${f}”`); return; }
     if (!pp) return;
     const root = pp.slice(0, -1), sing = p < 3;
-    const ok = a === AUX_PP.a[p] ? [pp] : sing ? [root + "o/a", root + "o", root + "a"] : [root + "i/e", root + "i", root + "e"];
+    const ok = a === AUX.a[p] ? [pp] : sing ? [root + "o/a", root + "o", root + "a"] : [root + "i/e", root + "i", root + "e"];
     if (!ok.includes(part)) problem("Compound tenses with the wrong participle", `${where} ${tense} ${P6[p]}: “${f}” (participle ${pp})`);
   });
 }
@@ -395,7 +398,7 @@ for (const it of allItems.filter(i => i.type === "verb")) {
       });
     }
     if (conjOfGroup[it.group] || /^(reflexive|-rsi)$/.test(it.group)) { if (conj) compareRegular(where, it.it, conj, t, forms, it.note); }
-    if (t === "passato_prossimo") checkCompound(where, it.it, forms, t, ref && ref.pp, ref && ref.aux);
+    if (AUX_OF[t]) checkCompound(where, it.it, forms, t, ref && ref.pp, ref && ref.aux);
     if (t === "congiuntivo_presente" && cpRule) {
       forms.forEach((f, p) => {
         if (f === "—") return;
