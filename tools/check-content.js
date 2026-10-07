@@ -31,9 +31,19 @@ const stats = {};
 const count = (k, n = 1) => (stats[k] = (stats[k] || 0) + n);
 
 /* ---------- 1. the script parses ---------- */
+// One inline script is the app (it holds the boot section). Any other inline script must be a
+// small start-up snippet, such as the one in <head> that applies the Appearance setting before
+// the first paint; it must parse too.
+const BOOT_MARK = "/* ---------- boot ---------- */";
 const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-if (scripts.length !== 1) problem("Structure", `expected one inline <script>, found ${scripts.length}`);
-const code = scripts[0] || "";
+const appScripts = scripts.filter(s => s.includes(BOOT_MARK));
+if (appScripts.length !== 1) problem("Structure", `expected one inline app <script> (the one with the boot section), found ${appScripts.length}`);
+for (const s of scripts.filter(s => !s.includes(BOOT_MARK))) {
+  if (s.length > 2000) problem("Structure", `an extra inline <script> of ${s.length} characters; only small start-up snippets may sit beside the app script`);
+  try { new vm.Script(s, { filename: "index.html start-up <script>" }); }
+  catch (e) { console.error("A start-up script does not parse:\n" + e.stack); process.exit(1); }
+}
+const code = appScripts[0] || "";
 try { new vm.Script(code, { filename: "index.html <script>" }); }
 catch (e) { console.error("The app's script does not parse:\n" + e.stack); process.exit(1); }
 const srcTags = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]);
