@@ -114,6 +114,11 @@ for (const it of allItems) {
     const cz = it.cloze;
     if (!cz) continue;
     if (!/\{[^}]+\}/.test(cz.text || "")) { problem("Cloze without a blank", where); continue; }
+    { // the cloze, filled with its first answer, is one of the sentence's own versions
+      const pc = app.parseCloze(cz.text);
+      const filled = normalize(pc.parts.map((p, i) => p + (i < pc.blanks.length ? pc.blanks[i][0] : "")).join(""));
+      if (!arr(it.it).some(s => normalize(s) === filled)) problem("Clozes that don't match their sentence", `${where}: “${cz.text}” filled in isn't among ${arr(it.it).map(s => "“" + s + "”").join(", ")}`);
+    }
     if (!Array.isArray(cz.options)) continue;
     const parsed = app.parseCloze(cz.text);
     const first = parsed.blanks[0].map(normalize);
@@ -134,6 +139,7 @@ for (const it of allItems) {
   if (it.type === "transform") {
     count("transforms");
     if (!it.explanation) problem("Missing explanations", `${where}: transform has no explanation`);
+    if (arr(it.answer).some(a => normalize(a) === normalize(it.it))) problem("Transforms whose answer is the sentence unchanged", `${where}: “${it.it}”`);
   }
 }
 
@@ -259,6 +265,8 @@ const P6 = ["io", "tu", "lui/lei", "noi", "voi", "loro"];
 const vg = {}; for (const v of VERB_GYM) vg[v.it] = v;
 const vgForms = (v, tense) => v.f[VG_TENSES.indexOf(tense)];
 const AUX_PP = { a: ["ho", "hai", "ha", "abbiamo", "avete", "hanno"], e: ["sono", "sei", "è", "siamo", "siete", "sono"] };
+// The auxiliary of each compound tense: the passato prossimo takes the present, the trapassato prossimo the imperfetto.
+const AUX_OF = { passato_prossimo: AUX_PP, trapassato_prossimo: { a: ["avevo", "avevi", "aveva", "avevamo", "avevate", "avevano"], e: ["ero", "eri", "era", "eravamo", "eravate", "erano"] } };
 
 // Pronominal verbs (alzarsi, metterci, andarsene, farcela) put pronouns in front of each form;
 // strip them to check the verb itself: "mi alzo" → "alzo", "se n'è andato" → "è andato".
@@ -296,6 +304,7 @@ const conjOfFam = { are: "are", cg: "are", iare: "are", ere: "ere", erepp: "ere"
 const REVIEWED = {
   sciare: "keeps its stressed i: scii, scierò",
   cucire: "keeps the i so the c stays soft: cucio, cuciono",
+  sedere: "e becomes ie in the stressed forms (siedo, mi siedo); future siederò or sederò",
 };
 
 function compareRegular(where, inf, conj, tense, forms, note = "") {
@@ -319,16 +328,17 @@ function compareRegular(where, inf, conj, tense, forms, note = "") {
 // Compound tenses: the auxiliary fits the person, and the participle is the same in all six,
 // agreeing where the auxiliary is essere.
 function checkCompound(where, inf, forms, tense, pp, aux) {
+  const AUX = AUX_OF[tense];
   forms.forEach((f, p) => {
     if (f === "—") return;
     count("compound forms checked");
     const bare = strip(f, isPron(inf));
     const sp = bare.indexOf(" ");
     const a = bare.slice(0, sp), part = bare.slice(sp + 1);
-    if (![AUX_PP.a[p], AUX_PP.e[p]].includes(a) || (aux && a !== AUX_PP[aux][p])) { problem("Compound tenses with the wrong auxiliary", `${where} ${tense} ${P6[p]}: “${f}”`); return; }
+    if (![AUX.a[p], AUX.e[p]].includes(a) || (aux && a !== AUX[aux][p])) { problem("Compound tenses with the wrong auxiliary", `${where} ${tense} ${P6[p]}: “${f}”`); return; }
     if (!pp) return;
     const root = pp.slice(0, -1), sing = p < 3;
-    const ok = a === AUX_PP.a[p] ? [pp] : sing ? [root + "o/a", root + "o", root + "a"] : [root + "i/e", root + "i", root + "e"];
+    const ok = a === AUX.a[p] ? [pp] : sing ? [root + "o/a", root + "o", root + "a"] : [root + "i/e", root + "i", root + "e"];
     if (!ok.includes(part)) problem("Compound tenses with the wrong participle", `${where} ${tense} ${P6[p]}: “${f}” (participle ${pp})`);
   });
 }
@@ -337,20 +347,52 @@ function checkCompound(where, inf, forms, tense, pp, aux) {
 for (const v of VERB_GYM) {
   const where = `Verbs section: ${v.it}`;
   VG_TENSES.forEach((t, i) => {
-    if (!v.f[i]) { problem("Verbs section gaps", `${where}: no ${t}`); return; }
+    // only the imperativo may be missing: verbs whose commands aren't used in practice (potere, piacere) have none
+    if (!v.f[i]) { if (t === "imperativo") count("Verbs section verbs without commands"); else problem("Verbs section gaps", `${where}: no ${t}`); return; }
     if (v.f[i].length !== 6) problem("Verb tables without six forms", `${where} ${t}`);
     if (t === "passato_prossimo") checkCompound(where, v.it, v.f[i], t, v.pp, v.aux);
     else if (conjOfFam[v.fam]) compareRegular(where, v.it, conjOfFam[v.fam], t, v.f[i]);
   });
 }
 
+// (a1) The Verbs section's English: the From English drill shows a verb's first gloss and accepts every verb
+// that lists it, so verbs sharing a first gloss must be true synonyms. Pairs checked by hand:
+const SAME_FIRST_GLOSS = new Set(["buttare/lanciare", "capire/comprendere", "chiedere/domandare", "cominciare/iniziare", "credere/ritenere",
+  "cucinare/cuocere", "dimenticare/dimenticarsi", "mandare/inviare", "notare/accorgersi", "restituire/rendere", "ricordare/ricordarsi",
+  "spostare/muovere", "stare/restare/rimanere"]);
+{
+  const byGloss = {};
+  for (const v of VERB_GYM) {
+    const en0 = String(arr(v.en)[0] || "");
+    if (!/^to /.test(en0)) problem("Verbs section glosses", `${v.it}: the first gloss “${en0}” should start with “to” (it is the From English prompt)`);
+    (byGloss[en0.toLowerCase()] = byGloss[en0.toLowerCase()] || []).push(v.it);
+    // a verb flagged as taking both auxiliaries is skipped by the essere-or-avere question, so its note must say when each is used
+    if (v.both && !(/essere/.test(v.note || "") && /avere/.test(v.note || ""))) problem("Verbs section glosses", `${v.it}: takes both auxiliaries, but its note doesn't say when essere and when avere`);
+  }
+  for (const [g, list] of Object.entries(byGloss)) if (list.length > 1 && !SAME_FIRST_GLOSS.has(list.join("/"))) look("Verbs sharing a first gloss (From English accepts both)", `“${g}”: ${list.join(", ")}; if they aren't true synonyms, add a bracket to one gloss, otherwise add them to SAME_FIRST_GLOSS`);
+}
+
+// (a2) Reflexive verbs, and compound verbs labelled -ere or -ire: the verb inside the pronouns
+// follows the rules of its conjugation too (an -ire verb may take -isc-, as its io form shows).
+for (const v of VERB_GYM) {
+  const comp = v.fam === "comp" && conjOfGroup[v.group];
+  if (v.fam !== "refl" && !comp) continue;
+  const base = baseInf(v.it);
+  const io = strip(v.f[0][0], isPron(v.it));
+  const conj = comp ? conjOfGroup[v.group] : /are$/.test(base) ? "are" : /ere$/.test(base) ? "ere" : /isco$/.test(io) ? "isc" : "ire";
+  VG_TENSES.forEach((t, i) => { if (t !== "passato_prossimo" && v.f[i]) compareRegular(`Verbs section: ${v.it}`, v.it, conj, t, v.f[i], v.note); });
+}
+
 // (b) The units: agree with the Verbs section, follow the rules, and the derived tenses
 // (subjunctive, imperative, progressive) follow from the verb's other forms.
-const CONG_PRES_IRR = ["sia", "abbia", "sappia", "dia", "stia", "debba", "vada", "faccia"];
+const CONG_PRES_IRR = ["sia", "abbia", "sappia", "dia", "stia", "debba", "vada", "faccia", "rifaccia"];
 const IRR_SUBJ = new Set(CONG_PRES_IRR.concat(CONG_PRES_IRR.map(x => x + "no")));
-const IMPER_TU_IRR = ["sii", "abbi", "sappi", "di'", "va'", "fa'", "da'", "sta'", "vai", "fai", "dai", "stai"];
+const IMPER_TU_IRR = ["sii", "abbi", "sappi", "di'", "va'", "fa'", "da'", "sta'", "vai", "fai", "dai", "stai", "rifai"];
 const IMPER_VOI_IRR = ["siate", "abbiate", "sappiate"];
 const CONG_IMPF_IRR = { essere: "fo", dare: "de", stare: "ste" };
+// Commands of pronominal verbs other than reflexives, checked by hand: the pronouns join the end of
+// tu, noi and voi (va' + te + ne → vattene) and go before Lei and Loro.
+const PRON_COMMANDS = { andarsene: "—, vattene, se ne vada, andiamocene, andatevene, se ne vadano" };
 const STARE = { presente_progressivo: ["sto", "stai", "sta", "stiamo", "state", "stanno"], passato_progressivo: ["stavo", "stavi", "stava", "stavamo", "stavate", "stavano"] };
 const CONG_AUX = { ho: "abbia", hai: "abbia", ha: "abbia", abbiamo: "abbiamo", avete: "abbiate", hanno: "abbiano", sono: null, sei: "sia", "è": "sia", siamo: "siamo", siete: "siate" };
 
@@ -362,8 +404,18 @@ function congPresRule(presB, areLike) {
   return [sing, sing, sing, [noi], [noi.replace(/iamo$/, "iate")], sing.map(s => s + "no")];
 }
 
-for (const it of allItems.filter(i => i.type === "verb")) {
-  const where = `${it.id} (${it.unit})`;
+// The Verbs section's commands and subjunctives go through the same checks as the units' (vgCheck marks
+// them, so they are not compared with themselves). Their group follows the family: -are families take the
+// -are rules, the irregular families (irr, comp, contr, pron, aux) take the -a subjunctive.
+const VG_DERIVED = ["imperativo", "congiuntivo_presente", "congiuntivo_imperfetto"];
+const vgCheckItems = VERB_GYM.map(v => {
+  const forms = {};
+  for (const t of VG_DERIVED) if (vgForms(v, t)) forms[t] = vgForms(v, t);
+  const group = ["are", "cg", "iare"].includes(v.fam) ? "-are" : conjOfFam[v.fam] || v.fam === "refl" ? undefined : "irregular";
+  return { id: `Verbs section: ${v.it}`, unit: "vb", it: v.it, group, forms, vgCheck: true };
+});
+for (const it of allItems.filter(i => i.type === "verb").concat(vgCheckItems)) {
+  const where = it.vgCheck ? it.id : `${it.id} (${it.unit})`;
   const ref = vg[it.it], pron = isPron(it.it), base = baseInf(it.it);
   const tenses = it.forms || {};
   const conj = conjOfGroup[it.group] || (ref && conjOfFam[ref.fam]) || null;
@@ -376,15 +428,17 @@ for (const it of allItems.filter(i => i.type === "verb")) {
   count("unit verbs");
   for (const [t, forms] of Object.entries(tenses)) {
     if (!Array.isArray(forms) || forms.length !== 6) { problem("Verb tables without six forms", `${where} ${t}`); continue; }
-    if (ref && VG_TENSES.includes(t)) {
+    if (ref && VG_TENSES.includes(t) && !it.vgCheck) {
+      if (!vgForms(ref, t)) { problem("Verb forms that disagree with the Verbs section", `${where} ${t}: the unit has this tense, the Verbs section has none`); continue; }
       vgForms(ref, t).forEach((g, p) => {
         count("forms shared with the Verbs section");
         if (forms[p] !== g) problem("Verb forms that disagree with the Verbs section", `${where} ${t} ${P6[p]}: unit has “${forms[p]}”, Verbs section has “${g}”`);
       });
     }
     if (conjOfGroup[it.group] || /^(reflexive|-rsi)$/.test(it.group)) { if (conj) compareRegular(where, it.it, conj, t, forms, it.note); }
-    if (t === "passato_prossimo") checkCompound(where, it.it, forms, t, ref && ref.pp, ref && ref.aux);
-    if (t === "congiuntivo_presente" && cpRule) {
+    if (AUX_OF[t]) checkCompound(where, it.it, forms, t, ref && ref.pp, ref && ref.aux);
+    if (t === "congiuntivo_presente" && cpRule && REVIEWED[base]) count("forms of hand-reviewed verbs skipped");
+    else if (t === "congiuntivo_presente" && cpRule) {
       forms.forEach((f, p) => {
         if (f === "—") return;
         count("subjunctive forms checked");
@@ -417,7 +471,10 @@ for (const it of allItems.filter(i => i.type === "verb")) {
     // loro from the present subjunctive, noi and voi as in the present. A reflexive pronoun is
     // joined to the end of tu, noi and voi, and goes before Lei and loro.
     if (t === "imperativo" && !presB) look("Imperatives with nothing to check against", `${where}: no present tense here or in the Verbs section, so “${forms.slice(1).join(", ")}” went unchecked`);
-    if (t === "imperativo" && presB) {
+    if (t === "imperativo" && PRON_COMMANDS[it.it]) {
+      if (forms.join(", ") === PRON_COMMANDS[it.it]) count("pronominal commands checked by hand");
+      else problem("Imperative forms that differ from the rule", `${where}: “${forms.join(", ")}”, checked by hand as “${PRON_COMMANDS[it.it]}”`);
+    } else if (t === "imperativo" && presB) {
       const cp = tenses.congiuntivo_presente ? tenses.congiuntivo_presente.map(f => strip(variants(f)[0], pron)) : null;
       const refl = /si$/.test(it.it);
       const lei = cp ? [cp[2]] : cpRule[2], loro = cp ? [cp[5]] : cpRule[5];
