@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v2.4)
+# Italian Practice App: Content Pack Guide (v2.5)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v7.3) actually accepts, so new packs can be written in a build chat and imported from the Data screen (or baked into the app on republish). Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v7.4) actually accepts, so new packs can be written in a build chat and imported from the Data screen (or baked into the app on republish). Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
@@ -64,6 +64,7 @@ Cards are typed in both directions. By default the Italian is shown and the Engl
 - **English → Italian:** the prompt is the first entry in `en`, so make it British and unambiguous. Where an English word has several senses, a bracket limits it: *orange (fruit)*, *floor (storey)*, *light (not heavy)*. The bracket is optional to type in the other direction (*orange* is accepted), but the "also means this" retry only pairs cards whose glosses match the prompt exactly, so if the bare word is a plain translation too, list it separately: *conoscere* has "to know (a person or place)" and "to know". A gloss that repeats a bracketed one is shown only once (*so (therefore), therefore*). A verb gloss never pairs with a noun gloss (*to fall* / *fall*).
 - Order the glosses British first; American vocabulary can follow as a later accepted answer (*holiday / vacation*, *lift / elevator*, *number plate / license plate*).
 - Notes add what the card can't show: false friends (*A false friend: …*), irregular plurals (*le uova*, *le dita*), masculine nouns in *-a* (*il problema*), nouns that don't change in the plural (*le foto*), and collective singulars (*la gente*, *la frutta*).
+- Each pack adds new words: a word appears on one flashcard only, in any pack (accents count, so *metà* and *meta* are two words), and the content check refuses a repeat. Where a close relative of an earlier word is worth knowing, the note names it rather than giving it a card of its own (pack 5's *presupposto* mentions *presupporre*). A verb's first gloss starts with *to*, so it is never paired with a noun. Later packs step up gently in difficulty: pack 5 (v7.4) is upper-intermediate, on the way to C1.
 
 **number**
 ```json
