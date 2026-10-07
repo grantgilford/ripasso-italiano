@@ -6,6 +6,7 @@ This repo is the workshop for Grant's personal Italian practice app. Read this f
 
 - `index.html` — the whole app: one self-contained HTML file (vanilla JS and CSS, no build step). Content (units, items, lessons, the Verbs section `VERB_GYM`, `ID_ALIASES`) is embedded as JS constants. The version is `APP_VERSION` near the end of the file.
 - `docs/italian-app-spec.md` — the original build spec: goals, principles, exercise types, spaced repetition, screens.
+- `docs/design-system.md` — the **Ripasso Italiano** look (Oct 2026): name, logo, colours, type, components and every screen, with mockups, logo files and fonts in `docs/design/`. Follow it for any interface work.
 - `docs/italian-app-content-guide.md` — **the standard for all content work**. Every unit, item, explanation and lesson must meet it. Read it in full before touching content.
 - `tools/check-content.js` — the content checks (`node tools/check-content.js`, add `--verbose` for every finding). Reads `index.html` and changes nothing.
 - `tools/check-new-words.js` — checks a list of candidate words for a new vocab pack against every word already in the app (`node tools/check-new-words.js words.txt`), so a pack adds only new words. The flashcard packs run from pack 1 (common words) to pack 5 (upper-intermediate); each later pack should be a gentle step up.

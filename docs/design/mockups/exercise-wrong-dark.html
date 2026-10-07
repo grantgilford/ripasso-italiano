@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Static copy of a Ripasso design mockup (October 2026). Reference only: the app itself is index.html. -->
+<meta charset="utf-8">
+<title>Piazza exercise, dark</title>
+</head>
+<body>
+<style>
+@font-face{font-family:'Bricolage Grotesque';src:url(../fonts/bricolage-grotesque-500-700.woff2) format('woff2');font-weight:500 700;font-style:normal}
+@font-face{font-family:'DM Sans';src:url(../fonts/dm-sans-400-700.woff2) format('woff2');font-weight:400 700;font-style:normal}
+@font-face{font-family:'DM Sans';src:url(../fonts/dm-sans-italic-400-500.woff2) format('woff2');font-weight:400 500;font-style:italic}
+html{background:#888}body{display:flex;justify-content:center;padding:24px 0}
+</style>
+<style>
+body{margin:0}
+a{color:#5FD3A2}a:hover{color:#8CE3BE}
+button{font:inherit}
+</style>
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #0E1512; color: #E9F0EC; font-family: 'DM Sans', sans-serif; display: flex; flex-direction: column">
+  <div style="padding: 26px 20px 0; display: flex; align-items: center; gap: 12px">
+    <button aria-label="Quit" style="all: unset; cursor: pointer; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin-left: -10px">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#9DB0A7" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+    </button>
+    <div style="flex: 1; height: 10px; background: #24302B; border-radius: 999px"><div style="width: 54%; height: 10px; background: #5FD3A2; border-radius: 999px"></div></div>
+    <span style="font-size: 14px; font-weight: 600; color: #9DB0A7">7/12</span>
+  </div>
+  <div style="flex: 1; padding: 34px 20px 0; display: flex; flex-direction: column; gap: 18px">
+    <span style="align-self: flex-start; font-size: 13px; font-weight: 600; color: #5FD3A2; background: #17211D; border-radius: 999px; padding: 6px 12px">Fill in the blank</span>
+    <div style="background: #17211D; border-radius: 22px; padding: 26px 22px; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 500; font-size: 30px; line-height: 1.25">Noi <span style="display: inline-block; min-width: 110px; border-bottom: 3px solid #E9F0EC">&#160;</span> italiano.</div>
+      <div style="font-size: 15px; color: #9DB0A7">parlare · noi · presente</div>
+    </div>
+    <label style="display: flex; flex-direction: column; gap: 8px">
+      <span style="font-size: 13px; color: #9DB0A7; font-weight: 500">Your answer</span>
+      <input type="text" value="parlamo" style="font-family: 'DM Sans', sans-serif; font-size: 22px; border: 2px solid #F0616B; background: #17211D; border-radius: 14px; padding: 14px 16px; color: #E9F0EC; outline: none">
+    </label>
+    <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px">
+      <button style="all: unset; cursor: pointer; background: #17211D; border-radius: 12px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px">à</button>
+      <button style="all: unset; cursor: pointer; background: #17211D; border-radius: 12px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px">è</button>
+      <button style="all: unset; cursor: pointer; background: #17211D; border-radius: 12px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px">é</button>
+      <button style="all: unset; cursor: pointer; background: #17211D; border-radius: 12px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px">ì</button>
+      <button style="all: unset; cursor: pointer; background: #17211D; border-radius: 12px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px">ò</button>
+      <button style="all: unset; cursor: pointer; background: #17211D; border-radius: 12px; height: 44px; display: flex; align-items: center; justify-content: center; font-size: 18px">ù</button>
+    </div>
+  </div>
+  <div style="background: #2E1418; border-radius: 26px 26px 0 0; padding: 22px 20px 26px; display: flex; flex-direction: column; gap: 10px">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <span style="width: 32px; height: 32px; border-radius: 999px; background: #F0616B; display: flex; align-items: center; justify-content: center">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1F0B0D" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"></path></svg>
+      </span>
+      <span style="font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: 22px; color: #FF9AA2">Not quite</span>
+    </div>
+    <div style="font-size: 17px; color: #E9F0EC">Answer: <span style="font-weight: 700">parliamo</span></div>
+    <div style="font-size: 15px; line-height: 1.5; color: #D9C9CB">The noi ending is always -iamo, for every verb group: parl- + iamo.</div>
+    <button style="all: unset; cursor: pointer; margin-top: 6px; background: #F0616B; color: #1F0B0D; text-align: center; padding: 16px; font-weight: 700; font-size: 16px; border-radius: 16px">Continue</button>
+  </div>
+</div>
+</body>
+</html>
