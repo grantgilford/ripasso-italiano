@@ -347,7 +347,8 @@ function checkCompound(where, inf, forms, tense, pp, aux) {
 for (const v of VERB_GYM) {
   const where = `Verbs section: ${v.it}`;
   VG_TENSES.forEach((t, i) => {
-    if (!v.f[i]) { problem("Verbs section gaps", `${where}: no ${t}`); return; }
+    // only the imperativo may be missing: verbs whose commands aren't used in practice (potere, piacere) have none
+    if (!v.f[i]) { if (t === "imperativo") count("Verbs section verbs without commands"); else problem("Verbs section gaps", `${where}: no ${t}`); return; }
     if (v.f[i].length !== 6) problem("Verb tables without six forms", `${where} ${t}`);
     if (t === "passato_prossimo") checkCompound(where, v.it, v.f[i], t, v.pp, v.aux);
     else if (conjOfFam[v.fam]) compareRegular(where, v.it, conjOfFam[v.fam], t, v.f[i]);
@@ -384,11 +385,14 @@ for (const v of VERB_GYM) {
 
 // (b) The units: agree with the Verbs section, follow the rules, and the derived tenses
 // (subjunctive, imperative, progressive) follow from the verb's other forms.
-const CONG_PRES_IRR = ["sia", "abbia", "sappia", "dia", "stia", "debba", "vada", "faccia"];
+const CONG_PRES_IRR = ["sia", "abbia", "sappia", "dia", "stia", "debba", "vada", "faccia", "rifaccia"];
 const IRR_SUBJ = new Set(CONG_PRES_IRR.concat(CONG_PRES_IRR.map(x => x + "no")));
-const IMPER_TU_IRR = ["sii", "abbi", "sappi", "di'", "va'", "fa'", "da'", "sta'", "vai", "fai", "dai", "stai"];
+const IMPER_TU_IRR = ["sii", "abbi", "sappi", "di'", "va'", "fa'", "da'", "sta'", "vai", "fai", "dai", "stai", "rifai"];
 const IMPER_VOI_IRR = ["siate", "abbiate", "sappiate"];
 const CONG_IMPF_IRR = { essere: "fo", dare: "de", stare: "ste" };
+// Commands of pronominal verbs other than reflexives, checked by hand: the pronouns join the end of
+// tu, noi and voi (va' + te + ne → vattene) and go before Lei and Loro.
+const PRON_COMMANDS = { andarsene: "—, vattene, se ne vada, andiamocene, andatevene, se ne vadano" };
 const STARE = { presente_progressivo: ["sto", "stai", "sta", "stiamo", "state", "stanno"], passato_progressivo: ["stavo", "stavi", "stava", "stavamo", "stavate", "stavano"] };
 const CONG_AUX = { ho: "abbia", hai: "abbia", ha: "abbia", abbiamo: "abbiamo", avete: "abbiate", hanno: "abbiano", sono: null, sei: "sia", "è": "sia", siamo: "siamo", siete: "siate" };
 
@@ -400,8 +404,18 @@ function congPresRule(presB, areLike) {
   return [sing, sing, sing, [noi], [noi.replace(/iamo$/, "iate")], sing.map(s => s + "no")];
 }
 
-for (const it of allItems.filter(i => i.type === "verb")) {
-  const where = `${it.id} (${it.unit})`;
+// The Verbs section's commands and subjunctives go through the same checks as the units' (vgCheck marks
+// them, so they are not compared with themselves). Their group follows the family: -are families take the
+// -are rules, the irregular families (irr, comp, contr, pron, aux) take the -a subjunctive.
+const VG_DERIVED = ["imperativo", "congiuntivo_presente", "congiuntivo_imperfetto"];
+const vgCheckItems = VERB_GYM.map(v => {
+  const forms = {};
+  for (const t of VG_DERIVED) if (vgForms(v, t)) forms[t] = vgForms(v, t);
+  const group = ["are", "cg", "iare"].includes(v.fam) ? "-are" : conjOfFam[v.fam] || v.fam === "refl" ? undefined : "irregular";
+  return { id: `Verbs section: ${v.it}`, unit: "vb", it: v.it, group, forms, vgCheck: true };
+});
+for (const it of allItems.filter(i => i.type === "verb").concat(vgCheckItems)) {
+  const where = it.vgCheck ? it.id : `${it.id} (${it.unit})`;
   const ref = vg[it.it], pron = isPron(it.it), base = baseInf(it.it);
   const tenses = it.forms || {};
   const conj = conjOfGroup[it.group] || (ref && conjOfFam[ref.fam]) || null;
@@ -414,7 +428,8 @@ for (const it of allItems.filter(i => i.type === "verb")) {
   count("unit verbs");
   for (const [t, forms] of Object.entries(tenses)) {
     if (!Array.isArray(forms) || forms.length !== 6) { problem("Verb tables without six forms", `${where} ${t}`); continue; }
-    if (ref && VG_TENSES.includes(t)) {
+    if (ref && VG_TENSES.includes(t) && !it.vgCheck) {
+      if (!vgForms(ref, t)) { problem("Verb forms that disagree with the Verbs section", `${where} ${t}: the unit has this tense, the Verbs section has none`); continue; }
       vgForms(ref, t).forEach((g, p) => {
         count("forms shared with the Verbs section");
         if (forms[p] !== g) problem("Verb forms that disagree with the Verbs section", `${where} ${t} ${P6[p]}: unit has “${forms[p]}”, Verbs section has “${g}”`);
@@ -422,7 +437,8 @@ for (const it of allItems.filter(i => i.type === "verb")) {
     }
     if (conjOfGroup[it.group] || /^(reflexive|-rsi)$/.test(it.group)) { if (conj) compareRegular(where, it.it, conj, t, forms, it.note); }
     if (AUX_OF[t]) checkCompound(where, it.it, forms, t, ref && ref.pp, ref && ref.aux);
-    if (t === "congiuntivo_presente" && cpRule) {
+    if (t === "congiuntivo_presente" && cpRule && REVIEWED[base]) count("forms of hand-reviewed verbs skipped");
+    else if (t === "congiuntivo_presente" && cpRule) {
       forms.forEach((f, p) => {
         if (f === "—") return;
         count("subjunctive forms checked");
@@ -455,7 +471,10 @@ for (const it of allItems.filter(i => i.type === "verb")) {
     // loro from the present subjunctive, noi and voi as in the present. A reflexive pronoun is
     // joined to the end of tu, noi and voi, and goes before Lei and loro.
     if (t === "imperativo" && !presB) look("Imperatives with nothing to check against", `${where}: no present tense here or in the Verbs section, so “${forms.slice(1).join(", ")}” went unchecked`);
-    if (t === "imperativo" && presB) {
+    if (t === "imperativo" && PRON_COMMANDS[it.it]) {
+      if (forms.join(", ") === PRON_COMMANDS[it.it]) count("pronominal commands checked by hand");
+      else problem("Imperative forms that differ from the rule", `${where}: “${forms.join(", ")}”, checked by hand as “${PRON_COMMANDS[it.it]}”`);
+    } else if (t === "imperativo" && presB) {
       const cp = tenses.congiuntivo_presente ? tenses.congiuntivo_presente.map(f => strip(variants(f)[0], pron)) : null;
       const refl = /si$/.test(it.it);
       const lei = cp ? [cp[2]] : cpRule[2], loro = cp ? [cp[5]] : cpRule[5];
