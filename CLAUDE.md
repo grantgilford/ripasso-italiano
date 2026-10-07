@@ -14,7 +14,11 @@ The live app is a private claude.ai artifact (https://claude.ai/artifact/1d1Zqo9
 
 - Never try to publish or deploy anything. Your job ends with a tested `index.html` on a branch.
 - The app must keep working as a single self-contained file. Don't split it into several files, add a build step, or load anything except pinned scripts from cdnjs.
-- **Progress lives in the browser's localStorage under the app's existing keys and schema.** Never rename keys or change the saved-progress format without a migration that reads the old format, since a mistake there loses Grant's real progress. When an item is removed or renamed, map its old id in `ID_ALIASES`.
+- **Progress is kept in two places, and both hold Grant's real progress:**
+  - **The browser copy**, in localStorage: `itapp.progress.v1` (progress), `itapp.packs.v1` (imported packs), `itapp.reading.v1` (last lesson section read) and `itapp.migratedV1` (a one-time flag).
+  - **The synced copy**, in the artifact's cloud database (`window.claude.use("db")`), which carries progress across devices: `progress2/meta`, `progress2/days_YYYY`, the item shards `progress2/s00`…`s15` (each record packed as a fixed-order array), plus `flags/<id>` and `packs/<id>`. The old `progress/main` document is still read once per device for migration.
+
+  Never rename a key, collection or document, change the shard count or hashing, reorder the packed record, or otherwise change either format without a migration that reads the old format. The two copies are merged on every load, so a change to one must keep the merge with the other working, and a mistake in either loses progress on every device. When an item is removed or renamed, map its old id in `ID_ALIASES`.
 
 ## How to work
 
