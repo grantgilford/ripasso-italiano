@@ -8,6 +8,7 @@ This repo is the workshop for Grant's personal Italian practice app. Read this f
 - `docs/italian-app-spec.md` — the original build spec: goals, principles, exercise types, spaced repetition, screens.
 - `docs/italian-app-content-guide.md` — **the standard for all content work**. Every unit, item, explanation and lesson must meet it. Read it in full before touching content.
 - `tools/check-content.js` — the content checks (`node tools/check-content.js`, add `--verbose` for every finding). Reads `index.html` and changes nothing.
+- `tools/check-new-words.js` — checks a list of candidate words for a new vocab pack against every word already in the app (`node tools/check-new-words.js words.txt`), so a pack adds only new words. The flashcard packs run from pack 1 (common words) to pack 5 (upper-intermediate); each later pack should be a gentle step up.
 - `tools/test-progress.js` — the progress safety test (`node tools/test-progress.js`, about a minute; needs Playwright and Chromium). Runs the real app in a headless browser and checks that saved progress, in the browser and in the synced copy, survives loading, aliases, practice sessions, syncing and a new device. `tools/item-ids.txt` lists every id that may hold progress.
 
 ## How the app reaches Grant

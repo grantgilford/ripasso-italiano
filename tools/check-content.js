@@ -151,6 +151,30 @@ for (const it of allItems) {
   if (it.unit === "u18" && !REGISTER.test(it.note || "")) problem("Unit 18 notes without a register label", `${where}: ${it.it}`);
 }
 
+/* ---------- 5b. flashcard packs ---------- */
+// Each flashcard pack adds new words: a word (its `it`, case and curly apostrophes aside; accents
+// count, so metà and meta are two words) appears in one flashcard card only. pos codes are the
+// guide's list, and a verb's first gloss (the English → Italian prompt) starts with "to".
+const FC_POS = new Set(["nm", "nf", "v", "adj", "adv", "pron", "prep", "conj", "num", "det", "int", "expr", "np", "vp", "advp"]);
+{
+  const flashUnits = new Set(Object.values(units).filter(u => u.mode === "flashcards").map(u => u.id));
+  const seenWord = {};
+  for (const it of allItems) {
+    if (!flashUnits.has(it.unit)) continue;
+    const where = `${it.id} (${it.unit})`;
+    count("flashcard cards");
+    if (!String(it.pos || "").split("/").every(p => FC_POS.has(p))) problem("Flashcard pos codes not in the guide", `${where}: “${it.pos}”`);
+    if (!arr(it.en).length) problem("Flashcards without English", where);
+    for (const w of arr(it.it)) {
+      const k = String(w).toLowerCase().replace(/[’‘]/g, "'").replace(/\s+/g, " ").trim();
+      if (seenWord[k]) problem("Flashcard words repeated across packs", `“${w}” is ${seenWord[k]} and ${where}`);
+      else seenWord[k] = where;
+    }
+    const en0 = String(arr(it.en)[0] || "");
+    if (String(it.pos).split("/")[0] === "v" && !/^to /.test(en0)) look("Flashcard verbs whose prompt lacks “to”", `${where}: “${en0}”`);
+  }
+}
+
 /* ---------- 6. unit notes and the review-unit tags ---------- */
 const REVIEW_TAGS = ["Essere & basics", "Nouns & articles", "Present tense", "Irregular verbs", "Verb tenses", "Adjectives", "Numbers", "Adverbs", "Questions", "Prepositions", "Conjunctions", "Subjunctive", "Object pronouns", "Formal & informal", "Time", "Longer sentences"];
 for (const u of Object.values(units)) {
