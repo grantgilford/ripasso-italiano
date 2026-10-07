@@ -274,7 +274,7 @@ const REVIEWED = {
   cucire: "keeps the i so the c stays soft: cucio, cuciono",
 };
 
-function compareRegular(where, inf, conj, tense, forms) {
+function compareRegular(where, inf, conj, tense, forms, note = "") {
   const base = baseInf(inf);
   const exp = regular(base, conj, tense);
   if (!exp) return;
@@ -283,7 +283,12 @@ function compareRegular(where, inf, conj, tense, forms) {
   forms.forEach((f, p) => {
     if (f === "—") return;
     count("forms checked against the regular rules");
-    if (!variants(f).map(x => strip(x, isPron(inf))).some(g => exp[p].includes(g))) diffs.push(`${P6[p]} “${f}” (pattern: ${exp[p][0]})`);
+    const got = variants(f).map(x => strip(x, isPron(inf)));
+    if (got.some(g => exp[p].includes(g))) return;
+    // A shortened future (vedere → vedrò, condizionale vedrei) keeps the -ere label, as in the
+    // Verbs section, as long as the verb's note says so.
+    if (conj === "ere" && /^(futuro|condizionale)$/.test(tense) && got.includes(base.slice(0, -3) + exp[p][0].slice(base.length - 2)) && /futur/i.test(note)) { count("shortened futures named in the note"); return; }
+    diffs.push(`${P6[p]} “${f}” (pattern: ${exp[p][0]})`);
   });
   if (diffs.length) look("Verb forms that differ from the regular pattern", `${where}, labelled regular ${conj === "isc" ? "-ire (-isc-)" : "-" + conj}, ${tense.replace("_", " ")}: ${diffs.join("; ")}`);
 }
@@ -353,7 +358,7 @@ for (const it of allItems.filter(i => i.type === "verb")) {
         if (forms[p] !== g) problem("Verb forms that disagree with the Verbs section", `${where} ${t} ${P6[p]}: unit has “${forms[p]}”, Verbs section has “${g}”`);
       });
     }
-    if (conjOfGroup[it.group] || /^(reflexive|-rsi)$/.test(it.group)) { if (conj) compareRegular(where, it.it, conj, t, forms); }
+    if (conjOfGroup[it.group] || /^(reflexive|-rsi)$/.test(it.group)) { if (conj) compareRegular(where, it.it, conj, t, forms, it.note); }
     if (t === "passato_prossimo") checkCompound(where, it.it, forms, t, ref && ref.pp, ref && ref.aux);
     if (t === "congiuntivo_presente" && cpRule) {
       forms.forEach((f, p) => {

@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v2.3)
+# Italian Practice App: Content Pack Guide (v2.4)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v7.2) actually accepts, so new packs can be written in a build chat and imported from the Data screen (or baked into the app on republish). Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v7.3) actually accepts, so new packs can be written in a build chat and imported from the Data screen (or baked into the app on republish). Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
@@ -77,7 +77,7 @@ Drilled both ways (digits → word, word → digits); explanations of the compos
   "forms": { "presente": ["finisco", "finisci", "finisce", "finiamo", "finite", "finiscono"] },
   "note": "-isc- appears in every form except noi and voi." }
 ```
-Forms are always ordered io, tu, lui/lei, noi, voi, loro. Add tenses as extra keys (`passato_prossimo`, `futuro`). `group` is `-are`, `-ere`, `-ire` (regular, and the app then explains stem + ending) or a label like `irregular`; add `note` for spelling changes. A person that doesn't exist is written "—": *succedere*, used only of things that happen, has "—", "—", "succede", "—", "—", "succedono", and the drills skip the gaps. When a verb takes both auxiliaries, the note says when, as the Verbs section does for *finire*: *avere* with an object (*ho finito il libro*), *essere* when something comes to an end (*il film è finito*).
+Forms are always ordered io, tu, lui/lei, noi, voi, loro. Add tenses as extra keys (`passato_prossimo`, `futuro`). `group` is `-are`, `-ere`, `-ire` (the app then introduces the verb as "an -ere verb" and explains each regular form as stem + ending) or a label like `irregular`; add `note` for spelling changes. A verb that follows its conjugation apart from a shortened future or an irregular participle keeps its `-ere` (or `-ire`) label, as in the Verbs section, and its `note` names the exception: *vedere* is `-ere`, with the note "Participle visto; shortened future stem vedr- (vedrò)." The content check accepts a shortened future only when the note mentions the future. A person that doesn't exist is written "—": *succedere*, used only of things that happen, has "—", "—", "succede", "—", "—", "succedono", and the drills skip the gaps. When a verb takes both auxiliaries, the note says when, as the Verbs section does for *finire*: *avere* with an object (*ho finito il libro*), *essere* when something comes to an end (*il film è finito*).
 
 **sentence**
 ```json
