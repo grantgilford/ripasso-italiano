@@ -428,6 +428,16 @@ details > summary { cursor: pointer; }
 .hit { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; }
 .hit .unit { color: var(--muted); font-size: 13px; }
 .hit .conjtable { margin-top: 4px; }
+/* ---------- the installed copy: notices on Today, the leave-session sheet ---------- */
+.notice { display: flex; flex-direction: column; gap: 8px; }
+.notice-h { display: flex; align-items: center; gap: 8px; }
+.notice-h .ico { flex: none; color: var(--accent); }
+#n-save .notice-h .ico { color: var(--bad); }
+.notice p { margin: 0 0 4px; font-size: 15px; line-height: 1.45; }
+.sheet-bg { position: fixed; inset: 0; z-index: 50; display: flex; align-items: flex-end; justify-content: center; padding: 16px; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: rgba(5, 12, 9, .55); }
+.sheet { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 480px; padding: 20px; box-shadow: 0 8px 32px rgba(0, 0, 0, .25); }
+.sheet p { margin: 0 0 8px; font-size: 15px; }
+.sheet:focus { outline: none; }
 @media (max-width: 374px) {
   .seg.mini > button { padding: 0 6px; }
   .srow.static { gap: 10px; }
@@ -4080,7 +4090,8 @@ function loadLocal() {
 }
 function saveProgress(touch = true) {
   if (touch) progress.updatedAt = now();
-  lsSet(LS_PROGRESS, progress);
+  const ok = lsSet(LS_PROGRESS, progress);
+  if (ok !== !S.saveFailed) { S.saveFailed = !ok; if (S.screen === "home") render(); } // Today warns while the device refuses to save
   scheduleSync();
 }
 
@@ -5592,7 +5603,7 @@ function buildSession(kind, unitId) {
 function startSession(kind, unitId) {
   const s = buildSession(kind, unitId);
   if (!s.queue.length) { S.flash = "Nothing to practise right now."; S.scrollTo = S.screen === "home" ? null : "flash"; render(); return; }
-  session = s; S.screen = "session"; S.feedback = null; S.revealed = false; S.picked = null; S.bankPicked = [];
+  session = s; S.screen = "session"; S.feedback = null; S.leaveAsk = false; S.revealed = false; S.picked = null; S.bankPicked = [];
   render();
 }
 function current() { return session && session.queue[session.pos]; }
@@ -5688,7 +5699,7 @@ function render() {
   const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
   app.className = S.screen === "session" ? "session" : bare ? "notabs" : "";
   const flash = S.flash && S.screen !== "home" && !bare ? `<div class="card flash" id="flash" role="status">${esc(S.flash)}</div>` : "";
-  app.innerHTML = flash + fn() + (bare ? "" : tabBar());
+  app.innerHTML = flash + fn() + (bare ? "" : tabBar()) + (S.screen === "session" && S.leaveAsk ? leaveSheetHtml() : "");
   nbHyphens(app);
   if (prev !== key) { S.viewKey = key; window.scrollTo(0, (/^(units|rules|lookup|reference)/.test(key) && mem[key]) || 0); }
   if (S.jumpSec != null) { const t = S.screen === "reference" && document.getElementById("lsec-" + S.jumpSec); S.jumpSec = null; if (t) t.scrollIntoView({ block: "start" }); }
@@ -5697,6 +5708,7 @@ function render() {
   wire();
   if (S.screen === "home") fitTip();
   if (S.screen === "reference") markLessonChip();
+  syncHistory();
 }
 function nbHyphens(root) { // a hyphen that starts a word (-iamo, (-ato), -o/-a) becomes a non-breaking hyphen, so the line can't break after it
   const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode: (n) => /(^|[\s(\/])-\p{L}/u.test(n.nodeValue) && !(n.parentElement && n.parentElement.closest("textarea, script, style")) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT });
@@ -5850,6 +5862,7 @@ function renderHome() {
   <span class="ring${String(xp).length + String(goal).length > 4 ? " long" : ""}" role="img" aria-label="Today: ${xp} of ${goal} XP"><svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true"><circle class="ring-t" cx="26" cy="26" r="22"/>${arc > 0 ? `<circle class="ring-v" cx="26" cy="26" r="22" stroke-dasharray="${arc.toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 26 26)"/>` : ""}</svg><span aria-hidden="true">${xp}/${goal}</span></span></div></header>`;
   if (dbState === "error") h += `<button type="button" class="syncnote" data-go="data">${icon("cloud", 16)}${esc(syncLabel())}</button>`;
   if (S.flash) h += `<div class="card flash" role="status">${esc(S.flash)}</div>`;
+  h += noticeHtml();
   if (unit) {
     const us = unitStats(unit.id);
     h += `<button type="button" class="hero" data-start="continue"><span class="hero-top"><span class="hero-chip">${esc(unitEyebrow(unit))}</span><span>${us.pct}% learned</span></span>
@@ -6196,9 +6209,12 @@ function renderData() {
   <section class="card dsec" id="sec-sync"><h2>Sync</h2><p class="muted">${esc(syncDetail())}</p>${S.report ? `<div class="report" role="status">${esc(S.report)}</div>` : ""}</section>
   <section class="card dsec" id="sec-flags"><h2>Flagged items</h2>` + (fl.length ? `<p class="small muted">${fl.length} item${fl.length === 1 ? "" : "s"} flagged. Ask Claude to review your flagged items and they can be fixed in the next update.</p><div>` + fl.map(([k, f]) => `<div class="frow"><div><div>${esc(f.prompt)}</div><div class="small muted">${esc((content.unitById[f.unit] || {}).title || f.unit)} · expected ${esc(f.expected)}${f.given ? " · you gave " + esc(f.given) : ""}</div>${f.note ? `<div class="small">${esc(f.note)}</div>` : ""}</div><button type="button" data-unflag="${esc(k)}">Remove</button></div>`).join("") + `</div>`
       : `<p class="small muted">None yet. Use Flag this item under any answer that looks wrong.</p>`) + `</section>
+  ${appSectionHtml()}
   <section class="card dsec" id="sec-backup"><h2>Progress backup</h2>
-  <div class="btnrow wrap">${S.downloadsOk || S.standalone ? `<button type="button" data-act="downloadProgress">Save backup file</button>` : ""}<button type="button" data-act="pickProgress">Load backup file</button><button type="button" data-act="exportProgress">Show backup text</button></div>
-  <input type="file" id="progressFile" accept=".json,application/json" style="display:none">
+  <p class="small muted">A backup file holds all your progress. Keep one somewhere safe, such as Google Drive, and load it to restore your progress or move it to another device; loading merges it with what's here, so nothing is lost.</p>
+  ${S.standalone ? `<p class="small">${esc(lastBackupText())}</p>` : ""}
+  <div class="btnrow wrap">${S.standalone && canShareBackup() ? `<button type="button" class="primary" data-act="shareProgress">Share backup…</button>` : ""}${S.downloadsOk || S.standalone ? `<button type="button" data-act="downloadProgress">Save backup file</button>` : ""}<button type="button" data-act="pickProgress">Load backup file</button><button type="button" data-act="exportProgress">Show backup text</button></div>
+  <input type="file" id="progressFile" style="display:none">
   ${S.exportText ? `<label class="vh" for="exportText">Backup text</label><textarea id="exportText" readonly>${esc(S.exportText)}</textarea><p class="small muted">Select all and copy, or paste a backup below to restore.</p>` : ""}
   <label class="vh" for="progressText">Paste a progress backup</label><textarea id="progressText" placeholder="Paste a progress backup here"></textarea>
   <div class="btnrow"><button type="button" data-act="importProgress">Import progress</button></div></section>
@@ -6217,7 +6233,7 @@ function wire() {
   app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
     const g = b.dataset.go;
     S.flash = null; S.report = null; S.exportText = null;
-    if (g === "quit") { session = null; S.feedback = null; S.screen = "home"; }
+    if (g === "quit") { session = null; S.feedback = null; S.leaveAsk = false; S.screen = "home"; }
     else S.screen = g;
     S.scrollTo = b.dataset.to || null; // a You row can open a screen at one of its sections
     render();
@@ -6247,12 +6263,14 @@ function wire() {
   app.querySelectorAll("[data-useg]").forEach(b => b.onclick = () => { S.unitSeg = b.dataset.useg; render(); });
   app.querySelectorAll("[data-appearance]").forEach(b => b.onclick = () => setTheme(b.dataset.appearance));
   const pk = document.getElementById("sec-packs"); if (pk) pk.ontoggle = () => { S.packsOpen = pk.open; };
+  const sb = document.getElementById("sheetBg");
+  if (sb) { sb.onclick = (e) => { if (e.target === sb) action("stay"); }; const k = sb.querySelector(".sheet"); if (k) k.focus({ preventScroll: true }); } // focus moves into the sheet (and the keyboard closes)
   const inp = document.getElementById("answer");
-  if (inp && !S.feedback) { inp.focus(); }
+  if (inp && !S.feedback && !S.leaveAsk) { inp.focus(); }
   const cellInputs = app.querySelectorAll("[data-cell]");
   cellInputs.forEach(c => c.onfocus = () => { S.focusId = c.id; });
-  if (cellInputs.length && !S.feedback) cellInputs[0].focus();
-  if (S.feedback) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
+  if (cellInputs.length && !S.feedback && !S.leaveAsk) cellInputs[0].focus();
+  if (S.feedback && !S.leaveAsk) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
   const lb = document.getElementById("lookupBox");
   if (lb) { lb.oninput = () => { const pos = lb.selectionStart; S.lookup = lb.value; render(); const n = document.getElementById("lookupBox"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }; if (!S.lookup) lb.focus(); }
   const rf = document.getElementById("refFilter");
@@ -6303,12 +6321,19 @@ function action(a) {
     case "pickProgress": document.getElementById("progressFile").click(); break;
     case "exportProgress": S.exportText = backupText(); render(); break;
     case "downloadProgress": downloadProgress(); break;
+    case "shareProgress": case "backupNow": backupNow(); break;
+    case "backupLater": setBackupInfo({ snooze: now() + 3 * 864e5 }); render(); break;
+    case "welcomeDone": setBackupInfo({ welcomed: true }); render(); break;
+    case "stay": S.leaveAsk = false; render(); break;
+    case "applyUpdate": applyUpdate(); break;
+    case "updateLater": S.updateLater = true; render(); break;
+    case "checkUpdate": checkForUpdate(true); break;
     case "importProgress": {
       const txt = document.getElementById("progressText").value.trim();
       let obj; try { obj = JSON.parse(txt); } catch (e) { S.report = "Not valid JSON: " + e.message; render(); return; }
       if (!obj || (obj.v !== 1 && obj.v !== 2) || typeof obj.items !== "object") { S.report = "This doesn't look like a progress backup."; render(); return; }
       progress = mergeProgress(progress, obj); buildContent(); saveProgress();
-      S.report = "Progress imported and merged (newest record per item wins)."; render(); break;
+      S.report = "Backup loaded: its progress is now merged with what was here (for each item, the newest record is kept)."; render(); break;
     }
     case "reset":
       if (confirm("Reset all progress? This cannot be undone.")) {
@@ -6321,6 +6346,7 @@ function action(a) {
 }
 document.addEventListener("keydown", (e) => {
   if (S.screen !== "session" || !session) return;
+  if (S.leaveAsk) { if (e.key === "Escape") action("stay"); return; }
   const q = current(); if (!q) return;
   const tag = (e.target && e.target.tagName) || "";
   if (e.key === "Enter") {
@@ -6411,7 +6437,7 @@ let db = null, dbState = "checking", syncTimer = null, lastPushed = {}, writing 
 function syncLabel() { return { checking: "", off: "Saved on this device", on: "Synced", error: "Sync error, saved locally" }[dbState] || ""; }
 function syncDetail() {
   return { checking: "Checking for cloud sync…",
-    off: S.standalone ? "This is a standalone copy: progress is saved in this browser only. Use Save backup file to keep a copy or move it to another device." : "Progress is saved in this browser only. Cloud sync isn't available in this view, so use Export progress to move it to another device.",
+    off: S.standalone ? "This copy keeps your progress on this device only (cloud sync works only inside claude.ai). Make a backup now and then, to keep a copy or move your progress to another device." + (S.persisted === true ? " The phone has agreed to keep this storage even when space runs low." : S.persisted === false && HOSTED ? " The phone hasn't yet agreed to keep this storage when space runs low; installing the app usually fixes that." : "") : "Progress is saved in this browser only. Cloud sync isn't available in this view, so use Export progress to move it to another device.",
     on: "Progress is saved in this browser and synced to your Claude account, so it follows you across devices.",
     error: "Cloud sync hit an error; progress is still saved in this browser." }[dbState];
 }
@@ -6493,23 +6519,144 @@ function saveBlob(filename, text) {
   a.download = filename; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
+function say(msg) { if (S.screen === "data") S.report = msg; else S.flash = msg; } // a message on Your data, or a note at the top of other screens
+const backupName = (ext) => "ripasso-backup-" + dayKey(now()) + "." + ext;
 async function downloadProgress() {
-  const filename = "italian-progress-" + dayKey(now()) + ".json";
+  const filename = backupName("json");
   if (S.downloads) {
-    try { await S.downloads.save({ filename, data: backupText() }); }
-    catch (e) { if (e && e.code !== "declined") { S.report = "Could not save the file (" + (e.code || "error") + "). Use Export progress instead."; render(); } }
-  } else if (S.standalone) saveBlob(filename, backupText());
+    try { await S.downloads.save({ filename, data: backupText() }); markBackedUp(); }
+    catch (e) { if (e && e.code !== "declined") { S.report = "Could not save the file (" + (e.code || "error") + "). Use Show backup text instead."; render(); } }
+  } else if (S.standalone) { saveBlob(filename, backupText()); markBackedUp(); say("Backup saved to your downloads as " + filename + "."); render(); }
+}
+
+/* ---------- the installed copy: offline worker, back button, backups on this device, updates ----------
+   The app can also be served from its own website (GitHub Pages) and installed on a phone from there.
+   Everything here is for that copy and for other copies outside claude.ai; inside claude.ai the
+   artifact page is managed for us, so none of it runs there. */
+const IN_CLAUDE = !!(window.claude && window.claude.use);
+const HOSTED = !IN_CLAUDE && "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost");
+const LS_BACKUP = "itapp.backup.v1"; // per device, never synced: { at: last backup, snooze: no reminder before, welcomed: the first-run card was dismissed }
+const backupInfo = () => lsGet(LS_BACKUP) || {};
+function setBackupInfo(o) { lsSet(LS_BACKUP, Object.assign(backupInfo(), o)); }
+function markBackedUp() { setBackupInfo({ at: now(), snooze: 0 }); }
+const isInstalled = () => !!(window.matchMedia && (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches));
+function ago(t) {
+  const d = Math.floor((now() - t) / 864e5);
+  return d <= 0 ? "today" : d === 1 ? "yesterday" : d < 14 ? d + " days ago" : d < 60 ? Math.floor(d / 7) + " weeks ago" : Math.floor(d / 30) + " months ago";
+}
+function lastBackupText() { const b = backupInfo(); return b.at ? "Last backup from this device: " + ago(b.at) + "." : "No backup from this device yet."; }
+
+// Sharing a backup opens Android's share menu (Drive, Gmail, Files…). Phones only share a few file types, so the shared file is plain text; it holds the same backup as the .json file.
+function canShareBackup() { try { return !!(navigator.share && navigator.canShare && navigator.canShare({ files: [new File(["{}"], "t.txt", { type: "text/plain" })] })); } catch (e) { return false; } }
+async function shareProgress() { // falls back to saving the file where sharing isn't available
+  if (!canShareBackup()) { downloadProgress(); return; }
+  const f = new File([backupText()], backupName("txt"), { type: "text/plain" });
+  try { await navigator.share({ files: [f], title: "Ripasso backup" }); markBackedUp(); say("Backup shared. To restore it, use Load backup file in Your data and choose that file."); }
+  catch (e) { if (!e || e.name !== "AbortError") say("Could not share the backup. Use Save backup file in Your data instead."); }
+  render();
+}
+const backupNow = () => shareProgress();
+
+// Ask the phone to keep this app's storage even when space runs low (installed apps are usually allowed).
+function protectStorage() {
+  if (!(navigator.storage && navigator.storage.persist)) return;
+  navigator.storage.persisted().then(p => p || navigator.storage.persist()).then(p => { S.persisted = !!p; if (S.screen === "data") render(); }).catch(() => { });
+}
+
+// One card at a time on Today, the most urgent first: progress couldn't be saved, an update, the first-run welcome, a backup reminder.
+function noticeHtml() {
+  const card = (id, ic, title, text, buttons) => `<section class="card notice" id="${id}" aria-labelledby="${id}-t"><h2 class="label notice-h" id="${id}-t">${icon(ic, 20, 2)}<span>${title}</span></h2><p class="small muted">${text}</p><div class="btnrow">${buttons}</div></section>`;
+  if (S.saveFailed) return card("n-save", "info", "Progress couldn't be saved", "This device refused to save your latest answers. Back up now so nothing is lost, then free some space on the phone.", `<button type="button" class="primary" data-act="backupNow">Back up now</button>`);
+  if (S.update && !S.updateLater) return card("n-update", "review", `Ripasso ${esc(S.update.version || "")} is ready`, "A new version has been downloaded. Updating takes a second and keeps all your progress.", `<button type="button" class="primary" data-act="applyUpdate">${S.applying ? "Updating…" : "Update now"}</button><button type="button" data-act="updateLater">Later</button>`);
+  if (!HOSTED) return "";
+  const b = backupInfo(), practised = Object.keys(progress.items).length > 0;
+  if (!practised && !b.welcomed && !b.at) return card("n-welcome", "you", "New on this device?", "If you've practised in another copy of Ripasso, such as the claude.ai one, load its backup file to bring your progress here.", `<button type="button" class="primary" data-go="data" data-to="sec-backup">Load a backup</button><button type="button" data-act="welcomeDone">Start fresh</button>`);
+  const due = practised && (progress.updatedAt || 0) > (b.at || 0) && now() - (b.at || 0) > 7 * 864e5 && now() > (b.snooze || 0);
+  if (due) return card("n-backup", "download", "Back up your progress", `Your progress is kept only on this phone. ${b.at ? "Your last backup was " + ago(b.at) + "." : "You haven't made a backup yet."}`, `<button type="button" class="primary" data-act="backupNow">Back up now</button><button type="button" data-act="backupLater">Later</button>`);
+  return "";
+}
+
+/* the offline worker and updates (sw.js) */
+function initInstall() {
+  if (!HOSTED) return;
+  const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l);
+  navigator.serviceWorker.addEventListener("message", e => onWorkerMessage(e.data || {}));
+  navigator.serviceWorker.register("sw.js").catch(e => { S.offlineError = true; console.warn("offline copy unavailable", e); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
+  protectStorage();
+  checkForUpdate();
+}
+function checkForUpdate(manual) {
+  if (!HOSTED) return;
+  if (manual) { S.updateState = "checking"; render(); }
+  navigator.serviceWorker.ready.then(r => { if (r.active) r.active.postMessage({ type: "check" }); }).catch(() => { });
+}
+function onWorkerMessage(m) {
+  if (m.type === "update") { S.update = { version: m.version || "" }; S.updateState = "ready"; }
+  else if (m.type === "current") { S.update = null; S.updateState = "current"; }
+  else if (m.type === "offline") { S.updateState = S.update ? "ready" : "offline"; }
+  else if (m.type === "applied") { location.reload(); return; }
+  if (S.screen === "home" || S.screen === "data") render();
+}
+function applyUpdate() {
+  if (session || S.applying) return; // never mid-session
+  S.applying = true; render();
+  navigator.serviceWorker.ready.then(r => r.active.postMessage({ type: "apply" })).catch(() => location.reload());
+  setTimeout(() => location.reload(), 6000); // in case the worker doesn't answer
+}
+function appSectionHtml() {
+  if (!HOSTED) return "";
+  const st = { checking: "Checking for a new version…", current: "You have the latest version.", offline: "Couldn't check for updates: no connection.", ready: S.update && S.update.version ? `Version ${esc(S.update.version)} is ready to install.` : "A new version is ready to install." }[S.updateState] || "";
+  return `<section class="card dsec" id="sec-app"><h2>App</h2>
+  <p class="muted">Version ${esc(APP_VERSION)} · ${isInstalled() ? "installed on this device" : "open in the browser"}. ${S.offlineError ? "The offline copy couldn't be set up, so the app needs a connection to open." : "It opens and works without a connection."}</p>
+  ${isInstalled() ? "" : `<p class="small muted">To install it, open the browser menu (⋮) and choose Install app or Add to Home screen.</p>`}
+  ${st ? `<p class="small" role="status">${st}</p>` : ""}
+  <div class="btnrow">${S.update ? `<button type="button" class="primary" data-act="applyUpdate">${S.applying ? "Updating…" : "Update now"}</button>` : `<button type="button" data-act="checkUpdate">Check for updates</button>`}</div></section>`;
+}
+
+/* the back button: Android's back gesture (and the browser's) steps back through the app's screens instead of closing it.
+   While away from Today, one extra history entry is kept; going back uses it up, and the app goes back one screen and adds it again.
+   On Today there is none, so back leaves the app as usual. In a practice session, back first asks before leaving. */
+const BACK_ON = !IN_CLAUDE && !!(window.history && history.pushState);
+let navGuard = false, navSkip = 0;
+if (BACK_ON && history.state && history.state.ripasso) navGuard = true; // a reload kept the entry from last time
+function syncHistory() {
+  if (!BACK_ON) return;
+  const want = S.screen !== "home";
+  if (want && !navGuard) { history.pushState({ ripasso: 1 }, ""); navGuard = true; }
+  else if (!want && navGuard) { navGuard = false; navSkip++; history.back(); }
+}
+window.addEventListener("popstate", () => {
+  if (!BACK_ON) return;
+  if (navSkip) { navSkip--; return; }
+  navGuard = false;
+  goBack();
+});
+function goBack() {
+  S.flash = null; S.report = null; S.exportText = null;
+  if (S.screen === "session" && session) { S.leaveAsk = !S.leaveAsk; render(); return; }
+  if (S.screen === "home") { render(); return; }
+  const back = app.querySelector(".hdr .back");
+  if (back && S.screen !== "summary") { back.click(); return; }
+  if (S.screen === "summary") session = null;
+  S.screen = "home"; render();
+}
+function leaveSheetHtml() {
+  return `<div class="sheet-bg" id="sheetBg"><div class="card sheet" tabindex="-1" role="alertdialog" aria-modal="true" aria-labelledby="leave-t" aria-describedby="leave-d">
+  <h2 class="label" id="leave-t">Leave this session?</h2><p class="small muted" id="leave-d">The answers you've given so far are already saved.</p>
+  <div class="btnrow"><button type="button" class="primary" data-act="stay">Keep practising</button><button type="button" data-go="quit">Leave</button></div></div></div>`;
 }
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "8.0";
+const APP_VERSION = "8.1";
 applyTheme(themePref());
 loadLocal();
 buildContent();
 saveProgress(false);
 render();
 initSync();
+initInstall();
 if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.screen === "home") fitTip(); }); // the tip card is measured again once the fonts are in
 </script>
 </body>

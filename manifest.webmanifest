@@ -1,0 +1,18 @@
+{
+  "name": "Ripasso Italiano",
+  "short_name": "Ripasso",
+  "description": "Short typed Italian exercises with spaced repetition, lessons, verb drills and vocabulary packs.",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "lang": "en-GB",
+  "background_color": "#F3F6F4",
+  "theme_color": "#F3F6F4",
+  "icons": [
+    { "src": "icons/ripasso-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/ripasso-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/ripasso-icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/ripasso-icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
