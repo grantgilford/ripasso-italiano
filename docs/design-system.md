@@ -413,7 +413,7 @@ A small card at the bottom of Today showing one short Italian tidbit, picked fro
 - Any change to content, scoring, scheduling, sync, backup formats or storage keys, apart from the one new device-only key `itapp.theme.v1`.
 - New features beyond the You screen, the theme setting and the tip card.
 - Publishing or deploying (Grant republishes from a chat, as always).
-- A manifest or service worker. The PNG icons are there for a future offline copy; don't wire them up now.
+- A manifest or service worker. (Added afterwards, in version 8.1: see `CLAUDE.md`. The installed copy uses the PNG icons via `icons/`.)
 
 ---
 
