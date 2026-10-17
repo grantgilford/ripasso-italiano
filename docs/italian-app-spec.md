@@ -4,12 +4,12 @@ Owner: Grant Gilford. Purpose: personal study tool, not a commercial product.
 
 ## 1. Goal and principles
 
-A text-only practice app that copies Duolingo's mechanics (short lessons, mixed exercise types, spaced repetition, XP and streaks) without its visual layer. It should feel fast and quiet. Every screen exists to put an Italian prompt in front of the learner and check the answer.
+A text-first practice app (with Italian read aloud on request, from v8.2) that copies Duolingo's mechanics (short lessons, mixed exercise types, spaced repetition, XP and streaks) without its visual layer. It should feel fast and quiet. Every screen exists to put an Italian prompt in front of the learner and check the answer.
 
 Design principles, in priority order:
 
 1. **Learning first.** Typed production (writing the Italian) is favored over recognition (picking from options), because it builds real recall.
-2. **No decoration.** No mascots, animations, confetti, sounds, images, or audio. Feedback is plain text, with color only as a secondary cue.
+2. **No decoration.** No mascots, animations, confetti, sound effects, or images. Feedback is plain text, with color only as a secondary cue. The one sound is Italian read aloud (from v8.2): a speaker beside the Italian plays it in the device's own voice, only when tapped.
 3. **Content is data.** Vocabulary, sentences, verbs, and grammar questions live in a JSON format, separate from app logic. New content can be added without rebuilding the app.
 4. **The content is the source of truth for grammar.** The app never derives articles, plurals, or conjugations itself. It only uses what the content states.
 5. **Mobile first, desktop friendly.** One column, large tap targets, full keyboard support on desktop.
@@ -186,7 +186,7 @@ To be confirmed against where the learner currently is. Proposed A1 units, about
 
 ## 14. Out of scope
 
-Audio, speech recognition, images, animations, sound effects, accounts, social features, leaderboards, ads, and anything commercial.
+Recorded audio, speech recognition, images, animations, sound effects, accounts, social features, leaderboards, ads, and anything commercial. (Read aloud by the device's own voice came in with v8.2; listening exercises and speech recognition may follow.)
 
 ## 15. Open questions for Grant
 

@@ -104,6 +104,22 @@ button:active:not(:disabled) { opacity: .8; }
 .btnrow.wrap > button { flex: 1 1 auto; }
 .btnrow.end { justify-content: flex-end; }
 .iconbtn { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--fg); }
+/* ---------- read aloud: a speaker beside Italian text. Its icon is a mask on the button, so the thousands of verb tables stay light. ---------- */
+:root {
+  --say-ico: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z'/%3E%3Cpath d='M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.7 7.7 0 0 1 0 11'/%3E%3C/svg%3E");
+  --say-stop: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='6.5' y='6.5' width='11' height='11' rx='2.5' fill='%23000'/%3E%3C/svg%3E");
+}
+.say { display: inline-flex; align-items: center; justify-content: center; flex: none; width: 44px; height: 44px; margin: -11px -10px -11px -6px; vertical-align: middle; border-radius: 999px; color: var(--accent); }
+.say::before { content: ""; width: 20px; height: 20px; background: currentColor; -webkit-mask: var(--say-ico) center / contain no-repeat; mask: var(--say-ico) center / contain no-repeat; }
+.say.on::before { -webkit-mask-image: var(--say-stop); mask-image: var(--say-stop); }
+.say.solo { margin: 0; background: var(--tint); }
+.say.solo::before { width: 22px; height: 22px; }
+.sayrow { display: flex; align-items: flex-start; gap: 10px; }
+.sayrow > :first-child { flex: 1; min-width: 0; }
+.dlg-all { justify-self: start; margin: -6px 0 -6px -10px; color: var(--accent); }
+.dlg-all .ico { color: var(--accent); }
+.dlg-all.on .lbl-play, .dlg-all:not(.on) .lbl-stop { display: none; }
+.nosay [data-say], .nosay [data-conj] { display: none !important; } /* read aloud is off, or the device has no Italian voice */
 /* ---------- inputs ---------- */
 input[type=text], textarea, select { display: block; width: 100%; font: inherit; font-size: 16px; color: var(--fg); background: var(--field); border: 2px solid var(--line); border-radius: 14px; padding: 13px 15px; outline: none; -webkit-appearance: none; appearance: none; }
 input[type=text]:focus, textarea:focus, select:focus { border-color: var(--accent); }
@@ -179,6 +195,7 @@ label { display: block; }
 .tip-h { display: flex; align-items: center; gap: 6px; font-size: 13px; }
 .tip-h .ico { color: var(--accent); }
 .tip-it { font-weight: 600; color: var(--accent); }
+.tip-h > .say { margin: -14px -10px -14px auto; }
 .tip p { margin: 0; font-size: 15px; line-height: 1.45; }
 /* ---------- Units ---------- */
 .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--seg); }
@@ -267,6 +284,9 @@ th { color: var(--muted); font-size: 13px; font-weight: 600; vertical-align: bot
 .gcard { padding: 8px 16px; }
 .gitem { padding: 10px 0; }
 .gitem + .gitem { border-top: 1px solid var(--line); }
+.conj { display: flex; align-items: flex-start; gap: 6px; }
+.conj > .conjtable { flex: 1; min-width: 0; }
+.conj > .say { margin: -6px -10px 0 0; }
 .conjtable { font-size: 16px; font-weight: 500; line-height: 1.55; }
 .conjtable span { display: inline-block; width: 4.5em; color: var(--muted); font-size: 14px; font-weight: 400; }
 .conjtable.subj span { width: 5.6em; white-space: nowrap; }
@@ -285,6 +305,8 @@ details > summary { cursor: pointer; }
 .sx { display: flex; flex-direction: column; gap: 18px; padding: 28px 0 32px; }
 .chip-type { align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: var(--chip-type); color: var(--accent); font-size: 13px; font-weight: 600; }
 .prompt-card { border-radius: 22px; padding: 26px 22px; }
+.prompt-card > .say { margin: -6px -8px 0 0; }
+.flipback > .say { margin: -6px -6px 0 0; }
 .prompt { font: 500 30px/1.25 var(--display); overflow-wrap: anywhere; }
 .prompt .en { font: inherit; }
 .prompt span.hint { color: var(--muted); font: 400 18px/1.3 var(--sans); }
@@ -342,6 +364,7 @@ details > summary { cursor: pointer; }
 .fb.bad .fb-icon { background: var(--bad); color: var(--bad-fg); }
 .fb.ok .fb-icon { background: var(--ok); color: var(--ok-fg); }
 .fb-title { font: 700 22px/1.2 var(--display); }
+.fb-head > .say { margin: -6px 0 -6px auto; background: var(--card); }
 .fb.bad .fb-title { color: var(--bad-title); }
 .fb.ok .fb-title { color: var(--ok-title); }
 .fb-answer { color: var(--fg); font-size: 17px; overflow-wrap: anywhere; }
@@ -381,6 +404,7 @@ details > summary { cursor: pointer; }
 .srow-l { flex: 1; min-width: 0; font-size: 16px; font-weight: 500; }
 .srow-v { color: var(--muted); font-size: 14px; text-align: right; }
 .srow > .ico:last-child { color: var(--muted); }
+.srow-hint { flex: 1 0 100%; margin: -2px 0 6px; padding-left: 48px; }
 .seg.mini { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--seg-in); }
 .seg.mini > button { min-height: 44px; min-width: 44px; padding: 0 9px; border-radius: 10px; font-size: 13px; }
 .seg.mini > button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
@@ -4516,7 +4540,16 @@ function distractorsFor(item, field, n) {
 }
 function verbTable(it) {
   const keys = Object.keys(it.forms);
-  return keys.map(t => (keys.length > 1 ? `<div class="sans muted small" style="margin-top:8px">${esc(t.replace(/_/g, " "))}</div>` : "") + `<div class="conjtable">` + it.forms[t].map((f, i) => `<div><span>${esc(PERSONS[i])}</span>${esc(f)}</div>`).join("") + `</div>`).join("");
+  return keys.map(t => (keys.length > 1 ? `<div class="sans muted small" style="margin-top:8px">${esc(t.replace(/_/g, " "))}</div>` : "") + conjWrap(`<div class="conjtable">` + it.forms[t].map((f, i) => `<div><span>${esc(PERSONS[i])}</span>${esc(f)}</div>`).join("") + `</div>`, it.forms[t], t)).join("");
+}
+// A conjugation table with its speaker, which reads each person as the table labels it (commands bare). The words are taken
+// from the table when the speaker is tapped (conjRead), so the Verbs section's thousands of tables carry no second copy of them.
+function conjWrap(table, forms, tense) {
+  return TTS && arr(forms).some(f => f && f !== "—" && f !== "-") ? `<div class="conj">${table}<button type="button" class="say" data-conj="${tense === "imperativo" ? "bare" : "1"}" aria-label="Listen to the table"></button></div>` : table;
+}
+function conjRead(b) {
+  const t = b.previousElementSibling; if (!t) return "";
+  return [...t.children].map(r => { const p = r.querySelector("span"), f = r.textContent.slice(p ? p.textContent.length : 0).trim(); return !f || f === "—" || f === "-" ? "" : b.dataset.conj === "bare" || !p ? f : p.textContent.trim() + " " + f; }).filter(Boolean).join("\n");
 }
 function itemLabel(it) {
   if (it.type === "grammar_mc") return it.prompt;
@@ -4547,7 +4580,7 @@ function makeExercise(item, r, force) {
     const g = item.pos === "nm" ? "m" : item.pos === "nf" ? "f" : item.pos === "nm/nf" ? "m/f" : "";
     const d = progress.settings.fcDir || "it-en";
     const toEn = d === "it-en" || (d === "both" && Math.random() < 0.5) || (box === 0 && d === "both");
-    if (toEn) Object.assign(ex, { type: "Flashcard · translate to English", typeKey: "flashcard", kind: "production", mode: "typed", typos: true, english: true, numWords: true,
+    if (toEn) Object.assign(ex, { type: "Flashcard · translate to English", typeKey: "flashcard", kind: "production", mode: "typed", typos: true, english: true, numWords: true, say: it,
       promptHtml: esc(it) + (g ? ` <span class="hint">${g}</span>` : ""),
       accepted: arr(item.en), shownAnswer: enList(item).join(", ") });
     else Object.assign(ex, { type: "Flashcard · translate to Italian", typeKey: "flashcard", kind: "production", mode: "typed", typos: true,
@@ -4576,7 +4609,7 @@ function makeExercise(item, r, force) {
     }
     case "verb": {
       if (introduce) {
-        Object.assign(ex, { type: "New verb", typeKey: "intro", kind: "recognition", mode: "flip",
+        Object.assign(ex, { type: "New verb", typeKey: "intro", kind: "recognition", mode: "flip", say: item.it,
           promptHtml: `${esc(item.it)}<div class="hint">${esc(arr(item.en).join(", "))}${item.group ? " · " + esc(item.group) : ""}</div>`,
           backHtml: verbTable(item), selfGrade: true });
         return ex;
@@ -4588,7 +4621,7 @@ function makeExercise(item, r, force) {
       const vars = formVariants(form);
       let accepted = vars.concat(PRON_PREFIX[p].flatMap(pr => vars.map(v => pr + " " + v)));
       if (tense.startsWith("congiuntivo")) accepted = accepted.concat(accepted.map(a => "che " + a));
-      Object.assign(ex, { type: "Conjugation", typeKey: "conjugation", kind: "production", mode: "typed", typos: false, tense, person: p,
+      Object.assign(ex, { type: "Conjugation", typeKey: "conjugation", kind: "production", mode: "typed", typos: false, tense, person: p, say: item.it,
         promptHtml: `${esc(item.it)} <span class="hint">· ${esc(PERSONS[p])} · ${esc(tense.replace(/_/g, " "))}${item.group ? " · " + esc(item.group) : ""}</span>`,
         accepted, shownAnswer: PERSONS[p] + " " + form });
       return ex;
@@ -4596,7 +4629,7 @@ function makeExercise(item, r, force) {
     case "sentence": {
       const it = arr(item.it)[0], en = arr(item.en)[0];
       if (introduce || !item.cloze) {
-        Object.assign(ex, { type: "New sentence", typeKey: "intro", kind: "recognition", mode: "flip",
+        Object.assign(ex, { type: "New sentence", typeKey: "intro", kind: "recognition", mode: "flip", say: it,
           promptHtml: esc(it), backHtml: `<div class="sans">${esc(en)}</div>` + (item.explanation ? `<div class="sans muted small" style="margin-top:6px">${esc(item.explanation)}</div>` : ""), selfGrade: true });
         return ex;
       }
@@ -4645,24 +4678,24 @@ function makeExercise(item, r, force) {
       const toWords = introduce || Math.random() < 0.65;
       if (toWords) Object.assign(ex, { type: "Clock", typeKey: "clock", kind: "production", mode: "typed", typos: false,
         promptHtml: `<span class="en">${esc(item.value)}</span><div class="hint">write the time in words (Che ore sono?)</div>`, accepted: arr(item.it), shownAnswer: arr(item.it)[0] });
-      else Object.assign(ex, { type: "Clock", typeKey: "clock", kind: "production", mode: "typed", typos: false, english: true,
+      else Object.assign(ex, { type: "Clock", typeKey: "clock", kind: "production", mode: "typed", typos: false, english: true, say: arr(item.it)[0],
         promptHtml: esc(arr(item.it)[0]) + `<div class="hint">write the time in digits (hh:mm)</div>`, accepted: clockDigits(item).accepted, shownAnswer: clockDigits(item).shown });
       return ex;
     }
     case "transform": {
       const ans = arr(item.answer);
       if (introduce) {
-        Object.assign(ex, { type: "New pattern", typeKey: "intro", kind: "recognition", mode: "flip",
+        Object.assign(ex, { type: "New pattern", typeKey: "intro", kind: "recognition", mode: "flip", say: item.it, sayBack: ans[0], sayAnswer: ans[0],
           promptHtml: esc(item.it) + `<div class="hint">${esc(item.task)}</div>`, backHtml: esc(ans[0]) + (item.explanation ? `<div class="sans muted small" style="margin-top:6px">${esc(item.explanation)}</div>` : ""), selfGrade: true });
         return ex;
       }
-      Object.assign(ex, { type: "Transform", typeKey: "transform", kind: "production", mode: "typed", typos: false,
+      Object.assign(ex, { type: "Transform", typeKey: "transform", kind: "production", mode: "typed", typos: false, say: item.it, sayAnswer: ans[0],
         promptHtml: esc(item.it) + `<div class="hint">${esc(item.task)}</div>`, accepted: ans, shownAnswer: ans[0] });
       return ex;
     }
     case "prep": {
       if (introduce) {
-        Object.assign(ex, { type: "New preposition", typeKey: "intro", kind: "recognition", mode: "flip",
+        Object.assign(ex, { type: "New preposition", typeKey: "intro", kind: "recognition", mode: "flip", say: item.it,
           promptHtml: esc(item.it) + `<div class="hint">${esc(arr(item.en).join(", "))}</div>`, backHtml: prepTableHtml(item.it), selfGrade: true });
         return ex;
       }
@@ -4673,7 +4706,7 @@ function makeExercise(item, r, force) {
       const toWords = introduce || Math.random() < 0.6;
       if (toWords) Object.assign(ex, { type: "Number", typeKey: "number", kind: "production", mode: "typed", typos: false,
         promptHtml: `<span class="en">${esc(String(item.value))}</span><div class="hint">write the number in words</div>`, accepted: [item.it].concat(arr(item.alt)), shownAnswer: item.it });
-      else Object.assign(ex, { type: "Number", typeKey: "number", kind: "production", mode: "typed", typos: false, english: true,
+      else Object.assign(ex, { type: "Number", typeKey: "number", kind: "production", mode: "typed", typos: false, english: true, say: item.it,
         promptHtml: esc(item.it) + `<div class="hint">write in digits</div>`, accepted: [String(item.value)], shownAnswer: String(item.value) });
       return ex;
     }
@@ -4730,7 +4763,8 @@ function flipCard(ex, item) {
   const front = dir === "it" ? esc(it) : `<span class="en">${esc(en)}</span>`;
   const back = dir === "it" ? `<div class="sans">${esc(en)}</div>` : esc(item.pos === "noun" && item.art ? joinArt(item.art, it) : it);
   const extra = Array.isArray(item.forms) ? `<div class="sans muted small">${esc(formsText(item.forms))}</div>` : "";
-  return Object.assign(ex, { type: "Flip card", typeKey: "flip", kind: "recognition", mode: "flip", promptHtml: front, backHtml: back + extra, selfGrade: true });
+  const said = dir === "it" ? { say: it } : { sayBack: item.pos === "noun" && item.art ? joinArt(item.art, it) : it }; // the Italian side, wherever it is shown
+  return Object.assign(ex, { type: "Flip card", typeKey: "flip", kind: "recognition", mode: "flip", promptHtml: front, backHtml: back + extra, selfGrade: true }, said);
 }
 function _flipUnused(ex, item, dir, front, back) {
   return Object.assign(ex, { type: "Flip card", typeKey: "flip", kind: "recognition", mode: "flip", promptHtml: front, backHtml: back, selfGrade: true });
@@ -4740,7 +4774,7 @@ function mcMeaning(ex, item, itToEn) {
   const d = distractorsFor(item, itToEn ? "en" : "it", 3);
   const options = shuffle([itToEn ? en : it].concat(d.map(x => x.value)));
   const optionSources = {}; d.forEach(x => optionSources[x.value] = x.source);
-  return Object.assign(ex, { type: "Meaning", typeKey: "meaning", kind: "recognition", mode: "options", optionSources,
+  return Object.assign(ex, { type: "Meaning", typeKey: "meaning", kind: "recognition", mode: "options", optionSources, say: itToEn ? it : null,
     promptHtml: itToEn ? esc(it) : `<span class="en">${esc(en)}</span>`, options, correct: itToEn ? en : it, shownAnswer: itToEn ? en : it });
 }
 function prepDrill(ex, item) {
@@ -4984,7 +5018,7 @@ function verbWhy(item, tense, p) {
 }
 function verbTableHtml(item, tense, hi) {
   const t = tense || Object.keys(item.forms)[0];
-  return `<div class="conjtable">` + item.forms[t].map((f, i) => `<div><span>${esc(PERSONS[i])}</span>${i === hi ? "<b>" + esc(f) + "</b>" : esc(f)}</div>`).join("") + `</div>`;
+  return conjWrap(`<div class="conjtable">` + item.forms[t].map((f, i) => `<div><span>${esc(PERSONS[i])}</span>${i === hi ? "<b>" + esc(f) + "</b>" : esc(f)}</div>`).join("") + `</div>`, item.forms[t], t);
 }
 function enList(item) { // English meanings for display: a bare form already given by a bracketed one (so (therefore) … so) is shown once
   const seen = new Set();
@@ -5232,7 +5266,7 @@ function vgAccepted(form, p, tense) { // the form, with its subject pronoun, and
 }
 function vgTableHtml(item, tense, marks) { // marks: {p: true} bolded
   const forms = item.allForms[tense];
-  return `<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + esc(f) + "</b>" : esc(f)}</div>`).join("") + `</div>`;
+  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + esc(f) + "</b>" : esc(f)}</div>`).join("") + `</div>`, forms, tense);
 }
 function vgFormsElsewhere(item, form, exceptTense, exceptP) { // does this form also occur in another ladder tense / person?
   const n = formVariants(form).map(normalize), hits = [];
@@ -5314,7 +5348,7 @@ function verbGymExercise(ex, item, r, force) {
   const head = `${esc(item.it)} <span class="hint">· ${esc(tl)}</span>`;
   if (box === 0 && !force) {
     const ex0 = verbWhy(vgVerb(item), item.tense, vgPersons(item)[0]);
-    Object.assign(ex, { type: item.step ? "New tense · " + tl : "New verb", typeKey: "intro", kind: "recognition", mode: "vintro",
+    Object.assign(ex, { type: item.step ? "New tense · " + tl : "New verb", typeKey: "intro", kind: "recognition", mode: "vintro", say: item.it,
       promptHtml: `${esc(item.it)}<div class="hint sans">${esc(arr(item.en).join(", "))}</div>`,
       introHtml: (item.step === 0 ? `<p><b>${esc(fam[0])}.</b> ${esc(fam[1])}</p>` : "")
         + (item.note && (item.step === 0 || item.tense === "passato_prossimo" || /futur|stem|particip|essere|avere/i.test(item.note)) ? `<p>${esc(item.note)}</p>` : "")
@@ -5328,7 +5362,7 @@ function verbGymExercise(ex, item, r, force) {
   const persons = force && force.persons;
   const table = () => {
     const cells = persons && persons.length ? persons.slice() : vgPersons(item);
-    Object.assign(ex, { type: persons ? "Verb table · the forms you missed" : "Verb table", typeKey: "vtable", kind: "production", mode: "table", cells,
+    Object.assign(ex, { type: persons ? "Verb table · the forms you missed" : "Verb table", typeKey: "vtable", kind: "production", mode: "table", cells, say: item.it,
       promptHtml: head + `<div class="hint sans">${esc(arr(item.en)[0])}</div>`,
       accepted: item.forms.map((f, p) => vgAcc(item, p)), shownAnswer: item.forms.join(", "), answerInContext: item.it + ", " + tl + ": " + item.forms.join(", ") });
     return ex;
@@ -5340,6 +5374,7 @@ function verbGymExercise(ex, item, r, force) {
     ? (rnd < 0.58 ? "table" : rnd < 0.74 ? "pick" : rnd < 0.86 ? "spot" : rnd < 0.94 ? "tenseid" : "aux")
     : (rnd < 0.3 ? "table" : rnd < 0.47 ? "spot" : rnd < 0.59 ? "meaning" : rnd < 0.71 ? "switch" : rnd < 0.79 ? "inf" : rnd < 0.89 ? "tenseid" : rnd < 0.94 ? "person" : "aux");
   const P = vgPersons(item), pl = (p) => vgPerson(item.tense, p);
+  const said = (p) => item.tense === "imperativo" ? item.forms[p] : pl(p) + " " + item.forms[p]; // the answer read aloud: commands bare, other forms with their person
   if (choice === "pick") {
     const p = pick(P), right = item.forms[p], acc = vgAcc(item, p).map(normalize);
     const opts = [], notes = {};
@@ -5352,7 +5387,7 @@ function verbGymExercise(ex, item, r, force) {
     for (const w of wrong.slice(1)) take(w.form, w.why);
     for (const q of shuffle(P.filter(q => q !== p))) take(item.forms[q], `that is the ${pl(q)} form; ${pl(p)} is ${right}.`);
     if (opts.length >= 2) {
-      Object.assign(ex, { type: "Pick the form", typeKey: "vpick", kind: "recognition", mode: "options", person: p, tense: item.tense, optionNotes: notes,
+      Object.assign(ex, { type: "Pick the form", typeKey: "vpick", kind: "recognition", mode: "options", person: p, tense: item.tense, optionNotes: notes, say: item.it, sayAnswer: said(p),
         promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
         options: shuffle([right].concat(opts)), correct: right, shownAnswer: pl(p) + " " + right });
       return ex;
@@ -5360,7 +5395,7 @@ function verbGymExercise(ex, item, r, force) {
   }
   if (choice === "meaning") {
     const p = pick(P), m = vgMeaningAnswers(item, p);
-    Object.assign(ex, { type: "From English", typeKey: "vmeaning", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, others: m.others,
+    Object.assign(ex, { type: "From English", typeKey: "vmeaning", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, others: m.others, sayAnswer: said(p),
       promptHtml: `<span class="en">${esc(arr(item.en)[0])}</span> <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">type the Italian verb form</div>`,
       accepted: m.accepted, alts: m.alts, shownAnswer: pl(p) + " " + item.forms[p] });
     return ex;
@@ -5368,7 +5403,7 @@ function verbGymExercise(ex, item, r, force) {
   if (choice === "switch" && started.length >= 2) {
     const from = pick(started.filter(t => t !== item.tense)), both = P.filter(q => vgPersons(item, from).includes(q)), p = pick(both);
     if (p != null && normalize(item.allForms[from][p]) !== normalize(item.forms[p])) {
-      Object.assign(ex, { type: "Change the tense", typeKey: "vswitch", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, from,
+      Object.assign(ex, { type: "Change the tense", typeKey: "vswitch", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, from, say: item.allForms[from][p], sayAnswer: said(p),
         promptHtml: `${esc(item.allForms[from][p])}<div class="hint sans">${esc(item.it)} · ${esc(pl(p))} · ${esc(TENSE_LABEL[from])} → <b>${esc(tl)}</b></div><div class="hint sans">same person, new tense</div>`,
         accepted: vgAcc(item, p), shownAnswer: pl(p) + " " + item.forms[p] });
       return ex;
@@ -5381,14 +5416,14 @@ function verbGymExercise(ex, item, r, force) {
     const pool = tricky.length && Math.random() < 0.7 ? tricky : ps;
     if (pool.length) {
       const p = pick(pool);
-      Object.assign(ex, { type: "Which verb?", typeKey: "vinf", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p,
+      Object.assign(ex, { type: "Which verb?", typeKey: "vinf", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, say: item.forms[p],
         promptHtml: `${esc(item.forms[p])}<div class="hint sans">which verb is this a form of? type the infinitive</div>`,
         accepted: [item.it], shownAnswer: item.it, answerInContext: item.forms[p] + " → " + item.it });
       return ex;
     }
   }
   if (choice === "aux" && item.tense === "passato_prossimo" && !item.both) {
-    Object.assign(ex, { type: "essere or avere?", typeKey: "vaux", kind: "recognition", mode: "options",
+    Object.assign(ex, { type: "essere or avere?", typeKey: "vaux", kind: "recognition", mode: "options", say: item.it, sayAnswer: said(P[0]),
       promptHtml: `${esc(item.it)} <span class="hint">· passato prossimo</span><div class="hint sans">${esc(arr(item.en)[0])} · which auxiliary?</div>`,
       options: ["avere", "essere"], correct: item.aux === "e" ? "essere" : "avere", shownAnswer: item.aux === "e" ? "essere" : "avere" });
     return ex;
@@ -5399,7 +5434,7 @@ function verbGymExercise(ex, item, r, force) {
       const p = ps[0], others = shuffle(started.filter(t => t !== item.tense)).slice(0, 3);
       if (others.length < 2) { const nxt = VG_TENSES.filter(t => t !== item.tense && !others.includes(t) && item.allForms[t]); others.push(...nxt.slice(0, 2 - others.length)); }
       const opts = shuffle([item.tense].concat(others)).map(t => TENSE_LABEL[t]);
-      Object.assign(ex, { type: "Which tense?", typeKey: "vtenseid", kind: "recognition", mode: "options", person: p, tense: item.tense,
+      Object.assign(ex, { type: "Which tense?", typeKey: "vtenseid", kind: "recognition", mode: "options", person: p, tense: item.tense, say: item.forms[p], sayAnswer: said(p),
         promptHtml: `${esc(item.forms[p])}<div class="hint sans">from ${esc(item.it)} · which tense is this?</div>`,
         options: opts, correct: tl, shownAnswer: tl });
       return ex;
@@ -5409,7 +5444,7 @@ function verbGymExercise(ex, item, r, force) {
     const ps = shuffle(P).filter(p => !item.forms.some((f, q) => q !== p && normalize(f) === normalize(item.forms[p])));
     if (ps.length) {
       const p = ps[0];
-      Object.assign(ex, { type: "Which person?", typeKey: "vperson", kind: "recognition", mode: "options", person: p, tense: item.tense,
+      Object.assign(ex, { type: "Which person?", typeKey: "vperson", kind: "recognition", mode: "options", person: p, tense: item.tense, say: item.forms[p], sayAnswer: said(p),
         promptHtml: `${esc(item.forms[p])}<div class="hint sans">${esc(item.it)}, ${esc(tl)} · ${item.tense === "imperativo" ? "who is the command for?" : "who is the subject?"}</div>`,
         options: P.map(pl), correct: pl(p), shownAnswer: pl(p) });
       return ex;
@@ -5417,7 +5452,7 @@ function verbGymExercise(ex, item, r, force) {
   }
   if (choice !== "table") {
     const p = pick(P);
-    Object.assign(ex, { type: "Verb form", typeKey: "vspot", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p,
+    Object.assign(ex, { type: "Verb form", typeKey: "vspot", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, say: item.it, sayAnswer: said(p),
       promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
       accepted: vgAcc(item, p), shownAnswer: pl(p) + " " + item.forms[p] });
     return ex;
@@ -5635,6 +5670,13 @@ function missedItalian(ex) { // the Italian a missed item is listed under in the
   if (item.type === "vocab" && item.pos === "noun" && item.art) return joinArt(item.art, arr(item.it)[0]);
   return String(arr(item.it)[0] || itemLabel(item));
 }
+function sayAnswerOf(ex, fb) { // the Italian the answer panel's speaker reads; none for rule questions, whose answers are often English
+  if (ex.typeKey === "grammar") return "";
+  if (ex.sayAnswer != null) return ex.sayAnswer;
+  if (ex.mode === "table") return conjSpeech(ex.item.forms, ex.item.tense === "imperativo" ? null : (p) => vgPerson(ex.item.tense, p));
+  if (ex.typeKey === "translate" && fb && !fb.ok && fb.closest) return fb.closest; // the version the panel compares with
+  return missedItalian(ex);
+}
 function finishAnswer(ok, note, given, closest) {
   const q = current(), ex = q.ex;
   const wasNew = rec(ex.item.id).box === 0;
@@ -5672,6 +5714,7 @@ function acceptAnswer() {
   render();
 }
 function continueSession() {
+  stopSaying();
   session.pos++; session.done++;
   S.feedback = null; S.revealed = false; S.picked = null; S.bankPicked = []; S.retry = null; S.flagOpen = false; S.focusId = null;
   if (session.pos >= session.queue.length) {
@@ -5695,7 +5738,7 @@ function render() {
   const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou }[S.screen] || renderHome;
   const key = S.screen === "reference" ? "reference:" + S.refUnit + ":" + (S.refTab || "lesson") : S.screen;
   const prev = S.viewKey, mem = S.scrollMem || (S.scrollMem = {});
-  if (prev && prev !== key) mem[prev] = window.scrollY;
+  if (prev && prev !== key) { mem[prev] = window.scrollY; stopSaying(); } // speech belongs to the screen it started on
   const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
   app.className = S.screen === "session" ? "session" : bare ? "notabs" : "";
   const flash = S.flash && S.screen !== "home" && !bare ? `<div class="card flash" id="flash" role="status">${esc(S.flash)}</div>` : "";
@@ -5743,6 +5786,7 @@ const ICON = { // 24-unit stroke icons, as drawn in docs/design/mockups
   flag: '<path d="M6 21V4M6 4h11l-2 4 2 4H6"/>',
   download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/>',
   layers: '<path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5M4 16.5l8 4.5 8-4.5"/>',
+  speaker: '<path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.7 7.7 0 0 1 0 11"/>',
 };
 function icon(name, size = 22, stroke = 1.8) { return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[name]}</svg>`; }
 function logo(size) { return `<svg class="ico logo" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="23" fill="#0F6B4B"/><path d="M31 32 L45 68" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" fill="none"/><path d="M55 32 L69 68" stroke="#EF4B55" stroke-width="13" stroke-linecap="round" fill="none"/></svg>`; }
@@ -5758,6 +5802,83 @@ function applyTheme(v) {
   } catch (e) { }
 }
 function setTheme(v) { lsSet(LS_THEME, v); applyTheme(v); render(); }
+/* Read aloud: the Italian is spoken by the device's own voice (the browser's speech synthesis), only when a speaker is tapped;
+   nothing is recorded or downloaded and nothing plays by itself. The setting (Off · Normal · Slow) is kept per device in its own key,
+   never in progress, like Appearance, since each phone has its own voices. Where the browser can't speak (the Android WebView inside
+   some apps) no speakers are drawn; where it lists its voices and none is Italian, they are hidden. */
+const LS_AUDIO = "itapp.audio.v1";
+const SAY_RATE = { normal: 0.9, slow: 0.65 };
+const SAY_SAMPLE = "Ciao! Come stai?"; // read when Normal or Slow is chosen, so the speed can be heard
+const TTS = (() => { try { return window.speechSynthesis && window.SpeechSynthesisUtterance ? window.speechSynthesis : null; } catch (e) { return null; } })();
+let sayVoice = null, sayListed = false, sayNow = null; // the Italian voice; whether the device has listed its voices; what is being read
+function audioPref() { const v = lsGet(LS_AUDIO); return v === "off" || v === "slow" ? v : "normal"; }
+const sayVoiceOk = () => !!TTS && !(sayListed && !sayVoice);
+function pickVoice() {
+  let vs = []; try { vs = TTS.getVoices() || []; } catch (e) { }
+  if (!vs.length) return; // not listed yet (Chrome lists them a moment after loading)
+  sayListed = true;
+  const lang = (v) => String(v.lang || "").replace("_", "-").toLowerCase();
+  const it = vs.filter(v => /^it(-|$)/.test(lang(v)));
+  // a voice on the phone itself also works offline; Italy's Italian before the Swiss
+  sayVoice = it.find(v => lang(v) === "it-it" && v.localService) || it.find(v => lang(v) === "it-it") || it.find(v => v.localService) || it[0] || null;
+}
+function applySay() { try { document.documentElement.classList.toggle("nosay", !sayVoiceOk() || audioPref() === "off"); } catch (e) { } }
+function setAudio(v) { lsSet(LS_AUDIO, v); applySay(); render(); if (v !== "off") speak(SAY_SAMPLE); }
+// The text a speaker reads, as one or more phrases: a note in brackets is skipped, the first of two endings or words is read
+// (andato/a, fa'/fai), and an arrow, a dash between two speakers or a slash between phrases becomes a pause. Only phrases with letters are read.
+function speakable(s) {
+  return String(s ?? "").split(/\n|\s+→\s+|\s+[—–]\s+|\s+\/\s+/).map(x => x
+    .replace(/\[\[[^\]|]*\|?([^\]]*)\]\]/g, "$1").replace(/\*+/g, "")
+    .replace(/\([^)]*\)/g, " ").replace(/([\p{L}']+)\/[\p{L}']+/gu, "$1")
+    .replace(/…/g, ", ").replace(/[→—–~]/g, " ")
+    .replace(/\s+/g, " ").replace(/\s+([,.!?;:])/g, "$1").replace(/^[\s,;:]+|[\s,;:]+$/g, "")).filter(x => /\p{L}/u.test(x));
+}
+function sayBtn(text, label, cls) { // a speaker for Italian text; cls "solo" makes it a round button of its own
+  return TTS && speakable(text).length ? `<button type="button" class="say${cls ? " " + cls : ""}" data-say="${esc(text)}" aria-label="${esc(label || "Listen")}"></button>` : "";
+}
+function sayAllBtn(lines) { // one button that reads a whole dialogue, line by line
+  const t = lines.filter(x => speakable(x).length).join("\n");
+  return TTS && t ? `<button type="button" class="quiet dlg-all" data-say="${esc(t)}">${icon("speaker", 20)}<span class="lbl-play">Listen to the dialogue</span><span class="lbl-stop">Stop</span></button>` : "";
+}
+// a verb table read one person at a time ("io parlo", "tu parli"…); label(p) names the person, or null to read the forms bare (commands); a missing person is skipped
+const conjSpeech = (forms, label) => arr(forms).map((f, p) => !f || f === "—" || f === "-" ? "" : label ? label(p) + " " + f : f).filter(Boolean).join("\n");
+function markSaying() { app.querySelectorAll("[data-say]").forEach(b => b.classList.toggle("on", !!sayNow && b.dataset.say === sayNow.key)); }
+function stopSaying() {
+  const busy = !!sayNow || !!(TTS && (TTS.speaking || TTS.pending));
+  sayNow = null;
+  if (busy) { try { TTS.cancel(); } catch (e) { } markSaying(); }
+  return busy;
+}
+function speak(raw) { // a second tap on the speaker that is playing stops it
+  if (!TTS) return;
+  const again = !!sayNow && sayNow.key === raw, busy = stopSaying(), parts = speakable(raw);
+  if (again || !parts.length) return;
+  const me = sayNow = { key: raw, us: [] }; // the utterances are kept here: Chrome can drop one that nothing refers to before it ends
+  const done = () => { if (sayNow === me) { sayNow = null; markSaying(); } };
+  for (const t of parts) {
+    const u = new SpeechSynthesisUtterance(t);
+    u.lang = sayVoice ? String(sayVoice.lang).replace("_", "-") : "it-IT";
+    if (sayVoice) u.voice = sayVoice;
+    u.rate = SAY_RATE[audioPref()] || SAY_RATE.normal;
+    u.onerror = (e) => { done(); if (e && /^(language|voice)-unavailable$/.test(e.error || "")) { sayListed = true; sayVoice = null; applySay(); } };
+    me.us.push(u);
+  }
+  me.us[me.us.length - 1].onend = done;
+  const go = () => { if (sayNow !== me) return; try { if (TTS.paused) TTS.resume(); me.us.forEach(u => TTS.speak(u)); } catch (e) { done(); } };
+  if (busy) setTimeout(go, 80); else go(); // straight after cancel() some Android versions drop the next utterance
+  markSaying();
+}
+if (TTS) {
+  // one listener for every speaker; on mousedown the answer field keeps the focus (and the keyboard stays up)
+  const speakerOf = (e) => { const b = e.target && e.target.closest && e.target.closest("[data-say], [data-conj]"); return b && app.contains(b) ? b : null; };
+  app.addEventListener("mousedown", (e) => { if (speakerOf(e)) e.preventDefault(); });
+  app.addEventListener("click", (e) => { const b = speakerOf(e); if (!b) return; e.preventDefault(); speak(b.dataset.say || (b.dataset.say = conjRead(b))); });
+  pickVoice();
+  const onVoices = () => { pickVoice(); applySay(); if (content && S.screen === "you") render(); };
+  try { TTS.addEventListener("voiceschanged", onVoices); } catch (e) { TTS.onvoiceschanged = onVoices; }
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stopSaying(); });
+}
+applySay();
 const TABS = [["home", "today", "Today"], ["units", "units", "Units"], ["rules", "book", "Rules"], ["lookup", "search", "Look up"], ["you", "you", "You"]];
 const TAB_OF = { reference: "units", stats: "you", settings: "you", data: "you" };
 function tabBar() {
@@ -5788,7 +5909,11 @@ let TIDBIT; // undefined: not picked yet; null: nothing suitable
 const TIP_LIMIT = 140; // characters: about three lines at 390 px
 const TIP_ABOUT_APP = /\b(typ(e|ed|es|ing)|accept(ed)?|answers?|cards?|tap|app|screen|drills?|exercises?|sessions?|box|flashcards?|units?|lessons?|glossary)\b/i;
 const tipNoteOk = (n) => !!n && /^[A-Z(]/.test(n) && /[.!?)]$/.test(n) && !TIP_ABOUT_APP.test(n);
-function tipFrom(i) { // the item in its own words, as html, or null when it doesn't fit
+function tipFrom(i) { // the item in its own words, as { html, it } (the Italian for the speaker), or null when it doesn't fit
+  const t = tipHtml(i);
+  return t ? { html: t, it: String(arr(i.it)[0]).trim() } : null;
+}
+function tipHtml(i) {
   const it = String(arr(i.it)[0] || "").trim(), en = arr(i.en).map(x => String(x).trim()).filter(Boolean);
   if (!it || !en.length) return null;
   if (i.type === "sentence") return (it + " " + en[0]).length <= TIP_LIMIT ? `<b lang="it">${esc(it)}</b> ${esc(en[0])}` : null;
@@ -5815,7 +5940,7 @@ function pickTidbit() { // an expression, a word with a note, or a sentence, eac
 }
 function tipCardHtml() {
   if (TIDBIT === undefined) TIDBIT = pickTidbit();
-  return TIDBIT ? `<aside class="card tip" id="tipcard" aria-label="Did you know?"><div class="tip-h">${icon("bulb", 18)}<span class="tip-it" lang="it">Lo sapevi?</span><span class="muted">Did you know?</span></div><p>${TIDBIT}</p></aside>` : "";
+  return TIDBIT ? `<aside class="card tip" id="tipcard" aria-label="Did you know?"><div class="tip-h">${icon("bulb", 18)}<span class="tip-it" lang="it">Lo sapevi?</span><span class="muted">Did you know?</span>${sayBtn(TIDBIT.it)}</div><p>${TIDBIT.html}</p></aside>` : "";
 }
 function fitTip() { // the card shows only when Today fits above the tab bar with it; otherwise it steps aside
   const card = document.getElementById("tipcard"); if (!card) return;
@@ -5830,13 +5955,17 @@ function syncValue() {
   return `<span class="sync"><span class="dot ${cls}" aria-hidden="true"></span>${esc(words)}</span>`;
 }
 function renderYou() {
-  const s = progress.settings, flags = Object.values(progress.flags || {}).filter(f => !f.removed).length, theme = themePref();
+  const s = progress.settings, flags = Object.values(progress.flags || {}).filter(f => !f.removed).length, theme = themePref(), audio = audioPref();
   const row = (ic, label, value, attrs) => `<button type="button" class="srow" ${attrs}><span class="well">${icon(ic, 20)}</span><span class="srow-l">${label}</span>${value != null ? `<span class="srow-v">${value}</span>` : ""}${icon("next", 18, 2)}</button>`;
   return `<header class="hdr"><h1 class="title">You</h1></header>
   <button type="button" class="card statcard" data-go="stats"><span class="statcard-h"><span class="label">Stats</span><span class="see">See all${icon("next", 18, 2)}</span></span>
   <span class="bigs"><span><span class="big">${streak()}</span><span class="small muted">day streak</span></span><span><span class="big">${fmtN(learnedCount())}</span><span class="small muted">items learned</span></span><span><span class="big">${pctOf(accuracy(30))}</span><span class="small muted">accuracy</span></span></span></button>`
   + groupHtml("Settings", `<div class="card rows">
     <div class="srow static"><span class="well">${icon("theme", 20)}</span><span class="srow-l" id="appearance">Appearance</span><div class="seg mini" role="group" aria-labelledby="appearance">${[["light", "Light"], ["dark", "Dark"], ["auto", "Auto"]].map(([v, l]) => `<button type="button" data-appearance="${v}" aria-pressed="${theme === v}">${l}</button>`).join("")}</div></div>
+    <div class="srow static" id="readaloud-row"><span class="well">${icon("speaker", 20)}</span><span class="srow-l" id="readaloud">Read aloud</span>${TTS
+      ? `<div class="seg mini" role="group" aria-labelledby="readaloud">${[["off", "Off"], ["normal", "Normal"], ["slow", "Slow"]].map(([v, l]) => `<button type="button" data-audio="${v}" aria-pressed="${audio === v}">${l}</button>`).join("")}</div>`
+        + (sayVoiceOk() ? "" : `<p class="small muted srow-hint">No Italian voice on this device yet. In the phone's Settings, search for Text-to-speech; in Speech Services by Google, choose Install voice data, then Italian. Then reopen Ripasso.</p>`)
+      : `<span class="srow-v">Not available</span><p class="small muted srow-hint">This browser can't speak. Open Ripasso in Chrome, or the installed app, to hear the Italian.</p>`}</div>
     ${row("timer", "Lesson length", `${s.lessonLength} exercises`, 'data-go="settings" data-to="set-lessonLength"')}
     ${row("plus", "New items per day", s.newPerDay >= 9999 ? "No limit" : String(s.newPerDay), 'data-go="settings" data-to="set-newPerDay"')}
     ${row("swap", "Vocab direction", { "it-en": "Italian → English", "en-it": "English → Italian", both: "Mixed" }[s.fcDir] || "", 'data-go="settings" data-to="set-fcDir"')}
@@ -5847,7 +5976,7 @@ function renderYou() {
     ${row("download", "Back up progress", null, 'data-go="data" data-to="sec-backup"')}
     ${row("layers", "Content packs", "Advanced", 'data-go="data" data-to="sec-packs"')}</div>`)
   + groupHtml("About", `<details class="card about"><summary>${logo(36)}<span class="about-t"><span class="label">Ripasso Italiano</span><span class="small muted">Version ${esc(APP_VERSION)} · About and credits</span></span>${icon("next", 18, 2)}</summary>
-    <div class="about-b"><p>Ripasso Italiano is a personal app for practising Italian: short typed exercises with spaced repetition, a lesson and glossary for every unit, verb drills and vocabulary packs. <i lang="it">Ripasso</i> means going back over what you have learned.</p>
+    <div class="about-b"><p>Ripasso Italiano is a personal app for practising Italian: short typed exercises with spaced repetition, a lesson and glossary for every unit, verb drills and vocabulary packs, with a speaker beside the Italian to hear it read aloud by the device's own voice. <i lang="it">Ripasso</i> means going back over what you have learned.</p>
     <p class="small muted">Typefaces: Bricolage Grotesque and DM Sans, both under the SIL Open Font Licence.</p></div></details>`);
 }
 function renderHome() {
@@ -5909,8 +6038,9 @@ function renderSession() {
   const ex = q.ex, fb = S.feedback;
   const done = session.done, total = session.queue.length;
   const tick = (cls) => `<span class="${cls}">${icon("tick", 18, 2.6)}<span class="vh">right</span></span>`, cross = (cls) => `<span class="${cls}">${icon("cross", 18, 2.6)}<span class="vh">wrong</span></span>`;
+  const sayP = sayBtn(ex.say, "Listen", "solo"); // only Italian that the prompt already shows
   let body = `<div class="sbar"><button type="button" class="iconbtn" data-go="quit" aria-label="Quit">${icon("close", 22, 2)}</button>${bar(100 * done / total, "bar10")}<span class="scount">${done + 1}/${total}${q.repeat ? " · repeat" : ""}</span></div>
-  <div class="sx"><span class="chip-type">${esc(ex.type)}</span><div class="card prompt-card"><div class="prompt">${ex.promptHtml}</div></div>`;
+  <div class="sx"><span class="chip-type">${esc(ex.type)}</span><div class="card prompt-card${sayP ? " sayrow" : ""}"><div class="prompt">${ex.promptHtml}</div>${sayP}</div>`;
   if (ex.mode === "vintro") {
     body += `<div class="card vintro">${ex.introHtml}</div><button type="button" class="primary wide" data-act="introDone">Got it, continue</button>`;
   } else if (ex.mode === "table") {
@@ -5924,7 +6054,8 @@ function renderSession() {
   } else if (ex.mode === "flip") {
     if (!S.revealed) body += `<button type="button" class="primary wide" data-act="reveal">Show answer</button>`;
     else {
-      body += `<div class="card flipback">${ex.backHtml}</div>`;
+      const sayB = sayBtn(ex.sayBack, "Listen", "solo");
+      body += sayB ? `<div class="card flipback sayrow"><div>${ex.backHtml}</div>${sayB}</div>` : `<div class="card flipback">${ex.backHtml}</div>`;
       if (!fb) body += `<div class="btnrow"><button type="button" data-act="missed">Missed</button><button type="button" class="primary" data-act="gotit">Got it</button></div>`;
     }
   } else if (ex.mode === "bank") {
@@ -5965,7 +6096,7 @@ function renderSession() {
     const flagged = progress.flags && progress.flags[flagId(ex)] && !progress.flags[flagId(ex)].removed;
     const accept = !fb.ok && ex.english && ex.typeKey === "flashcard" && fb.given ? `<button type="button" data-act="accept">Accept my answer</button>` : "";
     body += `<section class="fb ${fb.ok ? "ok" : "bad"}${anim ? " anim" : ""}" aria-live="polite" aria-labelledby="fbtitle"><div class="fb-body">
-      <div class="fb-head"><span class="fb-icon" aria-hidden="true">${icon(fb.ok ? "tick" : "cross", 16, 2.6)}</span><h2 class="fb-title" id="fbtitle">${title}</h2></div>`
+      <div class="fb-head"><span class="fb-icon" aria-hidden="true">${icon(fb.ok ? "tick" : "cross", 16, 2.6)}</span><h2 class="fb-title" id="fbtitle">${title}</h2>${sayBtn(sayAnswerOf(ex, fb), "Listen to the answer", "solo")}</div>`
       + (line ? `<div class="fb-answer">${line}</div>` : "") + extra
       + (!fb.ok && ex.mode === "typed" && fb.given ? `<div class="extra dim">You typed: ${esc(fb.given)}</div>` : "")
       + (!fb.ok && ex.mode !== "table" && ex.answerInContext && ex.answerInContext !== answer ? `<div class="extra">${esc(ex.answerInContext)}</div>` : "")
@@ -5997,7 +6128,7 @@ function renderSummary() {
   return `<header class="hdr"><h1 class="title">Session complete</h1></header>
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
-  ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" ? `<div class="small muted">${esc(m.item.prompt)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
+  ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}${m.item.type === "grammar_mc" ? "" : sayBtn(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" ? `<div class="small muted">${esc(m.item.prompt)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
   <button type="button" class="primary wide" data-go="home">Back to Today</button>`;
 }
 function boxTag(id) { const r = rec(id); return r.box === 0 ? "" : ` <span class="box">box ${r.box}${r.box >= 5 ? " ✓" : ""}</span>`; }
@@ -6025,12 +6156,12 @@ function lessonBlock(b) {
   if (typeof b === "string") return `<p>${inl(b)}</p>`;
   if (!b || typeof b !== "object") return "";
   if (b.h) return `<h3>${inl(b.h)}</h3>`;
-  if (b.ex) return `<div class="lex">` + b.ex.map(r => `<div><div class="lit">${inl(r[0])}</div>${r[1] ? `<div class="len">${inl(r[1])}</div>` : ""}${r[2] ? `<div class="lnote">${inl(r[2])}</div>` : ""}</div>`).join("") + `</div>`;
+  if (b.ex) return `<div class="lex">` + b.ex.map(r => `<div><div class="lit">${inl(r[0])}${sayBtn(r[0])}</div>${r[1] ? `<div class="len">${inl(r[1])}</div>` : ""}${r[2] ? `<div class="lnote">${inl(r[2])}</div>` : ""}</div>`).join("") + `</div>`;
   if (b.table) { const itc = new Set(b.it || []); return `<div class="tablewrap"><table class="ltab">` + (b.head ? `<tr>${b.head.map((c, j) => `<th${itc.has(j) ? ' class="it"' : ""}>${inl(c)}</th>`).join("")}</tr>` : "") + b.table.map(r => `<tr>${r.map((c, j) => `<td${itc.has(j) ? ' class="it"' : ""}>${cellHtml(c, itc.has(j))}</td>`).join("")}</tr>`).join("") + `</table></div>`; }
   if (b.list) { const t = b.ol ? "ol" : "ul"; return `<${t} class="llist">` + b.list.map(x => `<li>${inl(x)}</li>`).join("") + `</${t}>`; }
   if (b.tip) return `<div class="ltip">${icon("info", 20)}<div>${b.label ? `<div class="lab">${esc(b.label)}</div>` : ""}${arr(b.tip).map(x => `<p>${inl(x)}</p>`).join("")}</div></div>`;
-  if (b.dlg) return `<div class="dlg">` + b.dlg.map(r => `<div><div class="who">${esc(r[0])}</div><div class="lit">${inl(r[1])}</div><div class="len">${inl(r[2])}</div></div>`).join("") + `</div>`;
-  if (b.fix) return `<div class="lfix">` + b.fix.map(r => `<div class="fx"><div class="no"><span aria-hidden="true">✕</span><span class="vh">Not:</span> ${inl(r[0])}</div><div class="yes"><span aria-hidden="true">✓</span><span class="vh">Say:</span> ${inl(r[1])}</div>${r[2] ? `<div class="why">${inl(r[2])}</div>` : ""}</div>`).join("") + `</div>`;
+  if (b.dlg) return `<div class="dlg">` + sayAllBtn(b.dlg.map(r => r[1])) + b.dlg.map(r => `<div><div class="who">${esc(r[0])}</div><div class="lit">${inl(r[1])}${sayBtn(r[1])}</div><div class="len">${inl(r[2])}</div></div>`).join("") + `</div>`;
+  if (b.fix) return `<div class="lfix">` + b.fix.map(r => `<div class="fx"><div class="no"><span aria-hidden="true">✕</span><span class="vh">Not:</span> ${inl(r[0])}</div><div class="yes"><span aria-hidden="true">✓</span><span class="vh">Say:</span> ${inl(r[1])}${sayBtn(r[1])}</div>${r[2] ? `<div class="why">${inl(r[2])}</div>` : ""}</div>`).join("") + `</div>`;
   return "";
 }
 function lessonTitles(u, L) { return (L.sections || []).map(s => s.h).concat(u.notes && u.notes.length ? ["The unit in brief"] : []); }
@@ -6114,29 +6245,29 @@ function renderReference() {
   const list = (title, html) => groupHtml(title, `<div class="card gcard">${html}</div>`);
   h += `<label class="vh" for="refFilter">Filter this unit</label><input type="text" id="refFilter" placeholder="Filter…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`;
   if (u.notes && u.notes.length) h += groupHtml("Rules", `<div class="card notes">` + u.notes.map(n => `<p>${esc(n)}</p>`).join("") + `</div>`);
-  if (verbs.length) h += list("Verbs", verbs.map(v => `<div class="gitem"><div><span class="itx">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}${v.group ? " · " + esc(v.group) : ""}</span> ${boxTag(v.id)}</div>${Object.keys(v.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(v, t)).join("")}${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ""}</div>`).join(""));
-  if (nouns.length) h += table("Nouns", nouns.map(n => `<tr><td class="it">${esc(joinArt(n.art, arr(n.it)[0]))}<div class="gf">${esc(joinArt(n.indef, arr(n.it)[0]))} · ${esc(joinArt(n.artPl, n.plural))}</div></td><td>${esc(enList(n).join(", "))}${boxTag(n.id)}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""), `<tr><th>noun · a/an · plural</th><th>meaning</th></tr>`);
-  if (clocks.length) h += table("Telling the time", clocks.map(c => `<tr><td style="width:1%;white-space:nowrap">${esc(c.value)}</td><td class="it">${esc(arr(c.it)[0])}${boxTag(c.id)}${arr(c.it).length > 1 ? `<div class="small muted">also: ${esc(arr(c.it).slice(1).join(" · "))}</div>` : ""}</td></tr>`).join(""));
+  if (verbs.length) h += list("Verbs", verbs.map(v => `<div class="gitem"><div><span class="itx">${esc(v.it)}</span>${sayBtn(v.it)} <span class="muted">${esc(arr(v.en).join(", "))}${v.group ? " · " + esc(v.group) : ""}</span> ${boxTag(v.id)}</div>${Object.keys(v.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(v, t)).join("")}${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ""}</div>`).join(""));
+  if (nouns.length) h += table("Nouns", nouns.map(n => `<tr><td class="it">${esc(joinArt(n.art, arr(n.it)[0]))}${sayBtn(joinArt(n.art, arr(n.it)[0]))}<div class="gf">${esc(joinArt(n.indef, arr(n.it)[0]))} · ${esc(joinArt(n.artPl, n.plural))}</div></td><td>${esc(enList(n).join(", "))}${boxTag(n.id)}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""), `<tr><th>noun · a/an · plural</th><th>meaning</th></tr>`);
+  if (clocks.length) h += table("Telling the time", clocks.map(c => `<tr><td style="width:1%;white-space:nowrap">${esc(c.value)}</td><td class="it">${esc(arr(c.it)[0])}${sayBtn(arr(c.it)[0])}${boxTag(c.id)}${arr(c.it).length > 1 ? `<div class="small muted">also: ${esc(arr(c.it).slice(1).join(" · "))}</div>` : ""}</td></tr>`).join(""));
   if (trans.length) h += list("Patterns", trans.map(x => `<div class="gitem">${rowHtml(x)}</div>`).join(""));
   if (preps.length) h += list("Prepositions with the article", preps.map(x => `<div class="gitem">${rowHtml(x)}</div>`).join(""));
-  if (nums.length) h += table("Numbers", nums.map(n => `<tr><td style="width:1%;white-space:nowrap">${n.value}</td><td class="it">${esc(n.it)}${boxTag(n.id)}${arr(n.alt).length ? `<div class="small muted">also ${esc(arr(n.alt).join(", "))}</div>` : ""}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""));
-  if (other.length) h += table(nouns.length || verbs.length ? "Other words" : "Words", other.map(n => `<tr><td class="it">${esc(arr(n.it)[0])}${Array.isArray(n.forms) ? `<div class="gf">${esc(formsText(n.forms))}</div>` : ""}<div class="pos">${esc(posLabel(n.pos, n.gender))}</div></td><td>${esc(enList(n).join(", "))}${boxTag(n.id)}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""));
-  if (sents.length) h += table("Sentences", sents.map(x => `<tr><td class="it">${esc(arr(x.it)[0])}</td><td>${esc(arr(x.en)[0])}${boxTag(x.id)}${x.explanation ? `<div class="small muted">${esc(x.explanation)}</div>` : ""}</td></tr>`).join(""));
+  if (nums.length) h += table("Numbers", nums.map(n => `<tr><td style="width:1%;white-space:nowrap">${n.value}</td><td class="it">${esc(n.it)}${sayBtn(n.it)}${boxTag(n.id)}${arr(n.alt).length ? `<div class="small muted">also ${esc(arr(n.alt).join(", "))}</div>` : ""}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""));
+  if (other.length) h += table(nouns.length || verbs.length ? "Other words" : "Words", other.map(n => `<tr><td class="it">${esc(arr(n.it)[0])}${sayBtn(arr(n.it)[0])}${Array.isArray(n.forms) ? `<div class="gf">${esc(formsText(n.forms))}</div>` : ""}<div class="pos">${esc(posLabel(n.pos, n.gender))}</div></td><td>${esc(enList(n).join(", "))}${boxTag(n.id)}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""));
+  if (sents.length) h += table("Sentences", sents.map(x => `<tr><td class="it">${esc(arr(x.it)[0])}${sayBtn(arr(x.it)[0])}</td><td>${esc(arr(x.en)[0])}${boxTag(x.id)}${x.explanation ? `<div class="small muted">${esc(x.explanation)}</div>` : ""}</td></tr>`).join(""));
   if (gram.length) h += list("Grammar points", gram.map(g => `<div class="gitem">${esc(g.prompt)}${boxTag(g.id)}<div class="it">${esc(g.answer)}</div>${g.explanation ? `<div class="small muted">${esc(g.explanation)}</div>` : ""}</div>`).join(""));
   if (!items.length) h += `<p class="muted">No items match.</p>`;
   return h + `<button type="button" class="primary wide" data-unit="${esc(u.id)}">Practise this unit</button>`;
 }
 function rowHtml(i) {
-  if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span> <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableHtml(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
-  if (i.type === "verb") return `<div><span class="itx">${esc(i.it)}</span> <span class="muted">${esc(arr(i.en).join(", "))}${i.group ? " · " + esc(i.group) : ""}</span> ${boxTag(i.id)}</div>` + Object.keys(i.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(i, t)).join("") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
-  if (i.type === "vocab" && i.pos === "noun" && i.art) return `<div><span class="itx">${esc(joinArt(i.art, arr(i.it)[0]))}</span> <span class="muted">${esc(enList(i).join(", "))}</span> ${boxTag(i.id)}</div><div class="small">${esc(joinArt(i.indef, arr(i.it)[0]))} · ${esc(joinArt(i.artPl, i.plural))}</div>` + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
-  if (i.type === "vocab") return `<div><span class="itx">${esc(arr(i.it).join(", "))}</span> <span class="small muted">${esc(posLabel(i.pos, i.gender))}</span> ${boxTag(i.id)}</div><div>${esc(enList(i).join(", "))}</div>` + (Array.isArray(i.forms) ? `<div class="small muted">${esc(formsText(i.forms))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
-  if (i.type === "sentence") return `<div><span class="itx">${esc(arr(i.it)[0])}</span> ${boxTag(i.id)}</div><div>${esc(arr(i.en)[0])}</div>` + (i.explanation ? `<div class="small muted">${esc(i.explanation)}</div>` : "");
+  if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableHtml(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "verb") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))}${i.group ? " · " + esc(i.group) : ""}</span> ${boxTag(i.id)}</div>` + Object.keys(i.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(i, t)).join("") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "vocab" && i.pos === "noun" && i.art) return `<div><span class="itx">${esc(joinArt(i.art, arr(i.it)[0]))}</span>${sayBtn(joinArt(i.art, arr(i.it)[0]))} <span class="muted">${esc(enList(i).join(", "))}</span> ${boxTag(i.id)}</div><div class="small">${esc(joinArt(i.indef, arr(i.it)[0]))} · ${esc(joinArt(i.artPl, i.plural))}</div>` + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "vocab") return `<div><span class="itx">${esc(arr(i.it).join(", "))}</span>${sayBtn(arr(i.it).join(", "))} <span class="small muted">${esc(posLabel(i.pos, i.gender))}</span> ${boxTag(i.id)}</div><div>${esc(enList(i).join(", "))}</div>` + (Array.isArray(i.forms) ? `<div class="small muted">${esc(formsText(i.forms))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "sentence") return `<div><span class="itx">${esc(arr(i.it)[0])}</span>${sayBtn(arr(i.it)[0])} ${boxTag(i.id)}</div><div>${esc(arr(i.en)[0])}</div>` + (i.explanation ? `<div class="small muted">${esc(i.explanation)}</div>` : "");
   if (i.type === "grammar_mc") return `<div>${esc(i.prompt)} ${boxTag(i.id)}</div><div class="itx">${esc(i.answer)}</div>` + (i.explanation ? `<div class="small muted">${esc(i.explanation)}</div>` : "");
-  if (i.type === "number") return `<div>${i.value} <span class="itx">${esc(i.it)}</span> ${boxTag(i.id)}</div>` + (arr(i.alt).length ? `<div class="small muted">also: ${esc(arr(i.alt).join(" · "))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
-  if (i.type === "clock") return `<div>${esc(i.value)} <span class="itx">${esc(arr(i.it)[0])}</span> ${boxTag(i.id)}</div>` + (arr(i.it).length > 1 ? `<div class="small muted">also: ${esc(arr(i.it).slice(1).join(" · "))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
-  if (i.type === "transform") return `<div><span class="itx">${esc(i.it)}</span> <span class="small muted">→ ${esc(i.task)}</span> ${boxTag(i.id)}</div><div class="itx">${esc(arr(i.answer)[0])}</div>` + (i.explanation ? `<div class="small muted">${esc(i.explanation)}</div>` : "");
-  if (i.type === "prep") return `<div><span class="itx">${esc(i.it)}</span> <span class="muted">${esc(arr(i.en).join(", "))}</span> ${boxTag(i.id)}</div>` + prepTableHtml(i.it) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "number") return `<div>${i.value} <span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} ${boxTag(i.id)}</div>` + (arr(i.alt).length ? `<div class="small muted">also: ${esc(arr(i.alt).join(" · "))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "clock") return `<div>${esc(i.value)} <span class="itx">${esc(arr(i.it)[0])}</span>${sayBtn(arr(i.it)[0])} ${boxTag(i.id)}</div>` + (arr(i.it).length > 1 ? `<div class="small muted">also: ${esc(arr(i.it).slice(1).join(" · "))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "transform") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="small muted">→ ${esc(i.task)}</span> ${boxTag(i.id)}</div><div class="itx">${esc(arr(i.answer)[0])}${sayBtn(arr(i.answer)[0])}</div>` + (i.explanation ? `<div class="small muted">${esc(i.explanation)}</div>` : "");
+  if (i.type === "prep") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))}</span> ${boxTag(i.id)}</div>` + prepTableHtml(i.it) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   return "";
 }
 function renderLookup() {
@@ -6262,6 +6393,8 @@ function wire() {
   app.querySelectorAll("[data-act]").forEach(b => b.onclick = () => action(b.dataset.act));
   app.querySelectorAll("[data-useg]").forEach(b => b.onclick = () => { S.unitSeg = b.dataset.useg; render(); });
   app.querySelectorAll("[data-appearance]").forEach(b => b.onclick = () => setTheme(b.dataset.appearance));
+  app.querySelectorAll("[data-audio]").forEach(b => b.onclick = () => setAudio(b.dataset.audio));
+  markSaying();
   const pk = document.getElementById("sec-packs"); if (pk) pk.ontoggle = () => { S.packsOpen = pk.open; };
   const sb = document.getElementById("sheetBg");
   if (sb) { sb.onclick = (e) => { if (e.target === sb) action("stay"); }; const k = sb.querySelector(".sheet"); if (k) k.focus({ preventScroll: true }); } // focus moves into the sheet (and the keyboard closes)
@@ -6649,7 +6782,7 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "8.1";
+const APP_VERSION = "8.2";
 applyTheme(themePref());
 loadLocal();
 buildContent();

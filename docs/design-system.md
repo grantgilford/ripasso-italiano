@@ -166,7 +166,7 @@ Every text pairing above was checked: all are at least 4.5:1, most well over 6:1
 - **Width:** content column `max-width: 560px`, centred, as now; the tab bar spans the window, with its items centred within the same 560 px.
 - **No shadows and no gradients.** Cards sit on the background by colour alone. Borders only on inputs, the current-unit card (2 px `--accent`) and answer states.
 - **Tap targets:** at least 44 × 44 px everywhere, including the accent keys, chips and the Quit button.
-- **Motion:** only purposeful and small: the feedback panel slides up (about 180 ms), pressed buttons dim slightly. Wrap all of it in `@media (prefers-reduced-motion: no-preference)`. No mascots, confetti, sounds or decorative animation (the spec's "no decoration" principle still holds).
+- **Motion:** only purposeful and small: the feedback panel slides up (about 180 ms), pressed buttons dim slightly. Wrap all of it in `@media (prefers-reduced-motion: no-preference)`. No mascots, confetti, sound effects or decorative animation (the spec's "no decoration" principle still holds). Italian read aloud (7, Speakers) is content, not decoration: it plays only when a speaker is tapped.
 - **Icons:** inline stroke SVG, 24-unit viewBox, stroke 1.8, round caps and joins, `currentColor`. Copy the exact paths from the mockups (Today, Units, Rules, Look up, You, Review, Verbs, Flashcards, Mistakes, the flame, settings rows). No emoji. Icon-only buttons get an `aria-label`.
 
 ---
@@ -221,6 +221,13 @@ The current unit's card has a 2 px `--accent` border and two buttons: **Practise
 - Long explanations make the panel scroll, never the page behind it.
 
 **Settings rows** (You screen). These sit in a card with dividers. Each row: a 36 px `--tint` icon well with a 20 px `--accent` icon, the label (16 px 500), the value (`--muted`, right-aligned), then a chevron. 56 px minimum height.
+
+**Speakers (read aloud, from 8.2).** A speaker icon (the `speaker` icon: a speaker and two sound waves, drawn in the icon style above) beside Italian text reads it in the device's own Italian voice (the browser's speech synthesis) when tapped; nothing plays by itself and nothing is downloaded. While it reads, the icon becomes a small stop square, and a second tap stops it; moving to another screen or the next exercise stops it too.
+- *Inline* (`.say`): in lessons, the glossary, Look up, verb tables, the summary and the tip card. A 44 × 44 px button with a 20 px `--accent` icon, sitting after the text, with negative margins so it takes no more room than a word. The icon is a CSS mask rather than inline SVG, so the Verbs section's thousands of tables stay light.
+- *Round* (`.say.solo`): a 44 px `--tint` circle with a 22 px icon, at the top right of the prompt card and of a flip card's back, and at the right of the answer panel's heading (on `--card` there).
+- *Where:* every lesson example, each dialogue line (plus **Listen to the dialogue**, which reads the lines in turn and shows **Stop** meanwhile), the right half of each "wrong → right" pair (never the wrong one), every glossary and Look up entry with Italian, every conjugation table (read one person at a time, *io parlo*, *tu parli*…; commands bare), the session summary's missed items and the "Lo sapevi?" card.
+- *In a practice session* a prompt gets a speaker only when it already shows Italian, and the speaker reads only that, so it never gives the answer away; the answer panel's speaker reads the Italian answer (the whole sentence for a fill-in-the-blank, the whole table for a verb table). Rule questions get none, as their answers are often English. Tapping a speaker never moves the focus, so the keyboard stays up and Enter still checks.
+- *Setting:* You › Settings › **Read aloud: Off · Normal · Slow** (8.8). Where the browser can't speak (the Android WebView inside some apps) no speakers are drawn; where the device has no Italian voice they are hidden, and the You row says why.
 
 **Lesson tip box** (`.ltip`). `--note-bg` background, 14 px radius, an info icon, the heading in `--note-title` and the text in `--fg`. No left-border stripe.
 
@@ -342,6 +349,7 @@ A new `S.screen = "you"` with its own render function and a `data-go="you"` tab.
      - Read it at start-up before the first paint; wrap every read and write in `try/catch`.
      - It sets or removes `data-theme` on `<html>`. Auto removes the attribute, so the phone's setting applies.
      - It is deliberately not part of `progress`, so it neither syncs nor touches the progress formats, and different devices can have different themes.
+   - **Read aloud** (from 8.2): an inline segmented control, **Off · Normal · Slow**, like Appearance and stored the same way: per device in `itapp.audio.v1` (`"off"`, `"normal"` or `"slow"`, default Normal), never in `progress`, since each phone has its own voices. Normal reads a little below the voice's natural pace, Slow well below it; choosing either reads a sample (*Ciao! Come stai?*). Without speech in the browser the row says "Not available" and suggests Chrome or the installed app; without an Italian voice it says how to install one.
    - **Lesson length:** current value, e.g. "12 exercises".
    - **New items per day:** current value, e.g. "No limit".
    - **Vocab direction:** current value, e.g. "Italian → English".
@@ -411,7 +419,7 @@ A small card at the bottom of Today showing one short Italian tidbit, picked fro
 ## 12. Out of scope
 
 - Any change to content, scoring, scheduling, sync, backup formats or storage keys, apart from the one new device-only key `itapp.theme.v1`.
-- New features beyond the You screen, the theme setting and the tip card.
+- New features beyond the You screen, the theme setting and the tip card. (Read aloud followed in version 8.2: see Speakers in section 7.)
 - Publishing or deploying (Grant republishes from a chat, as always).
 - A manifest or service worker. (Added afterwards, in version 8.1: see `CLAUDE.md`. The installed copy uses the PNG icons via `icons/`.)
 
