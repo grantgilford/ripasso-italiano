@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v2.8)
+# Italian Practice App: Content Pack Guide (v2.9)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v8.0, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v8.2, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
@@ -128,6 +128,7 @@ Drilled both ways: digits → words (any entry in `it` is accepted) and words �
 - Flashcard units have their own pacing (cards per session, new per session) and are excluded from Continue and Review; grammar units use the daily new-item limit.
 - A unit's screen has two tabs when the unit has a lesson: **Lesson** (long-form reading, below) and **Glossary**, which lists every item in the unit (verb tables, noun forms, sentences with explanations, grammar points) with its box, filterable. Units without a lesson show the glossary only.
 - Explanations appear after mistakes by default, or after every answer (Settings); a new item's first card always shows its explanation.
+- **Read aloud** (v8.2): a speaker beside the Italian reads it in the device's own Italian voice, so write the Italian exactly as it should sound. The speaker reads the text as written, except that a note in brackets is skipped (*che (relative)* is read *che*; a transform's *Vivo a Roma. (two years, still there)* is read *Vivo a Roma.*), only the first of two endings or words joined by a slash is read (*andato/a* → *andato*, *fa'/fai* → *fa'*), and an arrow, a dash between two speakers or a slash with spaces round it becomes a pause (*Grazie! — Prego.*). So keep English out of `it`, lesson examples (`ex`) and dialogue lines except in brackets. Verb tables are read one person at a time as labelled (*io parlo*, *che io parli*; commands bare). In a practice session a prompt is read only when it already shows the Italian, and the answers of grammar questions are never read, as they are often English.
 - Every exercise has a **Flag this item** button with an optional note. Flagged items are listed on the Your data screen (You → Flagged items): that list is how a content problem gets back to the build chat.
 
 ## The Verbs section (`VERB_GYM`)

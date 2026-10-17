@@ -20,7 +20,16 @@
     5. Appearance (Light / Dark / Auto) sets the colours, survives a reload and
        leaves saved progress untouched;
     6. the "Lo sapevi?" card keeps its tidbit across redraws, picks afresh on
-       a new load, and steps aside when Today would not fit above the tab bar.
+       a new load, and steps aside when Today would not fit above the tab bar;
+    7. read aloud, with a stand-in for the phone's voices: the speakers in the
+       lessons, glossary, verb tables, Look up, Today and a practice session
+       read their Italian with the Italian voice; a prompt's speaker reads only
+       Italian the prompt already shows, never the answer (checked on every
+       item), and the answer panel's only Italian from the item; tapping a
+       speaker keeps the answer field focused; a second tap or leaving the
+       screen stops it; Off · Normal · Slow is kept per device and leaves
+       progress untouched; and with no Italian voice, or no speech at all, the
+       speakers are hidden or never drawn and You says why.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -75,8 +84,9 @@ function seedProgress() {
   localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items, days, flags, currentUnit: "u05", settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T }));
 }
 
-async function openApp(browser, origin, { width, height, scheme }) {
-  const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme });
+async function openApp(browser, origin, { width, height, scheme, init, touch }) {
+  const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, hasTouch: !!touch });
+  if (init) await context.addInitScript(init);
   const page = await context.newPage();
   page.errors = []; page.outside = [];
   page.on("pageerror", e => page.errors.push(String(e)));
@@ -199,6 +209,186 @@ async function tour(page, label, opts = {}) {
   check(L("leaving a session returns to Today with the tab bar"), (await screen(page)) === "home" && await page.$(".tabbar"));
 }
 
+/* ---------- read aloud ---------- */
+// A stand-in for the phone's speech, run in the page before the app: it lists the given voices, plays each
+// utterance for 300 ms in turn, and records what was read (window.__said) and how often it was stopped.
+function fakeSpeech(voices) {
+  if (voices === null) return `Object.defineProperty(window, "speechSynthesis", { value: undefined, configurable: true }); window.SpeechSynthesisUtterance = undefined;`;
+  return `(() => {
+    const voices = ${JSON.stringify(voices)}, said = window.__said = [], queue = [];
+    let cur = null, timer = 0;
+    const next = () => {
+      cur = queue.shift() || null; fake.speaking = !!cur; fake.pending = queue.length > 0;
+      if (!cur) return;
+      said.push({ text: cur.text, lang: cur.lang, rate: cur.rate, voice: cur.voice ? cur.voice.name : null });
+      timer = setTimeout(() => { const u = cur; next(); if (u.onend) u.onend({}); }, 300);
+    };
+    const fake = { speaking: false, pending: false, paused: false, cancels: 0,
+      getVoices: () => voices.map(v => Object.assign({ localService: true, default: false, voiceURI: v.name }, v)),
+      speak(u) { queue.push(u); if (!cur) next(); else fake.pending = true; },
+      cancel() { fake.cancels++; clearTimeout(timer); const was = [cur].concat(queue.splice(0)).filter(Boolean); cur = null; fake.speaking = fake.pending = false; was.forEach(u => u.onerror && u.onerror({ error: "interrupted" })); },
+      resume() { }, pause() { }, addEventListener() { }, removeEventListener() { } };
+    Object.defineProperty(window, "speechSynthesis", { value: fake, configurable: true });
+    window.SpeechSynthesisUtterance = function (t) { this.text = t; this.lang = ""; this.rate = 1; this.voice = null; };
+  })();`;
+}
+const VOICES = [{ name: "English (test)", lang: "en-GB" }, { name: "Italiano (test)", lang: "it-IT" }];
+
+async function readAloud(browser, origin) {
+  const said = (page) => page.evaluate(() => window.__said.slice());
+  const clearSaid = (page) => page.evaluate(() => { window.__said.length = 0; });
+  const visible = (page, sel) => page.$$eval(sel, es => es.filter(e => e.offsetParent !== null).length);
+  const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light", init: fakeSpeech(VOICES), touch: true });
+  const speakerText = (sel) => page.$eval(sel, b => b.dataset.say);
+  const parts = (t) => page.evaluate(t => speakable(t), t);
+
+  // Today, the lesson, its dialogue and its "wrong → right" pairs
+  check("Read aloud: the Lo sapevi? card has a speaker for its Italian", await page.$("#tipcard .tip-h [data-say]"));
+  await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
+  const lex = await page.$$eval(".lex > div", ds => ds.map(d => ({ it: d.querySelector(".lit").textContent.trim(), say: !!d.querySelector(".lit [data-say]") })));
+  check("Read aloud: every lesson example has a speaker", lex.length && lex.every(x => x.say), `${lex.filter(x => !x.say).length} of ${lex.length} without`);
+  check("Read aloud: every dialogue has Listen to the dialogue, and a speaker on each line", (await page.$$(".dlg")).length && (await page.$$eval(".dlg", ds => ds.every(d => d.querySelector(".dlg-all") && [...d.querySelectorAll(".lit")].every(l => l.querySelector("[data-say]"))))));
+  check("Read aloud: the right version of each “wrong → right” pair has a speaker, the wrong one none", (await page.$$eval(".lfix .fx", fs => fs.length && fs.every(f => f.querySelector(".yes [data-say]") && !f.querySelector(".no [data-say]")))));
+  await page.locator(".lex .lit [data-say]").first().scrollIntoViewIfNeeded();
+  const first = await page.$eval(".lex .lit [data-say]", b => speakable(b.dataset.say));
+  await clearSaid(page); await page.tap(".lex .lit [data-say]");
+  let s1 = await said(page);
+  check("Read aloud: a lesson example is read in Italian, with the Italian voice, at Normal speed", first.join() === lex[0].it && s1.length === 1 && s1[0].text === lex[0].it && s1[0].lang === "it-IT" && s1[0].voice === "Italiano (test)" && s1[0].rate === 0.9, JSON.stringify(s1) + " / " + lex[0].it);
+  check("Read aloud: the speaker that is playing shows it", await page.$(".lex .lit [data-say].on"));
+  await page.waitForTimeout(400);
+  check("Read aloud: …and goes back to the speaker when it ends", !(await page.$(".lex .lit [data-say].on")));
+  const lines = await page.$eval(".dlg", d => [...d.querySelectorAll(".lit [data-say]")].flatMap(b => speakable(b.dataset.say)));
+  await page.locator(".dlg-all").first().scrollIntoViewIfNeeded();
+  await clearSaid(page); await page.tap(".dlg-all");
+  check("Read aloud: Listen to the dialogue reads it line by line and offers Stop", (await page.$(".dlg-all.on")) && (await page.$eval(".dlg-all.on .lbl-stop", e => e.offsetParent !== null)));
+  await page.waitForTimeout(700);
+  const cancels = await page.evaluate(() => speechSynthesis.cancels);
+  await page.tap(".dlg-all");
+  s1 = await said(page);
+  check("Read aloud: the lines come in order, and a second tap stops them", s1.length >= 2 && s1.length < lines.length && s1.every((x, i) => x.text === lines[i]) && (await page.evaluate(() => speechSynthesis.cancels)) > cancels && !(await page.$(".dlg-all.on")) && !(await page.evaluate(() => speechSynthesis.speaking)), JSON.stringify(s1.map(x => x.text)) + "\n" + JSON.stringify(lines));
+  await page.tap(".dlg-all"); await page.waitForTimeout(100);
+  await page.evaluate(() => { S.refTab = "glossary"; render(); });
+  check("Read aloud: switching to another screen stops the reading", !(await page.evaluate(() => speechSynthesis.speaking || !!sayNow)));
+
+  // the glossary, verb tables and Look up
+  await page.evaluate(() => { S.refUnit = "u02"; S.refTab = "glossary"; render(); });
+  const nouns = await page.$$eval(".gloss td.it", ts => ts.map(t => ({ text: t.firstChild.textContent.trim(), say: t.querySelector("[data-say]") && t.querySelector("[data-say]").dataset.say })));
+  check("Read aloud: every glossary word has a speaker reading the word beside it", nouns.length > 20 && nouns.every(n => n.say === n.text), JSON.stringify(nouns.filter(n => n.say !== n.text).slice(0, 3)));
+  await page.evaluate(() => { S.refUnit = "u03"; render(); });
+  await clearSaid(page); await page.evaluate(() => document.querySelector(".conj > .say").click());
+  const table = (await said(page)).map(x => x.text);
+  await page.waitForTimeout(2000);
+  const all = (await said(page)).map(x => x.text);
+  check("Read aloud: a verb table is read one person at a time (io …, tu …)", table.length === 1 && /^io \S/.test(table[0]) && all.length === 6 && /^tu \S/.test(all[1]), all.join(" | "));
+  await page.evaluate(() => { S.refUnit = "vb"; render(); });
+  const cmd = await page.evaluate(() => { const d = document.createElement("div"); d.innerHTML = vgTableHtml(vgItem("andare", "imperativo"), "imperativo"); const b = d.querySelector(".conj > .say"); return b && speakable(conjRead(b)).join(" | "); });
+  check("Read aloud: in the Verbs section, commands are read bare (va', vada, andiamo…, no “tu va'”)", cmd === "va' | vada | andiamo | andate | vadano", cmd);
+  const subj = await page.evaluate(() => { const b = [...document.querySelectorAll(".conj > .say")].find(x => /^che io /.test(conjRead(x))); return b && conjRead(b); });
+  check("Read aloud: the subjunctive is read in its che clause (che io …)", !!subj, subj);
+  await page.evaluate(() => { S.screen = "lookup"; S.lookup = "libro"; render(); });
+  check("Read aloud: Look up results have speakers", (await page.$$(".hit [data-say]")).length > 0);
+
+  // a practice session: the prompt's speaker, the answer field keeps the focus, the answer panel
+  await page.evaluate(() => { progress.settings.fcDir = "it-en"; startSession("unit", "fc01"); });
+  let ex = await page.evaluate(() => ({ say: current().ex.say, it: arr(current().ex.item.it)[0], mode: current().ex.mode }));
+  check("Read aloud: a flashcard showing the Italian has a speaker for it", ex.say === ex.it && await page.$(".prompt-card [data-say]"), JSON.stringify(ex));
+  await page.fill("#answer", "abc");
+  await clearSaid(page); await page.tap(".prompt-card [data-say]");
+  check("Read aloud: tapping it reads the word and leaves the answer field focused, with what was typed", (await said(page)).map(x => x.text).join() === ex.it && (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "answer" && (await page.inputValue("#answer")) === "abc");
+  await page.click(".prompt-card [data-say]");
+  check("Read aloud: …with a mouse too", (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "answer");
+  await page.click('[data-act="check"]'); await page.waitForTimeout(400);
+  const fbSay = await speakerText(".fb-head [data-say]").catch(() => null);
+  check("Read aloud: the answer panel has a speaker for the Italian", fbSay === ex.it, fbSay);
+  await clearSaid(page); await page.tap(".fb-head [data-say]");
+  check("Read aloud: …and Continue keeps the focus, so Enter still moves on", (await said(page)).length === 1 && (await page.evaluate(() => document.activeElement && document.activeElement.dataset.act)) === "continue");
+  await page.evaluate(() => { session = null; S.feedback = null; S.screen = "home"; render(); });
+
+  // every item: a prompt reads only Italian it shows; the answer panel only Italian from the item itself
+  const r = await page.evaluate(() => {
+    const text = (h) => { const d = document.createElement("div"); d.innerHTML = String(h || "").replace(/</g, " <"); return normalize(d.textContent); };
+    const words = (x) => normalize(x).replace(/'/g, "' ").split(" ").filter(Boolean); // l'amico is l' + amico
+    const dataWords = (item, ex) => {
+      const own = [item, ex.noun].filter(Boolean).flatMap(i => [i.it, i.forms, i.allForms, i.plural, i.art, i.indef, i.artPl, i.answer, i.alt, i.cloze && i.cloze.text])
+        .concat(item.type === "prep" ? [PREP_TABLE[item.it]] : []); // a preposition's merged forms (della, nello…) come from the app's table
+      return new Set(words(JSON.stringify(own).replace(/[{}|]/g, " ")).concat(["io", "tu", "lui", "lei", "noi", "voi", "loro", "che"]));
+    };
+    const keep = [progress.settings.fcDir, progress.settings.flipDir], bad = [], typesRead = new Set();
+    let n = 0, prompts = 0, panels = 0;
+    for (const [fcDir, flipDir] of [["it-en", "IT→EN"], ["en-it", "EN→IT"]]) {
+      progress.settings.fcDir = fcDir; progress.settings.flipDir = flipDir;
+      for (const item of Object.values(content.items)) for (const box of [0, 1, 3]) for (let k = 0; k < 2; k++) {
+        const ex = makeExercise(item, { box, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 0 }); if (!ex) continue;
+        n++;
+        const where = `${item.id} (${ex.type})`;
+        if (ex.say) {
+          prompts++; typesRead.add(ex.typeKey);
+          if (/^<span class="en">/.test(ex.promptHtml)) bad.push(`${where}: the prompt is English but has a speaker`);
+          for (const x of speakable(ex.say)) if (!text(ex.promptHtml).includes(normalize(x))) bad.push(`${where}: reads “${x}”, the prompt shows “${text(ex.promptHtml)}”`);
+        }
+        for (const x of speakable(ex.sayBack || "")) if (!text(ex.backHtml).includes(normalize(x))) bad.push(`${where}: the back reads “${x}”, it shows “${text(ex.backHtml)}”`);
+        const a = sayAnswerOf(ex, { ok: true });
+        if (ex.typeKey === "grammar") { if (a) bad.push(`${where}: a rule question's answer is read`); continue; }
+        if (!speakable(a).length) { if (ex.mode !== "vintro") bad.push(`${where}: the answer panel has no speaker`); continue; }
+        panels++;
+        const own = dataWords(item, ex), stray = speakable(a).flatMap(words).filter(w => !own.has(w));
+        if (stray.length) bad.push(`${where}: the panel reads “${stray.join(" ")}”, not in the item`);
+      }
+    }
+    [progress.settings.fcDir, progress.settings.flipDir] = keep;
+    return { n, prompts, panels, types: [...typesRead].sort().join(", "), bad: [...new Set(bad)] };
+  });
+  check(`Read aloud: of ${r.n} exercises built from every item, ${r.prompts} prompts read only the Italian they show and ${r.panels} answer panels read only the item's Italian`, !r.bad.length && r.prompts > 1000 && r.panels > 10000, r.bad.slice(0, 8).join("\n") + (r.bad.length > 8 ? `\n… ${r.bad.length} in all` : ""));
+  if (process.env.VERBOSE) console.log("         prompts with a speaker: " + r.types);
+
+  // the setting: Off · Normal · Slow
+  const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
+  await tap(page, '.tab[data-go="you"]');
+  check("Read aloud: You has Off · Normal · Slow, with Normal chosen", await page.$('[data-audio="normal"][aria-pressed="true"]') && await page.$('[data-audio="off"]') && await page.$('[data-audio="slow"]') && !(await page.$("#readaloud-row .srow-hint")));
+  await clearSaid(page); await tap(page, '[data-audio="slow"]');
+  s1 = await said(page);
+  check("Read aloud: choosing Slow reads a sample, slowly, and is kept in itapp.audio.v1", s1.length === 1 && s1.every(x => x.rate === 0.65) && (await page.evaluate(() => localStorage.getItem("itapp.audio.v1"))) === '"slow"', JSON.stringify(s1));
+  await page.reload(); await page.waitForFunction(ready);
+  await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
+  await clearSaid(page); await page.evaluate(() => document.querySelector(".lex .lit [data-say]").click());
+  check("Read aloud: Slow survives a reload and slows every speaker", (await said(page)).every(x => x.rate === 0.65) && (await said(page)).length === 1);
+  await tap(page, '.tab[data-go="you"]'); await tap(page, '[data-audio="off"]');
+  await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
+  check("Read aloud: Off hides every speaker", (await visible(page, ".say, [data-say]")) === 0 && (await page.$$("[data-say]")).length > 0 && await page.evaluate(() => document.documentElement.classList.contains("nosay")));
+  await tap(page, '.tab[data-go="you"]'); await tap(page, '[data-audio="normal"]');
+  check("Read aloud: Normal brings them back", (await page.evaluate(() => document.documentElement.classList.contains("nosay"))) === false);
+  check("Read aloud: saved progress is untouched, and the setting is not part of it, so it never syncs", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore && !(await page.evaluate(() => JSON.stringify(progress))).includes("audio"));
+  check("Read aloud: no script errors", !page.errors.length, page.errors.join("\n"));
+  await context.close();
+
+  // a device whose voices include no Italian: the speakers are hidden and You says how to add one
+  {
+    const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "dark", init: fakeSpeech([VOICES[0]]) });
+    await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
+    check("No Italian voice: the speakers are hidden", (await visible(page, ".say, [data-say]")) === 0);
+    await tap(page, '.tab[data-go="you"]');
+    check("No Italian voice: You says so, and how to install one", /No Italian voice/.test(await page.$eval("#readaloud-row", e => e.textContent)));
+    await layout(page, "No Italian voice: You");
+    check("No Italian voice: no script errors", !page.errors.length, page.errors.join("\n"));
+    await context.close();
+  }
+  // a browser with no speech at all (the Android WebView inside some apps): no speakers are drawn
+  {
+    const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light", init: fakeSpeech(null) });
+    await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
+    const lessonSpeakers = (await page.$$(".say, [data-say]")).length;
+    await page.evaluate(() => { S.refUnit = "vb"; S.screen = "reference"; render(); });
+    const verbSpeakers = (await page.$$(".say, [data-say]")).length;
+    await page.evaluate(() => startSession("unit", "fc01"));
+    check("No speech: no speakers are drawn, in a lesson, the verb tables or a session", lessonSpeakers === 0 && verbSpeakers === 0 && (await page.$$(".say, [data-say]")).length === 0);
+    await page.evaluate(() => { session = null; S.screen = "you"; render(); });
+    check("No speech: You says read aloud isn't available in this browser", /Not available/.test(await page.$eval("#readaloud-row", e => e.textContent)) && !(await page.$("[data-audio]")));
+    check("No speech: no script errors", !page.errors.length, page.errors.join("\n"));
+    await context.close();
+  }
+  console.log("  Read aloud checked");
+}
+
 (async () => {
   const server = await serve();
   const origin = "http://127.0.0.1:" + server.address().port;
@@ -269,6 +459,9 @@ async function tour(page, label, opts = {}) {
       await context.close();
       console.log("  Lo sapevi? checked");
     }
+
+    /* Read aloud */
+    await readAloud(browser, origin);
   } catch (e) {
     failures++;
     console.log("\n  FAIL the test itself stopped: " + (e && e.stack || e));
