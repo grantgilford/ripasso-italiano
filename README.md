@@ -2,7 +2,7 @@
 
 A personal, text-only Italian practice app (called "Ripasso" in the app; *ripasso* means going back over your material). The whole app is `index.html`; open it in any browser.
 
-The app is used in two places: as a private claude.ai artifact (with cloud sync), and as an app installed on an Android phone from this repository's GitHub Pages site, https://grantgilford.github.io/italian-practice/ (it works offline and offers each new version merged to `main`). This repository is where changes are made and reviewed. The tag `v7.2` marks the known-good starting version.
+The app is used in two places: as a private claude.ai artifact (with cloud sync), and as an app installed on an Android phone from this repository's GitHub Pages site, https://grantgilford.github.io/ripasso-italiano/ (it works offline and offers each new version merged to `main`). This repository is where changes are made and reviewed. The tag `v7.2` marks the known-good starting version.
 
 To install it on Android: open the address above in Chrome, tap the menu (⋮) and choose **Install app** (or **Add to Home screen**). To bring progress across from another copy, use **You → Your data → Save backup file** there, then **Load backup file** in the installed app.
 

@@ -5,8 +5,8 @@
 
   Usage:  node tools/test-install.js [--headed]
 
-  Serves the repository at http://localhost:<port>/italian-practice/ (the same
-  shape as https://<user>.github.io/italian-practice/) and opens the real app
+  Serves the repository at http://localhost:<port>/ripasso-italiano/ (the same
+  shape as https://<user>.github.io/ripasso-italiano/) and opens the real app
   in a headless browser (Playwright + Chromium). It checks that:
 
     1. the manifest and icons are complete and valid, so Android offers
@@ -39,7 +39,7 @@ const { execSync } = require("child_process");
 
 const HEADED = process.argv.includes("--headed");
 const ROOT = path.join(__dirname, "..");
-const BASE = "/italian-practice/";
+const BASE = "/ripasso-italiano/";
 
 function loadPlaywright() {
   try { return require("playwright"); } catch (e) { }
@@ -58,7 +58,7 @@ function check(name, ok, detail) {
 }
 const section = (t) => console.log("\n" + t);
 
-/* ---------- a stand-in for GitHub Pages: the repository under /italian-practice/, which can be taken down or given a new index.html ---------- */
+/* ---------- a stand-in for GitHub Pages: the repository under /ripasso-italiano/, which can be taken down or given a new index.html ---------- */
 const site = { down: false, html: fs.readFileSync(path.join(ROOT, "index.html"), "utf8"), hits: [] };
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".webmanifest": "application/manifest+json", ".png": "image/png", ".json": "application/json" };
 function serve() {
@@ -121,7 +121,7 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
     page.on("pageerror", e => errors.push(String(e)));
     await page.goto(appUrl);
     await page.waitForFunction(ready);
-    check("the page links the manifest", await page.evaluate(() => { const l = document.querySelector('link[rel="manifest"]'); return !!l && l.href.endsWith("/italian-practice/manifest.webmanifest"); }));
+    check("the page links the manifest", await page.evaluate(() => { const l = document.querySelector('link[rel="manifest"]'); return !!l && l.href.endsWith("/ripasso-italiano/manifest.webmanifest"); }));
     check("the offline worker starts", await waitFor(page, () => navigator.serviceWorker.controller !== null || navigator.serviceWorker.ready.then(r => !!r.active)), "no active worker");
 
     /* 5a. First run on a new device */
