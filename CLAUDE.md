@@ -1,6 +1,6 @@
 # Italian practice app — briefing for Claude
 
-This repo is the workshop for Grant's personal Italian practice app, **Ripasso Italiano** ("Ripasso" in the app). Read this file first in every session.
+This repo (`grantgilford/ripasso-italiano`, renamed from `italian-practice` in Oct 2026) is the workshop for Grant's personal Italian practice app, **Ripasso Italiano** ("Ripasso" in the app). Read this file first in every session.
 
 ## What's here
 
@@ -20,7 +20,7 @@ This repo is the workshop for Grant's personal Italian practice app, **Ripasso I
 The app reaches Grant in two ways, both from the same `index.html`:
 
 1. **The claude.ai artifact** (https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ), with cloud sync. After work here is merged, Grant republishes `index.html` to that link from a claude.ai chat.
-2. **The installed copy** (from version 8.1): GitHub Pages serves the `main` branch at https://grantgilford.github.io/italian-practice/, and Grant installs it on his Android phone from Chrome. **Merging to `main` publishes it**: the installed app finds the new `index.html` the next time it opens and offers it on Today ("Update now"). Its progress is kept on the device only (no cloud sync), with backup files to move it between copies.
+2. **The installed copy** (from version 8.1): GitHub Pages serves the `main` branch at https://grantgilford.github.io/ripasso-italiano/, and Grant installs it on his Android phone from Chrome. **Merging to `main` publishes it**: the installed app finds the new `index.html` the next time it opens and offers it on Today ("Update now"). Its progress is kept on the device only (no cloud sync), with backup files to move it between copies.
 
 So:
 
