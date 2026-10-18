@@ -45,7 +45,7 @@ All units are open. The home screen suggests the next unit in order, but nothing
 | **Continue** (main button) | A lesson of about 12 exercises from the current unit: up to 5 new items plus due reviews from that unit |
 | **Review** | 15 exercises from items due across all units, most overdue first. Shows a count of due items on the home screen |
 | **Mistakes** | Items answered wrong in the last 7 days |
-| **Unit practice** | Any unit chosen from the unit list, new and review items mixed |
+| **Unit practice** | Any unit chosen from the unit list, new and review items mixed. Practising a grammar unit makes it the current unit, so Continue picks it up from then on |
 
 Within any session, a missed exercise is repeated at the end of the session until it's answered correctly. The repeat doesn't earn a promotion (see section 8). A session ends with a text summary: accuracy, XP earned, items promoted, and a list of missed items with correct answers.
 
