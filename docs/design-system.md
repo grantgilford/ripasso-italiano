@@ -165,7 +165,7 @@ Every text pairing above was checked: all are at least 4.5:1, most well over 6:1
 - **Radii:** hero card 22 px, cards and tiles 18 px, list-row cards 18 px, inputs 14 px, buttons 14–16 px, inner cells and badges 12 px, chips and pills fully round (999 px). The feedback panel's top corners are 26 px.
 - **Spacing:** screen side padding 20 px; 16 px between blocks on a screen, 12 px between tiles, 10 px between list cards, 14–16 px padding inside cards.
 - **Width:** content column `max-width: 560px`, centred, as now; the tab bar spans the window, with its items centred within the same 560 px.
-- **No shadows and no gradients.** Cards sit on the background by colour alone. Borders only on inputs, the current-unit card (2 px `--accent`) and answer states.
+- **No shadows and no gradients.** Cards sit on the background by colour alone. Borders only on inputs, the open unit card on Units (2 px `--accent`) and answer states.
 - **Tap targets:** at least 44 × 44 px everywhere, including the accent keys, chips and the Quit button.
 - **Motion:** only purposeful and small: the feedback panel slides up (about 180 ms), pressed buttons dim slightly. Wrap all of it in `@media (prefers-reduced-motion: no-preference)`. No mascots, confetti, sound effects or decorative animation (the spec's "no decoration" principle still holds). Italian read aloud (7, Speakers) is content, not decoration: it plays only when a speaker is tapped.
 - **Icons:** inline stroke SVG, 24-unit viewBox, stroke 1.8, round caps and joins, `currentColor`. Copy the exact paths from the mockups (Today, Units, Rules, Look up, You, Review, Verbs, Flashcards, Mistakes, the flame, settings rows). No emoji. Icon-only buttons get an `aria-label`.
@@ -195,7 +195,7 @@ Each one appears in the mockups; match them.
 - in progress: `--tint` fill, `--accent` number;
 - not started: `--seg` fill, `--muted` number, with "Not started".
 
-The current unit's card has a 2 px `--accent` border and two buttons: **Practise** (`--hero`) and **Read lesson** (`--tint` with `--accent` text, book icon).
+The open unit card (the current unit's, or the one just tapped) has a 2 px `--accent` border and two buttons: **Practise** (`--hero`) and **Read lesson** (`--tint` with `--accent` text, book icon).
 
 **Segmented control.** A `--seg` track with 4 px padding and 14 px radius; segments 44 px tall with 11 px radius. The selected segment is `--seg-on` with `--accent` text in light and `--fg` in dark. Where it switches views, use `role="tablist"` and `aria-selected`, as the existing Lesson/Glossary tabs do; for filters, `aria-pressed`.
 
@@ -261,6 +261,8 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 - **Sync:** the sync label moves to You › Your data. Keep a small notice line under the header only when sync is in error ("Sync error, saved locally"), so a problem is never silent.
 - **Flash message** (`S.flash`): shown as a card just below the header.
 - **Continue card:**
+  - It shows the current unit: the grammar unit practised last. Practise on any grammar unit (from Units, the unit screen or Rules) makes that unit the current one, so Today follows whatever Grant is working on. Vocab packs and the Verbs don't change it (from v8.4).
+  - When a session uses up the current unit's last new items, the card moves on to the next unit with new items, as it always has. Continue on a unit with no new items left does the same at the end of the session. Choosing to practise a finished unit from Units keeps it on Today until then.
   - The chip shows the unit's number. Grammar units are numbered by their position among the grammar units, the same numbers the new Units screen shows on its badges.
   - Then the title, `unitStats().pct` learned, new and due counts for the unit, and the **Continue** pill (`data-start="continue"`).
   - When the unit is finished, keep today's wording: "nothing due, extra practice".
@@ -282,8 +284,9 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 - **One list-row card per unit:**
   - **Showing:** the badge number, title, a one-line description (clamp to one line; the full text is on the unit screen) and the progress bar.
   - **Imported packs:** keep a small "pack …" note.
-  - **Tapping a card** opens the unit screen (`data-ref`).
-  - **The current unit's card** is expanded with **Practise** (`data-unit`) and **Read lesson** (`data-ref`).
+  - **One card is open at a time** (from v8.4). It has the accent border, "N new · N to review" (for the Verbs, new and due as on Today's Verbs tile), **Practise** (`data-unit`) and **Read lesson** (`data-ref`; "Open unit" where a unit has no lesson). The current unit's card is open when Units opens.
+  - **Tapping a closed card** (`data-upick`) opens it in place and closes the other, for any unit: grammar, vocab pack or Verbs. The tapped card stays where it was under the finger, and its buttons are scrolled clear of the tab bar. The choice lasts while Grant stays in Units and its unit screens (so it is still open after Read lesson and back), and goes back to the current unit once he leaves for another tab or a session.
+  - **The current unit** says "Current unit" at the start of its muted line, open or closed, so it is easy to find while another card is open.
   - **"Make this my Continue unit"** (`data-setunit`) moves to the unit screen.
 
 ### 8.4 Unit screen (`renderReference`, `renderVerbReference`), see `mockups/lesson-*.html`

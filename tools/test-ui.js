@@ -11,6 +11,11 @@
     1. every screen is reachable by tapping: the tab bar, the Units filter, a
        unit's Lesson and Glossary, the section chips, the You rows (Stats,
        Settings, Your data at its sections), and the back arrows;
+       choosing a unit: tapping any unit's card on Units opens it in place
+       with Practise and Read lesson (one open at a time, the tapped card
+       staying put and clear of the tab bar), and Practise makes a grammar
+       unit the current unit, so Today's Continue card follows the unit
+       practised last; a unit's last new items move it on to the next;
     2. there are no script errors and no requests outside the file (the fonts,
        icons and favicon are embedded);
     3. nothing is hidden behind the tab bar, nothing scrolls sideways, and every
@@ -105,6 +110,7 @@ async function openApp(browser, origin, { width, height, scheme, init, touch }) 
   return { page, context };
 }
 const screen = page => page.evaluate("S.screen");
+const listedUnits = page => page.$$eval(".ulist > *", es => es.map(e => e.dataset.upick || e.querySelector("[data-unit]")?.dataset.unit)); // the units on Units, in order
 async function tap(page, selector) { await page.click(selector); await page.waitForTimeout(60); }
 
 // Layout rules that hold on every screen with a tab bar.
@@ -144,9 +150,10 @@ async function tour(page, label, opts = {}) {
   check(L("the Units tab opens Units"), (await screen(page)) === "units" && await page.$('.tab[data-go="units"][aria-current="page"]'));
   await layout(page, L("Units"), opts);
   await tap(page, '[data-useg="vocab"]');
-  check(L("the Vocab filter lists the vocab packs"), (await page.$$eval(".ulist [data-ref]", es => es.map(e => e.dataset.ref))).every(id => /^fc/.test(id)));
+  const vocab = await listedUnits(page);
+  check(L("the Vocab filter lists the vocab packs"), vocab.length && vocab.every(id => /^fc/.test(id)), vocab.join());
   await tap(page, '[data-useg="verbs"]');
-  check(L("the Verbs filter lists the Verbs unit"), (await page.$$eval(".ulist [data-ref]", es => es.map(e => e.dataset.ref))).join() === "vb");
+  check(L("the Verbs filter lists the Verbs unit"), (await listedUnits(page)).join() === "vb");
   await tap(page, '[data-useg="grammar"]');
   check(L("the current unit's card has Practise and Read lesson"), await page.$('.ucard [data-unit="u05"]') && await page.$('.ucard [data-ref="u05"][data-tab="lesson"]'));
   await tap(page, '.ucard [data-ref="u05"]');
@@ -161,8 +168,11 @@ async function tour(page, label, opts = {}) {
   await layout(page, L("Glossary"), opts);
   await tap(page, '.hdr .back[data-go="units"]');
   check(L("the back arrow returns to Units"), (await screen(page)) === "units");
-  await tap(page, '.ulist [data-ref="u02"]');
-  check(L("tapping a unit's card opens that unit"), (await screen(page)) === "reference" && (await page.evaluate("S.refUnit")) === "u02");
+  await tap(page, '.ulist [data-upick="u02"]');
+  check(L("tapping another unit's card opens it in place, with Practise and Read lesson"), (await screen(page)) === "units" && (await page.$$(".ucard")).length === 1 && await page.$('.ucard [data-unit="u02"]') && await page.$('.ucard [data-ref="u02"][data-tab="lesson"]'));
+  await layout(page, L("Units, another card open"), opts);
+  await tap(page, '.ucard [data-ref="u02"]');
+  check(L("its Read lesson opens that unit"), (await screen(page)) === "reference" && (await page.evaluate("S.refUnit")) === "u02");
   check(L("another unit offers Make this my Continue unit"), await page.$('[data-setunit="u02"]'));
   // Rules and Look up
   await tap(page, '.tab[data-go="rules"]');
@@ -416,6 +426,74 @@ async function readAloud(browser, origin) {
       check("120% text: no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
       console.log("  120% text: toured every screen");
+    }
+
+    /* Choosing a unit: any card opens in place, and Today's Continue card follows the unit practised last */
+    {
+      const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light" });
+      const open = () => page.$$eval(".ucard [data-unit]", es => es.map(e => e.dataset.unit).join());
+      const finish = () => page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } return S.screen; });
+      const heroChip = () => page.$eval(".hero .hero-chip", e => e.textContent);
+      const grammar = await page.evaluate(() => content.units.filter(u => unitSeg(u) === "grammar").map(u => u.id));
+      await tap(page, '.tab[data-go="units"]');
+      check("Choosing a unit: Units opens with the current unit's card open", (await open()) === "u05");
+      const mid = grammar[8], last = grammar[grammar.length - 1];
+      await page.locator(`[data-upick="${mid}"]`).scrollIntoViewIfNeeded();
+      const before = await page.$eval(`[data-upick="${mid}"]`, e => e.getBoundingClientRect().top);
+      await tap(page, `[data-upick="${mid}"]`);
+      const after = await page.$eval(".ucard", e => e.getBoundingClientRect().top);
+      check("Choosing a unit: a unit below the open card opens without jumping, and the other card closes", (await open()) === mid && Math.abs(after - before) < 2, `${Math.round(before)} → ${Math.round(after)}`);
+      check("Choosing a unit: the current unit's closed card still says Current unit", /^Current unit/.test(await page.$eval('[data-upick="u05"] .clamp1', e => e.textContent)));
+      check("Choosing a unit: an open card that isn't the current unit leaves out “Current unit”", !/Current unit/.test(await page.$eval(".ucard", e => e.textContent)));
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await tap(page, `[data-upick="${last}"]`);
+      const clear = await page.evaluate(() => document.querySelector(".ucard").getBoundingClientRect().bottom <= document.querySelector(".tabbar").getBoundingClientRect().top);
+      check("Choosing a unit: the last unit's card opens with its buttons clear of the tab bar", (await open()) === last && clear);
+      await tap(page, '[data-useg="vocab"]');
+      await tap(page, '.ulist [data-upick="fc01"]');
+      check("Choosing a unit: a vocab pack opens the same way, with Practise and Open unit", (await open()) === "fc01" && await page.$('.ucard [data-ref="fc01"]'));
+      await tap(page, '[data-useg="verbs"]');
+      await tap(page, '.ulist [data-upick="vb"]');
+      check("Choosing a unit: so does the Verbs unit", (await open()) === "vb" && await page.$('.ucard [data-ref="vb"]'));
+      await tap(page, '[data-useg="grammar"]');
+      await tap(page, '.ulist [data-upick="u02"]');
+      await tap(page, '.ucard [data-ref="u02"]');
+      await tap(page, '.hdr .back[data-go="units"]');
+      check("Choosing a unit: after reading its lesson, back on Units the same card is open", (await screen(page)) === "units" && (await open()) === "u02");
+      await tap(page, '.tab[data-go="home"]'); await tap(page, '.tab[data-go="units"]');
+      check("Choosing a unit: after leaving Units, the current unit's card is open again", (await open()) === "u05");
+      await tap(page, '.ulist [data-upick="u02"]');
+      await tap(page, '.ucard [data-unit="u02"]');
+      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("itapp.progress.v1")).currentUnit);
+      check("Choosing a unit: Practise starts that unit and makes it the current unit, saved at once", (await screen(page)) === "session" && (await page.evaluate("session.unitId")) === "u02" && (await page.evaluate("progress.currentUnit")) === "u02" && saved === "u02", saved);
+      await tap(page, '[data-go="quit"]');
+      check("Choosing a unit: back on Today, the Continue card shows that unit", (await screen(page)) === "home" && (await heroChip()) === "Unit 2");
+      await tap(page, '.hero[data-start="continue"]');
+      check("Choosing a unit: …and Continue practises it", (await page.evaluate("session.unitId")) === "u02");
+      await tap(page, '[data-go="quit"]');
+      await tap(page, '.tab[data-go="units"]');
+      check("Choosing a unit: on Units it is now the current unit's card that is open", (await open()) === "u02" && /^Current unit/.test(await page.$eval(".ucard .urow-t > .small", e => e.textContent)) && !(await page.$eval('[data-upick="u05"]', e => e.textContent)).includes("Current unit"));
+      // going back over a finished unit keeps it on Today; Continue then moves on to the next unit with new items, as before
+      await tap(page, '.ulist [data-upick="u01"]');
+      await tap(page, '.ucard [data-unit="u01"]');
+      check("Choosing a unit: going back over a finished unit runs to the end", (await finish()) === "summary");
+      check("Choosing a unit: …and keeps that unit on Today", (await page.evaluate("progress.currentUnit")) === "u01");
+      await tap(page, '[data-go="home"]');
+      check("Choosing a unit: …shown on the Continue card", (await heroChip()) === "Unit 1");
+      await tap(page, '.hero[data-start="continue"]'); await finish();
+      check("Choosing a unit: Continue on a finished unit then moves on to the next unit with new items", (await page.evaluate("progress.currentUnit")) === "u05");
+      // practising the last new items of a unit moves Today on to the next unit
+      await tap(page, '[data-go="home"]');
+      const left = await page.evaluate(() => { const T = Date.now(); newIds("u05").slice(1).forEach(id => { progress.items[pid(id)] = { box: 1, due: T + 864e5, lapses: 0, lastSeen: T, lastWrong: 0, seenCount: 1, lastRight: T }; }); saveProgress(); return newIds("u05").length; });
+      await tap(page, '.tab[data-go="units"]');
+      await tap(page, '.ucard [data-unit="u05"]');
+      const next = await page.evaluate(() => { const i = content.units.findIndex(u => u.id === "u05"); return content.units.slice(i + 1).find(u => !isSideUnit(u.id) && newIds(u.id).length).id; });
+      await finish();
+      check("Choosing a unit: practising a unit's last new items moves Today on to the next unit", left === 1 && (await page.evaluate("progress.currentUnit")) === next, `${left} new left; current ${await page.evaluate("progress.currentUnit")}, expected ${next}`);
+      check("Choosing a unit: practising a vocab pack or the Verbs leaves the Continue unit as it is", await page.evaluate(() => { const was = progress.currentUnit, out = []; for (const u of ["fc01", "vb"]) { startSession("unit", u); out.push(S.screen === "session" && progress.currentUnit === was); session = null; S.screen = "home"; render(); } return out.every(Boolean); }));
+      check("Choosing a unit: no script errors", !page.errors.length, page.errors.join("\n"));
+      await context.close();
+      console.log("  Choosing a unit checked");
     }
 
     /* Appearance */

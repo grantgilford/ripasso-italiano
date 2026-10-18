@@ -5638,6 +5638,10 @@ function buildSession(kind, unitId) {
 function startSession(kind, unitId) {
   const s = buildSession(kind, unitId);
   if (!s.queue.length) { S.flash = "Nothing to practise right now."; S.scrollTo = S.screen === "home" ? null : "flash"; render(); return; }
+  if (kind === "unit" && content.unitById[unitId] && !isSideUnit(unitId)) { // Today's Continue card follows the unit practised last
+    s.hadNew = newIds(unitId).length > 0;
+    if (progress.currentUnit !== unitId) { progress.currentUnit = unitId; saveProgress(); }
+  }
   session = s; S.screen = "session"; S.feedback = null; S.leaveAsk = false; S.revealed = false; S.picked = null; S.bankPicked = [];
   render();
 }
@@ -5720,8 +5724,8 @@ function continueSession() {
   if (session.pos >= session.queue.length) {
     session.finished = true;
     session.xp += 5; today().xp = (today().xp || 0) + 5;
-    // Advance the current unit when it has no new items left
-    if (session.kind === "continue" && newIds(progress.currentUnit).length === 0) {
+    // Advance the current unit when it has no new items left (but not after choosing to go back over a unit already finished)
+    if ((session.kind === "continue" || (session.kind === "unit" && session.hadNew)) && session.unitId === progress.currentUnit && newIds(progress.currentUnit).length === 0) {
       const idx = content.units.findIndex(u => u.id === progress.currentUnit);
       const next = content.units.slice(idx + 1).find(u => !isSideUnit(u.id) && newIds(u.id).length > 0);
       if (next) progress.currentUnit = next.id;
@@ -5738,6 +5742,7 @@ function render() {
   const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou }[S.screen] || renderHome;
   const key = S.screen === "reference" ? "reference:" + S.refUnit + ":" + (S.refTab || "lesson") : S.screen;
   const prev = S.viewKey, mem = S.scrollMem || (S.scrollMem = {});
+  if (S.screen !== "units" && S.screen !== "reference") S.unitPick = null; // the card opened on Units lasts while you stay there or in its units
   if (prev && prev !== key) { mem[prev] = window.scrollY; stopSaying(); } // speech belongs to the screen it started on
   const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
   app.className = S.screen === "session" ? "session" : bare ? "notabs" : "";
@@ -6013,20 +6018,23 @@ function renderUnits() {
   const segs = [["grammar", "Grammar"], ["vocab", "Vocab"], ["verbs", "Verbs"]].map(([k, l]) => [k, l, content.units.filter(u => unitSeg(u) === k)]).filter(s => s[2].length);
   if (!segs.some(s => s[0] === S.unitSeg)) S.unitSeg = cur && segs.some(s => s[0] === unitSeg(cur)) ? unitSeg(cur) : (segs[0] || ["grammar"])[0];
   const list = (segs.find(s => s[0] === S.unitSeg) || [, , []])[2];
+  const open = list.find(u => u.id === S.unitPick) || (list.includes(cur) ? cur : null); // one card is open: the current unit's until another is tapped
   return `<div class="hgroup"><header class="hdr split"><h1 class="title">Units</h1><span class="small muted"><b class="fg">${pct}%</b> of the course learned</span></header>${bar(pct, "bar6")}</div>
   <div class="seg" role="group" aria-label="Show">${segs.map(([k, l, us]) => `<button type="button" data-useg="${k}" aria-pressed="${k === S.unitSeg}">${l}${us.length > 1 ? `<span class="seg-n">${us.length}</span>` : ""}</button>`).join("")}</div>
-  <div class="ulist">${list.map(u => unitRow(u, u === cur)).join("")}</div>`;
+  <div class="ulist">${list.map(u => unitRow(u, u === open, u === cur)).join("")}</div>`;
 }
-function unitRow(u, isCur) {
+function unitRow(u, isOpen, isCur) {
   const st = unitStats(u.id), state = st.total && st.learned === st.total ? "done" : st.started ? "going" : "new";
   const badge = `<span class="badge ${state}" aria-hidden="true">${u.mode === "verbs" ? icon("verbs", 20, 2) : unitNumber(u)}</span>`;
   const name = (unitSeg(u) === "grammar" ? `<span class="vh">Unit ${unitNumber(u)}: </span>` : "") + esc(u.title);
   const pack = isBuiltinPack(u.pack) ? "" : `<span class="small muted">pack ${esc(u.pack)}</span>`;
-  if (isCur) return `<div class="card ucard"><div class="urow">${badge}<div class="urow-t"><div class="urow-h"><span class="label">${name}</span><span class="ustat cur">${st.pct}%</span></div>
-    <span class="small muted">Current unit · ${newIds(u.id).length} new · ${dueIds(u.id).length} to review</span>${pack}${bar(st.pct)}</div></div>
+  const counts = u.mode === "verbs" ? ((vs) => `${vs.fresh} new · ${vs.due} to review`)(verbStats()) : `${newIds(u.id).length} new · ${dueIds(u.id).length} to review`;
+  if (isOpen) return `<div class="card ucard"><div class="urow">${badge}<div class="urow-t"><div class="urow-h"><span class="label">${name}</span><span class="ustat cur">${st.pct}%</span></div>
+    <span class="small muted">${isCur ? "Current unit · " : ""}${counts}</span>${pack}${bar(st.pct)}</div></div>
     <div class="ucard-btns"><button type="button" class="primary" data-unit="${esc(u.id)}">Practise</button>${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">${icon("book", 18)}Read lesson</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}</div></div>`;
   const status = state === "done" ? `<span class="ustat done">${icon("tick", 14, 2.6)}Learned</span>` : state === "new" ? `<span class="ustat none">Not started</span>` : `<span class="ustat">${st.pct}%</span>`;
-  return `<button type="button" class="card urow" data-ref="${esc(u.id)}">${badge}<span class="urow-t"><span class="urow-h"><span class="label">${name}</span>${status}</span>${u.description ? `<span class="small muted clamp1">${esc(u.description)}</span>` : ""}${pack}${state === "going" ? bar(st.pct) : ""}</span></button>`;
+  const line = [isCur ? "Current unit" : "", u.description ? esc(u.description) : ""].filter(Boolean).join(" · ");
+  return `<button type="button" class="card urow" data-upick="${esc(u.id)}">${badge}<span class="urow-t"><span class="urow-h"><span class="label">${name}</span>${status}</span>${line ? `<span class="small muted clamp1">${line}</span>` : ""}${pack}${state === "going" ? bar(st.pct) : ""}</span></button>`;
 }
 function unitHead(u) {
   const st = unitStats(u.id);
@@ -6392,6 +6400,15 @@ function wire() {
   });
   app.querySelectorAll("[data-act]").forEach(b => b.onclick = () => action(b.dataset.act));
   app.querySelectorAll("[data-useg]").forEach(b => b.onclick = () => { S.unitSeg = b.dataset.useg; render(); });
+  app.querySelectorAll("[data-upick]").forEach(b => b.onclick = () => {
+    const top = b.getBoundingClientRect().top;
+    S.flash = null; S.unitPick = b.dataset.upick; render();
+    const card = app.querySelector(".ucard"); if (!card) return;
+    window.scrollBy(0, card.getBoundingClientRect().top - top); // the tapped unit stays under the finger as the card above it closes
+    const bar = app.querySelector(".tabbar"), over = card.getBoundingClientRect().bottom + 12 - (bar ? bar.getBoundingClientRect().top : window.innerHeight);
+    if (over > 0) window.scrollBy(0, over); // and its buttons clear the tab bar
+    const go = card.querySelector("[data-unit]"); if (go) go.focus({ preventScroll: true });
+  });
   app.querySelectorAll("[data-appearance]").forEach(b => b.onclick = () => setTheme(b.dataset.appearance));
   app.querySelectorAll("[data-audio]").forEach(b => b.onclick = () => setAudio(b.dataset.audio));
   markSaying();
@@ -6782,7 +6799,7 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "8.3";
+const APP_VERSION = "8.4";
 applyTheme(themePref());
 loadLocal();
 buildContent();
