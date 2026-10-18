@@ -21,7 +21,12 @@
        leaves saved progress untouched;
     6. the "Lo sapevi?" card keeps its tidbit across redraws, picks afresh on
        a new load, and steps aside when Today would not fit above the tab bar;
-    7. read aloud, with a stand-in for the phone's voices: the speakers in the
+    7. there is room above the keyboard: at Pixel 8 size (412 × 915) the
+       exercise type sits in the session's top row, the answer box says "Your
+       answer" inside it, and Don't know and Check end within the top 460 px
+       (about what the phone leaves above its keyboard) on at least 95% of
+       typed questions;
+    8. read aloud, with a stand-in for the phone's voices: the speakers in the
        lessons, glossary, verb tables, Look up, Today and a practice session
        read their Italian with the Italian voice; a prompt's speaker reads only
        Italian the prompt already shows, never the answer (checked on every
@@ -458,6 +463,40 @@ async function readAloud(browser, origin) {
       check("Lo sapevi?: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
       console.log("  Lo sapevi? checked");
+    }
+
+    /* Room above the keyboard: a Pixel 8 (412 × 915) leaves about 460 px above its keyboard, so Don't know and Check must end by then */
+    {
+      const KEYBOARD_TOP = 460;
+      const { page, context } = await openApp(browser, origin, { width: 412, height: 915, scheme: "light" });
+      await tap(page, '.hero[data-start="continue"]');
+      const top = await page.evaluate(() => { const t = document.querySelector(".sbar .sbar-type"), bar = document.querySelector(".sbar"); return { text: t && t.textContent, inRow: !!t && t.getBoundingClientRect().bottom <= bar.getBoundingClientRect().bottom, type: current().ex.type }; });
+      check("Keyboard room: the exercise type is shown in the top row, under the progress bar", top.inRow && top.text === top.type, JSON.stringify(top));
+      const r = await page.evaluate((limit) => {
+        const out = { n: 0, fit: 0, worst: [], placeholder: true };
+        for (const item of Object.values(content.items)) {
+          if (isFlashUnit(item.unit)) continue; // flashcards are the shortest; verb tables move box to box with Enter
+          for (const box of [0, 1, 3, 5]) {
+            const ex = makeExercise(item, { box, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 0 });
+            if (!ex || ex.mode !== "typed") continue;
+            session = { kind: "unit", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+            S.screen = "session"; S.feedback = null; S.retry = null; render(); window.scrollTo(0, 0);
+            const inp = document.getElementById("answer"), lbl = document.querySelector("label.field > .vh");
+            if (!inp || inp.placeholder !== "Your answer" || !lbl || lbl.textContent !== "Your answer") out.placeholder = false;
+            const bottom = Math.max(...[...document.querySelectorAll('[data-act="giveup"], [data-act="check"]')].map(b => b.getBoundingClientRect().bottom));
+            out.n++; if (bottom <= limit) out.fit++; else out.worst.push([Math.round(bottom), `${item.id} (${ex.type})`]);
+          }
+        }
+        out.worst = out.worst.sort((a, b) => b[0] - a[0]).slice(0, 3).map(w => `${w[1]} ends at ${w[0]} px`);
+        session = null; S.screen = "home"; render();
+        return out;
+      }, KEYBOARD_TOP);
+      const pct = r.n ? 100 * r.fit / r.n : 0;
+      check(`Keyboard room: Don't know and Check end within the top ${KEYBOARD_TOP} px on at least 95% of typed questions (${pct.toFixed(1)}% of ${r.n})`, r.n > 1000 && pct >= 95, r.worst.join("\n"));
+      check("Keyboard room: the answer box says \"Your answer\" inside it, and keeps it as its label", r.placeholder);
+      check("Keyboard room: no script errors", !page.errors.length, page.errors.join("\n"));
+      await context.close();
+      console.log("  Keyboard room checked");
     }
 
     /* Read aloud */

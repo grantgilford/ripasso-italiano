@@ -152,6 +152,7 @@ Keeping the old token names where they still fit saves churn; new tokens are mar
 | `--panel-text` *new* | `#3B4A43` | `#C9D6CF` (on ok) / `#D9C9CB` (on bad) | Explanation text inside feedback panels |
 | `--note-bg` | `#E1EFE8` | `#183229` | Lesson tip boxes (`.ltip`), notes |
 | `--note-title` *new* | `#0A4F37` | `#5FD3A2` | Tip-box heading |
+| `--placeholder` *new* | `#46816A` | `#52987B` | "Your answer" inside the empty answer box (a faded green; from 8.3) |
 
 Every text pairing above was checked: all are at least 4.5:1, most well over 6:1. Keep it that way for anything you add.
 
@@ -313,12 +314,12 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 
 ### 8.5 Practice session (`renderSession`), see `mockups/exercise-wrong-*.html`
 
-- **Top row:** a Quit button (✕ icon, 44 px, `aria-label="Quit"`, `data-go="quit"`), the 10 px progress bar, then "7/12" (add "· repeat" when repeating).
+- **Top row:** a Quit button (✕ icon, 44 px, `aria-label="Quit"`, `data-go="quit"`), the 10 px progress bar with the exercise type beneath it ("Fill in the blank", Eyebrow style in `--accent`; a long one wraps rather than being cut short), then "7/12" (add "· repeat" when repeating).
 - **Prompt:**
-  - the exercise type as a `--tint` chip ("Fill in the blank");
   - the prompt in a card (Prompt style), with the blank as a 3 px underline;
   - hints muted beneath.
-- **Answer area:** the typed field labelled "Your answer", the accent keys, the options, the word bank and the verb tables. All the existing modes keep their markup hooks and simply take the new styles.
+- **Answer area:** the typed field, with "Your answer" as faded green placeholder text inside it (`--placeholder`, and a visually hidden label of the same words), the accent keys, the options, the word bank and the verb tables. All the existing modes keep their markup hooks and simply take the new styles.
+- **Room above the keyboard** (from 8.3): keep the session compact, 16 px under the top row and 12 px between blocks, so that on a Pixel 8 (412 × 915) Don't know and Check stay above the phone's keyboard, which leaves about 460 px. `tools/test-ui.js` checks this on every typed question; anything added above the answer box has to keep it passing. The mockups predate this and still show the type as a chip above the card.
   - *Word bank:* chips as answer tiles.
   - *Verb tables:* each row is a person label and an input, coloured per the answer states.
 - **Buttons:** Check (primary) and Don't know (secondary), side by side at the bottom of the content.
