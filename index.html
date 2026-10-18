@@ -21,7 +21,7 @@
   color-scheme: light;
   --bg: #F3F6F4; --card: #FFFFFF; --field: #FFFFFF; --fg: #10201A; --muted: #55655D; --line: #E1E8E4;
   --track: #D9E3DE; --tint: #E1EFE8; --seg: #E4EBE7; --seg-in: #E4EBE7; --seg-on: #FFFFFF; --seg-on-fg: #0F6B4B;
-  --badge-off: #E4EBE7; --chip-type: #E1EFE8;
+  --badge-off: #E4EBE7; --placeholder: #46816A;
   --accent: #0F6B4B; --accent-fg: #FFFFFF; --hero: #0F6B4B; --hero-fg: #FFFFFF; --hero-btn-fg: #0F6B4B;
   --nav-bg: #FFFFFF; --nav-line: #E1E8E4;
   --bad: #C62B36; --bad-fg: #FFFFFF; --bad-bg: #FDECEE; --bad-title: #9E1F2A;
@@ -37,7 +37,7 @@
     color-scheme: dark;
     --bg: #0E1512; --card: #17211D; --field: #17211D; --fg: #E9F0EC; --muted: #9DB0A7; --line: #2A3A33;
     --track: #24302B; --tint: #22312B; --seg: #17211D; --seg-in: #0E1512; --seg-on: #2A3A33; --seg-on-fg: #E9F0EC;
-    --badge-off: #1B2722; --chip-type: #17211D;
+    --badge-off: #1B2722; --placeholder: #52987B;
     --accent: #5FD3A2; --accent-fg: #0E1512; --hero: #127A55; --hero-fg: #FFFFFF; --hero-btn-fg: #0E5A40;
     --nav-bg: #131C18; --nav-line: #24302B;
     --bad: #F0616B; --bad-fg: #1F0B0D; --bad-bg: #2E1418; --bad-title: #FF9AA2;
@@ -51,7 +51,7 @@
   color-scheme: dark;
   --bg: #0E1512; --card: #17211D; --field: #17211D; --fg: #E9F0EC; --muted: #9DB0A7; --line: #2A3A33;
   --track: #24302B; --tint: #22312B; --seg: #17211D; --seg-in: #0E1512; --seg-on: #2A3A33; --seg-on-fg: #E9F0EC;
-  --badge-off: #1B2722; --chip-type: #17211D;
+  --badge-off: #1B2722; --placeholder: #52987B;
   --accent: #5FD3A2; --accent-fg: #0E1512; --hero: #127A55; --hero-fg: #FFFFFF; --hero-btn-fg: #0E5A40;
   --nav-bg: #131C18; --nav-line: #24302B;
   --bad: #F0616B; --bad-fg: #1F0B0D; --bad-bg: #2E1418; --bad-title: #FF9AA2;
@@ -300,10 +300,10 @@ details > summary { cursor: pointer; }
 /* ---------- practice session ---------- */
 .sbar { display: flex; align-items: center; gap: 12px; }
 .sbar .iconbtn { margin-left: -10px; color: var(--muted); }
-.sbar .bar { flex: 1; }
+.sbar-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.sbar-type { color: var(--accent); font-size: 13px; font-weight: 600; line-height: 1.3; }
 .scount { color: var(--muted); font-size: 14px; font-weight: 600; white-space: nowrap; }
-.sx { display: flex; flex-direction: column; gap: 18px; padding: 28px 0 32px; }
-.chip-type { align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: var(--chip-type); color: var(--accent); font-size: 13px; font-weight: 600; }
+.sx { display: flex; flex-direction: column; gap: 12px; padding: 16px 0 32px; } /* kept compact so Check stays above the phone's keyboard */
 .prompt-card { border-radius: 22px; padding: 26px 22px; }
 .prompt-card > .say { margin: -6px -8px 0 0; }
 .flipback > .say { margin: -6px -6px 0 0; }
@@ -314,8 +314,8 @@ details > summary { cursor: pointer; }
 .prompt div.hint + div.hint { margin-top: 4px; }
 .prompt .blank { display: inline-block; min-width: 3.4em; border-bottom: 3px solid var(--fg); }
 .field { display: flex; flex-direction: column; gap: 8px; }
-.field-l { color: var(--muted); font-size: 13px; font-weight: 500; }
 #answer { font-size: 22px; padding: 14px 16px; }
+#answer::placeholder { color: var(--placeholder); opacity: 1; }
 .accentbar { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .accentbar button { min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--card); color: var(--fg); font-size: 18px; }
 .options { display: grid; gap: 10px; }
@@ -6039,8 +6039,8 @@ function renderSession() {
   const done = session.done, total = session.queue.length;
   const tick = (cls) => `<span class="${cls}">${icon("tick", 18, 2.6)}<span class="vh">right</span></span>`, cross = (cls) => `<span class="${cls}">${icon("cross", 18, 2.6)}<span class="vh">wrong</span></span>`;
   const sayP = sayBtn(ex.say, "Listen", "solo"); // only Italian that the prompt already shows
-  let body = `<div class="sbar"><button type="button" class="iconbtn" data-go="quit" aria-label="Quit">${icon("close", 22, 2)}</button>${bar(100 * done / total, "bar10")}<span class="scount">${done + 1}/${total}${q.repeat ? " · repeat" : ""}</span></div>
-  <div class="sx"><span class="chip-type">${esc(ex.type)}</span><div class="card prompt-card${sayP ? " sayrow" : ""}"><div class="prompt">${ex.promptHtml}</div>${sayP}</div>`;
+  let body = `<div class="sbar"><button type="button" class="iconbtn" data-go="quit" aria-label="Quit">${icon("close", 22, 2)}</button><div class="sbar-mid">${bar(100 * done / total, "bar10")}<span class="sbar-type">${esc(ex.type)}</span></div><span class="scount">${done + 1}/${total}${q.repeat ? " · repeat" : ""}</span></div>
+  <div class="sx"><div class="card prompt-card${sayP ? " sayrow" : ""}"><div class="prompt">${ex.promptHtml}</div>${sayP}</div>`;
   if (ex.mode === "vintro") {
     body += `<div class="card vintro">${ex.introHtml}</div><button type="button" class="primary wide" data-act="introDone">Got it, continue</button>`;
   } else if (ex.mode === "table") {
@@ -6071,7 +6071,7 @@ function renderSession() {
     }).join("") + `</div>`;
   } else {
     if (S.retry && !fb) body += `<div class="note" role="status">${esc(S.retry)}</div>`;
-    body += `<label class="field"><span class="field-l">Your answer</span><input type="text" id="answer"${fb ? ` class="${fb.ok ? "ok" : "bad"}"` : ""} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" lang="it" ${fb ? "disabled" : ""} value="${fb ? esc(fb.given) : ""}"></label>` + (ex.english ? "" : accentBar());
+    body += `<label class="field"><span class="vh">Your answer</span><input type="text" id="answer"${fb ? ` class="${fb.ok ? "ok" : "bad"}"` : ` placeholder="Your answer"`} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" lang="it" ${fb ? "disabled" : ""} value="${fb ? esc(fb.given) : ""}"></label>` + (ex.english ? "" : accentBar());
     if (!fb) body += `<div class="btnrow"><button type="button" data-act="giveup">Don't know</button><button type="button" class="primary" data-act="check">Check</button></div>`;
   }
   body += `</div>`;
@@ -6782,7 +6782,7 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "8.2";
+const APP_VERSION = "8.3";
 applyTheme(themePref());
 loadLocal();
 buildContent();
