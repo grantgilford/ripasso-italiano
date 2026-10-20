@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v3.0)
+# Italian Practice App: Content Pack Guide (v3.1)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v8.5, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v8.6, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
@@ -120,9 +120,55 @@ Shown first as a flip card with the answer and explanation, then as a typed exer
 ```
 Drilled both ways: digits → words (any entry in `it` is accepted) and words → digits (*hh:mm*, a leading zero optional). The words shown are the first entry in `it`; if it is a 12-hour reading (*sono le sette e un quarto*), digits for either half of the day are accepted, while a 24-hour reading (*le diciannove e quindici*) or one with *mezzogiorno* / *mezzanotte* has one answer. List every common reading in `it`: counting up and counting back (*le sei meno un quarto*, *le cinque e tre quarti*, *le cinque e quarantacinque*), the plain-minutes forms (*le sei meno quindici*, *le due e trenta*), and the 24-hour one for afternoon times.
 
+### The practice types added in v8.6
+
+Five item types turn a rule into something to do rather than a question to answer. Each is described, with what it looks like and where it fits, in `docs/exercise-types.md`; units 1 and 2 use all five. Like every item, each needs an `explanation`, and every wrong choice it offers needs a reason.
+
+**spot** (Spot the mistake: tap the wrong word, then type it right)
+```json
+{ "id": "sp-u01-z01", "unit": "u01", "type": "spot", "it": "Anna è stanco.", "wrong": "stanco", "fix": ["stanca"],
+  "en": "Anna is tired.", "explanation": "The adjective agrees with Anna, a woman: stanca.",
+  "notes": { "è": "è is right: Anna is one person, so the lui/lei form." } }
+```
+`it` is the sentence as shown, with one mistake; `wrong` is that word, exactly as it appears once in the sentence (punctuation and capitals aside), and `fix` its right forms, first the one shown. A fix can be two words (*C'è* → *Ci sono*), and one ending in an apostrophe joins the next word (*una* → *un'*: *un'isola*). `en` is required: it is the prompt, and it is what tells the learner what the sentence should mean, so mark *(f.)* where an ending depends on it. `notes` are optional reasons for the right words a learner is likely to tap ("*trenta* is not the mistake…"); without one the app says the word is right as it stands. Set `"wrong": null` (and leave out `fix`) for a sentence with no mistake, the answer then being **No mistake**: use these for traps that are right (*Il problema è difficile*, *Marco è medico*, *Non sono mai stanco*), a few per unit. The learner types the fix only from box 2; a fix that differs from the mistake only by an accent or a capital (*e* → *è*, *Italiano* → *italiano*) is tap-only, since lenient accents would pass the wrong word typed back. The mistake must be a real slip a learner makes, and the corrected sentence must be the only fix: check that no other single word could be changed to make it right with the same meaning.
+
+**endings** (Complete the endings: boxes inside the sentence)
+```json
+{ "id": "en-u01-z01", "unit": "u01", "type": "endings", "text": "Le ragazz{e} sono stanc{he}.", "en": "The girls are tired.",
+  "explanation": "ragazza → ragazze; stanco → stanche, where the h keeps the hard c sound." }
+```
+Each `{…}` is a box; it can hold an ending (*stanc{he}*, which tests the *h*) or a short word (*{Un'}amica*), and `|` gives alternatives (*pront{i|e}* where the English doesn't settle the gender). Put the blank where the rule is, not where the answer is obvious: *stanc{he}* tests the spelling, *stanch{e}* doesn't. Keep to four boxes at most; `en` is shown as the hint. Checked exactly, accents lenient as everywhere.
+
+**reply** (Choose the reply, then Write the reply)
+```json
+{ "id": "re-u01-z01", "unit": "u01", "type": "reply", "who": "Luca", "line": "Ciao! Come ti chiami?", "cue": "Say your name is Anna.",
+  "answer": ["Mi chiamo Anna.", "Sono Anna.", "Il mio nome è Anna."],
+  "options": ["Ti chiami Anna.", "Si chiama Anna.", "Mi chiama Anna."],
+  "notes": { "Ti chiami Anna.": "ti chiami is “your name is”; for your own name, mi chiamo.", "…": "…" },
+  "explanation": "chiamarsi carries a small pronoun: mi chiamo, ti chiami, si chiama." }
+```
+`line` is what the other person says (read aloud on tap, so Italian only; `who`, optional, is shown above it and never read). `cue` says in English what to answer, and must make one reply right: the options can then differ by grammar (*Ti chiami* / *Mi chiamo*), by register (*E tu?* / *E Lei?*) or by meaning. List in `answer` every natural reply that fits the cue, most natural first; a subject pronoun may be added to any of them without listing it. Give two or three `options`, each with a note; with fewer than two the reply is only ever typed. An option must not be an acceptable reply to the cue (the content check refuses one that is in `answer`).
+
+**sort** (Sort the words)
+```json
+{ "id": "so-u02-z01", "unit": "u02", "type": "sort", "prompt": "Which article does each noun take?", "groups": ["il", "lo", "la", "l'"],
+  "rows": [ { "it": "zaino", "group": "lo", "say": "lo zaino", "note": "z- takes lo." }, … ],
+  "explanation": "il before most consonants, lo before z and s + consonant, la for feminine nouns, l' before a vowel." }
+```
+Two to four short `groups` (they share one row on a phone: a word or two each), and four to six `rows`, each Italian in `it`, its `group`, and a `note` saying why (the content check refuses a row without one). `say` is what the answer panel reads for the row, when the row alone would sound wrong (*lo zaino* rather than *zaino*, *c'è un problema* rather than *un problema*); a row with a gap shows it with an ellipsis (*Marco … stanco*) and gives the whole phrase in `say`. Every row must belong to one group only.
+
+**match** (Match the pairs)
+```json
+{ "id": "ma-u01-z02", "unit": "u01", "type": "match", "prompt": "Match each question with its answer",
+  "pairs": [["Come ti chiami?", "Mi chiamo Sara."], ["Di dove sei?", "Sono di Bologna."], …],
+  "explanation": "Each answer uses the verb of its question: chiamarsi, essere, stare, essere, avere." }
+```
+Four or five `pairs`, short enough to fit half a phone's width (about 28 characters a side). Every left side must be different and so must every right side, and no left side may fit a second right side: *io → sono* and *loro → sono* can't be in the same set. The left column is Italian; add `"right": "en"` when the right column is English (it is then not read aloud). `notes`, optional, keyed by a left side, add a reason after a wrong pairing of it.
+
 ## How the app treats content
 
-- New items are introduced with a recognition exercise, then get a production follow-up later in the same lesson; from box 2 on, only typed answers promote an item. Boxes: 10 min, 1, 3, 7, 14, 30, 60 days. Learned = box 5+.
+- New items are introduced with a recognition exercise, then get a production follow-up later in the same lesson; from box 2 on, only typed answers promote an item. Boxes: 10 min, 1, 3, 7, 14, 30, 60 days. Learned = box 5+. Sort and match items, and spot items with no mistake (or one whose fix differs only by an accent or a capital), have no typed exercise, so their recognition answers promote them. A new item's first exercise always shows its explanation, whatever the type.
+- Two exercises are built from content that already exists (v8.6): **Make it plural / Make it singular**, for every grammar-unit noun with all four forms (so give each noun its true plural and plural article: they are now typed, *il lago → i laghi*); and **Listen and type**, for sentences of up to nine words that have a cloze, played in the device's Italian voice and typed (only when the device has an Italian voice and Read aloud isn't Off; the learner can choose Can't listen now). The sentence played is the first entry in `it`, and it is the only answer accepted, so make the first entry the plain, natural version.
 - Accents lenient by default (with a note); apostrophes always matter, while quotation marks and other punctuation are ignored (*'zaino'* = *zaino*). Typo tolerance (on by default; Settings can turn it off) applies only to typed recall, translations and flashcards: one wrong, missing or extra letter in one word of five or more letters, as long as the last letter is right (so a changed last letter, such as a gender or number ending, is never forgiven) and the slip doesn't spell another word the app knows from its content: *quando* for *quanto*, *siamo* for *siano*, *vorrai* for *vorrei* or *night* for *right* is a wrong word, not a typo. Every other typed drill (articles, verb forms, agreement, prepositions, clozes, numbers, clock times, transforms) wants the exact spelling.
 - A note in brackets in an answer is optional to type, in Italian as in English: `"che (relative)"` accepts *che*, `"time (occasion)"` accepts *time*. Use brackets to tell apart two items with the same word, not for anything the learner must type.
 - Compound verb forms can carry agreement variants: `"sono andato/a"`, `"siamo andati/e"` — the drill and the clozes accept either ending.

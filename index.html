@@ -318,6 +318,7 @@ details > summary { cursor: pointer; }
 #answer::placeholder { color: var(--placeholder); opacity: 1; }
 .accentbar { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
 .accentbar button { min-height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--card); color: var(--fg); font-size: 18px; }
+@media (max-width: 340px) { .accentbar { gap: 4px; } } /* six keys of 44 px still fit at 120% text (325 px) */
 .options { display: grid; gap: 10px; }
 .opt { display: flex; align-items: center; gap: 14px; width: 100%; min-height: 56px; padding: 12px 16px; border: 2px solid transparent; border-radius: 16px; background: var(--card); color: var(--fg); font-size: 17px; line-height: 1.35; text-align: left; }
 .opt:disabled { opacity: 1; }
@@ -350,6 +351,52 @@ details > summary { cursor: pointer; }
 .vtable.subj .fix { padding-left: calc(5.6em + 10px); }
 .flipback { font: 500 24px/1.3 var(--sans); }
 .flipback .sans { font-size: 18px; font-weight: 400; }
+/* the exercise types added in 8.6: spot the mistake, sort, match, reply, endings, listen */
+.smark { flex: none; display: inline-flex; }
+.spotline { display: flex; flex-wrap: wrap; gap: 8px; }
+.spotline .wchip { display: inline-flex; align-items: center; gap: 4px; border: 2px solid transparent; }
+.spotline .wchip:disabled { opacity: 1; }
+.spotline .wchip.at { border-color: var(--accent); }
+.spotline .wchip.err { border-color: var(--bad); background: var(--bad-bg); color: var(--bad-title); text-decoration: line-through; }
+.spotline .wchip.miss { border: 2px dashed var(--bad); }
+.spotline .wchip.err .smark, .spotline .wchip.miss .smark { color: var(--bad); }
+.spotline .fixw { border-color: var(--ok); background: var(--ok-bg); color: var(--ok-title); }
+.spotline .fixw .smark { color: var(--ok); }
+.field .flabel { font-size: 15px; color: var(--muted); }
+.field .flabel b { color: var(--fg); }
+.sortrows { display: flex; flex-direction: column; gap: 8px; }
+.sortrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 8px 8px 14px; border-radius: 16px; background: var(--card); }
+.sortrow .sw { flex: 1 1 4.5em; min-width: 0; font-size: 18px; font-weight: 500; overflow-wrap: anywhere; }
+.sortseg { flex: 1 1 auto; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(44px, 1fr); gap: 4px; padding: 4px; border-radius: 14px; background: var(--seg-in); }
+.sortseg > button { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 4px; padding: 4px 8px; border: 2px solid transparent; border-radius: 11px; background: transparent; color: var(--muted); font-size: 15px; font-weight: 500; white-space: nowrap; }
+.sortseg > button[aria-pressed="true"] { background: var(--seg-on); color: var(--seg-on-fg); font-weight: 600; }
+.sortseg > button:disabled { opacity: .5; }
+.sortseg > button.right, .sortseg > button.wrong { opacity: 1; font-weight: 600; }
+.sortseg > button.right { border-color: var(--ok); background: var(--ok-bg); color: var(--ok-title); }
+.sortseg > button.wrong { border-color: var(--bad); background: var(--bad-bg); color: var(--bad-title); }
+.matchgrid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mcol { display: flex; flex-direction: column; gap: 8px; }
+.mchip { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 52px; padding: 8px 10px; border: 2px solid transparent; border-radius: 14px; background: var(--card); color: var(--fg); font-size: 16px; font-weight: 500; line-height: 1.3; text-align: center; overflow-wrap: anywhere; }
+.mchip.en { font-weight: 400; }
+.mchip.sel { border-color: var(--accent); background: var(--tint); }
+.mchip.bad { border-color: var(--bad); background: var(--bad-bg); }
+.mchip.bad .smark { color: var(--bad); }
+.mchip.done, .mchip.done:disabled { opacity: 1; border-color: var(--ok); background: var(--ok-bg); }
+.mchip .mn { flex: none; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: var(--ok); color: var(--accent-fg); font-size: 12px; font-weight: 700; }
+.prompt .rline { font: 500 26px/1.3 var(--display); }
+.prompt .who { display: block; margin-bottom: 4px; color: var(--muted); font: 600 14px/1.3 var(--sans); }
+.prompt.fieldsp { font-size: 26px; line-height: 1.75; }
+.prompt .nw { white-space: nowrap; }
+.prompt input.fld { display: inline-block; min-width: 44px; height: 44px; margin: 2px 2px; padding: 2px 4px; vertical-align: middle; font: inherit; font-size: 22px; line-height: 1; text-align: center; border-radius: 10px; }
+.prompt input.fld.ok { background: var(--ok-bg); }
+.prompt input.fld.bad { background: var(--bad-bg); }
+.prompt .fldfix { margin: 0 4px 0 2px; color: var(--ok-title); font: 600 20px/1 var(--sans); }
+.prompt .fldfix::before { content: "✓ "; }
+.listen { display: flex; align-items: center; gap: 14px; }
+.listen .say.solo.big { width: 64px; height: 64px; }
+.listen .say.solo.big::before { width: 30px; height: 30px; }
+.slowbtn { min-height: 44px; padding: 8px 18px; border-radius: 999px; background: var(--tint); color: var(--accent); font: 600 16px/1.2 var(--sans); }
+.slowbtn.on { background: var(--accent); color: var(--accent-fg); }
 .vintro p { margin: 8px 0; }
 .vintro p:first-child { margin-top: 0; }
 .vintro h3 { margin-top: 16px; font-weight: 600; }
@@ -1189,7 +1236,7 @@ const BUILTIN = {
     {"id":"s-u09-26","unit":"u09","type":"sentence","it":["Posso entrare?"],"en":["Can I come in?"],"cloze":{"text":"{Posso} entrare?","hint":"can I (potere)"},"explanation":"potere, io → posso, followed directly by the infinitive. Asking permission uses the present: posso entrare?"},
     {"id":"s-u09-27","unit":"u09","type":"sentence","it":["Puoi aiutarmi?","Mi puoi aiutare?"],"en":["Can you help me?"],"cloze":{"text":"{Puoi} aiutarmi?","hint":"can you (potere, tu)"},"explanation":"tu → puoi; the infinitive follows directly."},
     {"id":"s-u09-28","unit":"u09","type":"sentence","it":["Potresti ripetere, per favore?"],"en":["Could you repeat, please?"],"cloze":{"text":"{Potresti} ripetere, per favore?","hint":"could you (potere, tu, condizionale)"},"explanation":"The conditional potresti (could you) is softer than puoi (can you). It is the tu form, for friends and family."},
-    {"id":"s-u09-29","unit":"u09","type":"sentence","it":["Potrebbe parlare più lentamente?","Potrebbe parlare più piano?"],"en":["Could you speak more slowly? (formal)"],"cloze":{"text":"{Potrebbe} parlare più lentamente?","hint":"could you (potere, formal, condizionale)"},"explanation":"Formal Lei takes the third person, so could you = potrebbe. più lentamente = more slowly."},
+    {"id":"s-u09-29","unit":"u09","type":"sentence","it":["Potrebbe parlare più lentamente?","Potrebbe parlare più piano?","Può parlare più lentamente?","Può parlare più piano?"],"en":["Could you speak more slowly? (formal)"],"cloze":{"text":"{Potrebbe} parlare più lentamente?","hint":"could you (potere, formal, condizionale)"},"explanation":"Formal Lei takes the third person, so could you = potrebbe. più lentamente = more slowly."},
     {"id":"s-u09-30","unit":"u09","type":"sentence","it":["Vorresti un caffè?"],"en":["Would you like a coffee?"],"cloze":{"text":"{Vorresti} un caffè?","hint":"would you like (volere, tu, condizionale)"},"explanation":"vorresti is the tu conditional of volere (would you like); to a stranger use vorrebbe."},
     {"id":"s-u09-31","unit":"u09","type":"sentence","it":["Vorrei un bicchiere d'acqua.","Vorrei un bicchiere di acqua."],"en":["I would like a glass of water."],"cloze":{"text":"{Vorrei} un bicchiere d'acqua.","hint":"I would like (volere, condizionale)"},"explanation":"vorrei (I would like), the io conditional of volere, is the polite way to ask for something. d'acqua = di acqua, elided."},
     {"id":"s-u09-32","unit":"u09","type":"sentence","it":["Dovrei chiamare il medico?","Devo chiamare il medico?"],"en":["Should I call the doctor?"],"cloze":{"text":"{Dovrei} chiamare il medico?","hint":"should I (dovere, condizionale)"},"explanation":"should = the conditional of dovere: dovrei. Devo chiamare il medico? is also common when you ask what to do, though strictly it means Do I have to call the doctor?"},
@@ -2296,6 +2343,170 @@ const BUILTIN = {
     {"id":"g-u01-y04","unit":"u01","type":"grammar_mc","prompt":"c'è vs ci sono:","options":["singular vs plural","informal vs formal","present vs past","question vs statement"],"answer":"singular vs plural","explanation":"C'è un libro; ci sono due libri.","distractorNotes":{"informal vs formal":"Register is not the difference.","present vs past":"Both are present.","question vs statement":"Both work in either."}},
     {"id":"g-u01-y05","unit":"u01","type":"grammar_mc","prompt":"Which is correct?","options":["Anna è italiana.","Anna è italiano.","Anna è Italiana.","Anna è italiane."],"answer":"Anna è italiana.","explanation":"Feminine singular, no capital.","distractorNotes":{"Anna è italiano.":"Anna is feminine → italiana.","Anna è Italiana.":"No capital letter for adjectives.","Anna è italiane.":"italiane is the feminine plural; one woman is italiana."}},
     {"id":"g-u01-y06","unit":"u01","type":"grammar_mc","prompt":"'Where are you from?' (informal) is:","options":["Di dove sei?","Da dove sei?","Dove sei?","Di dove stai?"],"answer":"Di dove sei?","explanation":"essere + di for origin.","distractorNotes":{"Da dove sei?":"da is used with venire: da dove vieni.","Dove sei?":"That means 'where are you (right now)?'","Di dove stai?":"stare is not used for origin."}},
+    {"id":"v-u01-z-ciao","unit":"u01","type":"vocab","it":"ciao","en":["hello","bye (informal)"],"pos":"expression","note":"Informal only: to friends, family, children."},
+    {"id":"v-u01-z-salve","unit":"u01","type":"vocab","it":"salve","en":["hello (neutral)"],"pos":"expression","note":"Safe when unsure which register to use."},
+    {"id":"v-u01-z-buonanotte","unit":"u01","type":"vocab","it":"buonanotte","en":["good night"],"pos":"expression","note":"Only when going to bed or leaving late at night."},
+    {"id":"v-u01-z-a-presto","unit":"u01","type":"vocab","it":"a presto","en":["see you soon"],"pos":"expression","note":"Informal or neutral."},
+    {"id":"v-u01-z-a-dopo","unit":"u01","type":"vocab","it":"a dopo","en":["see you later"],"pos":"expression","note":"For later the same day; see you tomorrow is a domani."},
+    {"id":"v-u01-z-a-domani","unit":"u01","type":"vocab","it":"a domani","en":["see you tomorrow"],"pos":"expression","note":"Any register."},
+    {"id":"v-u01-z-scusa","unit":"u01","type":"vocab","it":"scusa","en":["sorry","excuse me (informal)"],"pos":"expression","note":"tu imperative of scusare."},
+    {"id":"v-u01-z-scusi","unit":"u01","type":"vocab","it":"scusi","en":["excuse me (formal)","sorry"],"pos":"expression","note":"Lei imperative: Scusi, dov'è la stazione?"},
+    {"id":"v-u01-z-per-favore","unit":"u01","type":"vocab","it":"per favore","en":["please"],"pos":"expression","note":"Neutral. per cortesia is more formal, per piacere more informal."},
+    {"id":"v-u01-z-mi-dispiace","unit":"u01","type":"vocab","it":"mi dispiace","en":["I'm sorry"],"pos":"expression","note":"Regret or sympathy (Mi dispiace, è chiuso), and also a heartfelt apology (Mi dispiace, ho sbagliato). scusa / scusi is the quick everyday sorry or excuse me."},
+    {"id":"v-u01-z-permesso","unit":"u01","type":"vocab","it":"permesso","en":["excuse me (passing through)","may I come in"],"pos":"expression","note":"Said when entering a home or squeezing past someone."},
+    {"id":"v-u01-z-come-stai","unit":"u01","type":"vocab","it":"come stai","en":["how are you (informal)"],"pos":"expression","note":"tu form."},
+    {"id":"v-u01-z-come-sta","unit":"u01","type":"vocab","it":"come sta","en":["how are you (formal)"],"pos":"expression","note":"Lei form: Come sta, signora?"},
+    {"id":"v-u01-z-piacere-mio","unit":"u01","type":"vocab","it":"piacere mio","en":["the pleasure is mine","nice to meet you too"],"pos":"expression","note":"The reply to Piacere! You can also simply say Piacere again."},
+    {"id":"v-u01-z-benissimo","unit":"u01","type":"vocab","it":"benissimo","en":["very well"],"pos":"adverb","note":"bene + -issimo: the best answer to Come stai?"},
+    {"id":"v-u01-z-cosi-cosi","unit":"u01","type":"vocab","it":"così così","en":["so-so"],"pos":"expression","note":"Between bene and male: Come stai? Così così."},
+    {"id":"v-u01-z-non-ce-male","unit":"u01","type":"vocab","it":"non c'è male","en":["not bad"],"pos":"expression","note":"A common reply to Come stai?, literally “there's no bad”."},
+    {"id":"v-u01-z-anchio","unit":"u01","type":"vocab","it":"anch'io","en":["me too","I too"],"pos":"expression","note":"anche + io, shortened: Sono stanco. Anch'io!"},
+    {"id":"v-u01-z-sono-io","unit":"u01","type":"vocab","it":"sono io","en":["it's me"],"pos":"expression","note":"Italian says “I am I”, and the verb agrees with io: Chi è? Sono io!"},
+    {"id":"v-u01-z-peccato","unit":"u01","type":"vocab","it":"peccato","en":["what a shame","pity"],"pos":"expression","note":"Che peccato! is What a pity!"},
+    {"id":"v-u01-z-irlandese","unit":"u01","type":"vocab","it":"irlandese","en":["Irish"],"pos":"adjective","forms":["irlandese","irlandese","irlandesi","irlandesi"],"note":"-ese, like inglese: one singular form for men and women."},
+    {"id":"v-u01-z-scozzese","unit":"u01","type":"vocab","it":"scozzese","en":["Scottish"],"pos":"adjective","forms":["scozzese","scozzese","scozzesi","scozzesi"],"note":"The country is la Scozia."},
+    {"id":"v-u01-z-gallese","unit":"u01","type":"vocab","it":"gallese","en":["Welsh"],"pos":"adjective","forms":["gallese","gallese","gallesi","gallesi"],"note":"The country is il Galles."},
+    {"id":"v-u01-z-australiano","unit":"u01","type":"vocab","it":"australiano","en":["Australian"],"pos":"adjective","forms":["australiano","australiana","australiani","australiane"]},
+    {"id":"v-u01-z-canadese","unit":"u01","type":"vocab","it":"canadese","en":["Canadian"],"pos":"adjective","forms":["canadese","canadese","canadesi","canadesi"]},
+    {"id":"v-u01-z-brasiliano","unit":"u01","type":"vocab","it":"brasiliano","en":["Brazilian"],"pos":"adjective","forms":["brasiliano","brasiliana","brasiliani","brasiliane"]},
+    {"id":"v-u01-z-infermiere","unit":"u01","type":"vocab","it":"infermiere","en":["nurse (male)","nurse"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"infermieri","artPl":"gli","note":"A woman is l'infermiera, like il cameriere and la cameriera."},
+    {"id":"v-u01-z-infermiera","unit":"u01","type":"vocab","it":"infermiera","en":["nurse (female)","female nurse"],"pos":"noun","gender":"f","art":"l'","indef":"un'","plural":"infermiere","artPl":"le","note":"The plural le infermiere looks like the masculine singular: the article tells them apart."},
+    {"id":"v-u01-z-impiegato","unit":"u01","type":"vocab","it":"impiegato","en":["office worker","clerk"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"impiegati","artPl":"gli","note":"A woman is l'impiegata."},
+    {"id":"v-u01-z-operaio","unit":"u01","type":"vocab","it":"operaio","en":["factory worker","labourer"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"operai","artPl":"gli","note":"The i of -aio is unstressed, so the plural has one i: operai."},
+    {"id":"v-u01-z-architetto","unit":"u01","type":"vocab","it":"architetto","en":["architect"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"architetti","artPl":"gli"},
+    {"id":"v-u01-z-farmacista","unit":"u01","type":"vocab","it":"farmacista","en":["chemist","pharmacist"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"farmacisti","artPl":"i","note":"-ista: il farmacista, la farmacista; plural i farmacisti, le farmaciste."},
+    {"id":"v-u01-z-cantante","unit":"u01","type":"vocab","it":"cantante","en":["singer"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"cantanti","artPl":"i","note":"One form for both: il cantante, la cantante; plural i cantanti, le cantanti."},
+    {"id":"v-u01-z-poliziotto","unit":"u01","type":"vocab","it":"poliziotto","en":["police officer","policeman"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"poliziotti","artPl":"i","note":"A woman is la poliziotta."},
+    {"id":"v-u01-z-autista","unit":"u01","type":"vocab","it":"autista","en":["driver"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"autisti","artPl":"gli","note":"-ista: l'autista for a man or a woman (un'autista)."},
+    {"id":"v-u01-z-pensionato","unit":"u01","type":"vocab","it":"pensionato","en":["pensioner","retired person"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"pensionati","artPl":"i","note":"Also an adjective: sono pensionato (I'm retired); a woman is pensionata."},
+    {"id":"v-u01-z-marito","unit":"u01","type":"vocab","it":"marito","en":["husband"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"mariti","artPl":"i","note":"A family member in the singular drops the article after a possessive: mio marito."},
+    {"id":"v-u01-z-moglie","unit":"u01","type":"vocab","it":"moglie","en":["wife"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"mogli","artPl":"le","note":"Irregular plural: le mogli. In the singular, mia moglie, with no article."},
+    {"id":"v-u01-z-biondo","unit":"u01","type":"vocab","it":"biondo","en":["blond","fair-haired"],"pos":"adjective","forms":["biondo","bionda","biondi","bionde"]},
+    {"id":"v-u01-z-carino","unit":"u01","type":"vocab","it":"carino","en":["pretty","cute","nice"],"pos":"adjective","forms":["carino","carina","carini","carine"],"note":"Used of people and things: una ragazza carina, una casa carina."},
+    {"id":"v-u01-z-educato","unit":"u01","type":"vocab","it":"educato","en":["polite","well-mannered"],"pos":"adjective","forms":["educato","educata","educati","educate"],"note":"A false friend: educato means polite; educated is istruito."},
+    {"id":"v-u01-z-sicuro","unit":"u01","type":"vocab","it":"sicuro","en":["sure","safe"],"pos":"adjective","forms":["sicuro","sicura","sicuri","sicure"],"note":"Sei sicuro? (Are you sure?) To a woman: Sei sicura?"},
+    {"id":"s-u01-z01","unit":"u01","type":"sentence","it":["Sono io!"],"en":["It's me!"],"cloze":{"text":"{Sono} io!","hint":"essere, io"},"explanation":"Italian says “I am I”: the verb agrees with io, so sono. The same pattern gives sei tu, è lui, siamo noi."},
+    {"id":"s-u01-z02","unit":"u01","type":"sentence","it":["Siete voi?"],"en":["Is that you (plural)?"],"cloze":{"text":"{Siete} voi?","hint":"essere, voi"},"explanation":"In “it's me” sentences the verb agrees with the pronoun after it: siete voi (it's you, plural)."},
+    {"id":"s-u01-z03","unit":"u01","type":"sentence","it":["È vero."],"en":["It's true."],"cloze":{"text":"{È} vero.","hint":"essere: it is"},"explanation":"There is no everyday word for “it” as a subject: the verb alone says it. è keeps its accent as a capital too: È."},
+    {"id":"s-u01-z04","unit":"u01","type":"sentence","it":["Non è facile."],"en":["It isn't easy.","It's not easy."],"cloze":{"text":"Non {è} facile.","hint":"essere: it is"},"explanation":"non goes straight before the verb, and “it” needs no word of its own: Non è facile."},
+    {"id":"s-u01-z05","unit":"u01","type":"sentence","it":["Di chi è?"],"en":["Whose is it?"],"cloze":{"text":"{Di} chi è?","hint":"whose","options":["Da","A"],"notes":{"Da":"da means from, or at someone's place; ownership takes di: Di chi è?","A":"a means to or at; ownership takes di: Di chi è?"}},"explanation":"essere di + a person says who something belongs to, and Di chi è? asks. The di comes first, as in Di dove sei?"},
+    {"id":"s-u01-z06","unit":"u01","type":"sentence","it":["È di Marco."],"en":["It's Marco's."],"cloze":{"text":"È {di} Marco.","hint":"belonging"},"explanation":"di + a name says whose something is: è di Marco (it's Marco's). Italian has no 's."},
+    {"id":"s-u01-z07","unit":"u01","type":"sentence","it":["Come sono i tuoi colleghi?"],"en":["What are your colleagues like?"],"cloze":{"text":"Come {sono} i tuoi colleghi?","hint":"essere, loro"},"explanation":"come + essere asks what someone is like, and the verb agrees with i tuoi colleghi: sono. How someone is, well or ill, uses stare: Come stanno?"},
+    {"id":"s-u01-z08","unit":"u01","type":"sentence","it":["Dov'è il museo?","Dove è il museo?","Dove si trova il museo?"],"en":["Where is the museum?"],"cloze":{"text":"{Dov'}è il museo?","hint":"where, shortened before è"},"explanation":"Before è, dove usually drops its e and takes an apostrophe: dov'è. The subject comes after the verb."},
+    {"id":"s-u01-z09","unit":"u01","type":"sentence","it":["Lei è molto gentile.","È molto gentile."],"en":["You are very kind. (formal)"],"cloze":{"text":"Lei è {molto} gentile.","hint":"very"},"explanation":"Before an adjective, molto means very and never changes: molto gentile, molto stanchi."},
+    {"id":"s-u01-z10","unit":"u01","type":"sentence","it":["Anche Marco è stanco.","Marco è stanco anche lui."],"en":["Marco is tired too."],"cloze":{"text":"{Anche} Marco è stanco.","hint":"too, also"},"explanation":"anche goes directly before the word it adds: anche Marco means Marco too, as well as someone else."},
+    {"id":"s-u01-z11","unit":"u01","type":"sentence","it":["Anch'io sono di Roma.","Anche io sono di Roma.","Sono di Roma anch'io.","Sono di Roma anche io."],"en":["I'm from Rome too."],"cloze":{"text":"{Anch'io|Anche io} sono di Roma.","hint":"I too"},"explanation":"anche + io, usually shortened to anch'io. Here the pronoun is needed, because anche must stand before a word."},
+    {"id":"s-u01-z12","unit":"u01","type":"sentence","it":["Marco non c'è.","Non c'è Marco."],"en":["Marco isn't here.","Marco isn't in."],"cloze":{"text":"Marco non {c'è}.","hint":"is here, is in"},"explanation":"c'è also says that someone is in or present: C'è Marco? No, non c'è. non goes before the ci."},
+    {"id":"s-u01-z13","unit":"u01","type":"sentence","it":["Non ci sono problemi.","Non c'è nessun problema."],"en":["There are no problems."],"cloze":{"text":"Non {ci sono} problemi.","hint":"there are"},"explanation":"ci sono is for more than one thing; with non and no article it means there are no: non ci sono problemi."},
+    {"id":"s-u01-z14","unit":"u01","type":"sentence","it":["Ecco i miei amici!"],"en":["Here are my friends!"],"cloze":{"text":"{Ecco} i miei amici!","hint":"here are"},"explanation":"ecco points things out and never changes: ecco il libro, ecco i miei amici."},
+    {"id":"s-u01-z15","unit":"u01","type":"sentence","it":["Siamo stanchi ma contenti.","Noi siamo stanchi ma contenti.","Siamo stanche ma contente.","Noi siamo stanche ma contente.","Siamo stanchi ma felici.","Siamo stanche ma felici."],"en":["We're tired but happy."],"cloze":{"text":"Siamo stanchi {ma} contenti.","hint":"but"},"explanation":"ma (but) joins the two adjectives, and both agree with noi: stanchi, contenti (all women: stanche, contente)."},
+    {"id":"s-u01-z16","unit":"u01","type":"sentence","it":["Sei italiano o spagnolo?","Tu sei italiano o spagnolo?","Sei italiana o spagnola?","Tu sei italiana o spagnola?"],"en":["Are you Italian or Spanish?"],"cloze":{"text":"Sei italiano {o} spagnolo?","hint":"or"},"explanation":"o (or) offers a choice. Both adjectives agree with the person asked: to a woman, italiana o spagnola."},
+    {"id":"s-u01-z17","unit":"u01","type":"sentence","it":["Marco ed Elena sono sposati.","Marco e Elena sono sposati."],"en":["Marco and Elena are married."],"cloze":{"text":"Marco {ed|e} Elena sono sposati.","hint":"and, before e-"},"explanation":"Before a word starting with e, e often becomes ed: Marco ed Elena. sposati is masculine plural, for a mixed couple."},
+    {"id":"s-u01-z18","unit":"u01","type":"sentence","it":["I ragazzi sono simpatici."],"en":["The boys are nice."],"cloze":{"text":"I ragazzi sono {simpatici}.","hint":"simpatico, agree"},"explanation":"simpatico is stressed on the third-last syllable (sim-PA-ti-co), so its masculine plural is simpatici, with no h."},
+    {"id":"s-u01-z19","unit":"u01","type":"sentence","it":["Le studentesse sono brave."],"en":["The students (f.) are good."],"cloze":{"text":"Le studentesse sono {brave}.","hint":"bravo, agree"},"explanation":"studentesse is feminine plural, so bravo becomes brave."},
+    {"id":"s-u01-z20","unit":"u01","type":"sentence","it":["Giulia è infermiera.","Giulia è un'infermiera."],"en":["Giulia is a nurse."],"cloze":{"text":"Giulia è {infermiera}.","hint":"nurse, a woman"},"explanation":"After essere a job usually takes no article: è infermiera. For a man, è infermiere."},
+    {"id":"s-u01-z21","unit":"u01","type":"sentence","it":["Mio marito è canadese."],"en":["My husband is Canadian."],"cloze":{"text":"Mio marito è {canadese}.","hint":"Canadian"},"explanation":"canadese ends in -ese, like inglese: one form for men and women. A family member in the singular drops the article: mio marito."},
+    {"id":"s-u01-z22","unit":"u01","type":"sentence","it":["Siete irlandesi?","Voi siete irlandesi?"],"en":["Are you (plural) Irish?"],"cloze":{"text":"{Siete} irlandesi?","hint":"essere, voi"},"explanation":"voi takes siete, and irlandese, an -ese adjective, has one plural form for any group: irlandesi."},
+    {"id":"s-u01-z23","unit":"u01","type":"sentence","it":["Il signor Rossi non è in ufficio."],"en":["Mr Rossi isn't in the office."],"cloze":{"text":"Il {signor} Rossi non è in ufficio.","hint":"signore, before a surname"},"explanation":"Before a surname, signore drops its -e: il signor Rossi. The article stays because you are talking about him."},
+    {"id":"s-u01-z24","unit":"u01","type":"sentence","it":["Scusi, Lei è il dottor Neri?","Scusi, è il dottor Neri?"],"en":["Excuse me, are you Dr Neri?"],"cloze":{"text":"Scusi, Lei è il {dottor} Neri?","hint":"dottore, before a surname"},"explanation":"Titles in -ore lose their -e before a surname, as signore does: il dottor Neri. scusi is the formal excuse me, to match Lei."},
+    {"id":"s-u01-z25","unit":"u01","type":"sentence","it":["Chi siete?","Voi chi siete?"],"en":["Who are you (plural)?"],"cloze":{"text":"Chi {siete}?","hint":"essere, voi"},"explanation":"chi usually takes a singular verb, but essere agrees with the people asked about: Chi siete? (Who are you, plural?)"},
+    {"id":"s-u01-z26","unit":"u01","type":"sentence","it":["Come si chiama, signora?","Lei come si chiama, signora?"],"en":["What's your name, madam?"],"cloze":{"text":"Come {si} chiama, signora?","hint":"formal you"},"explanation":"With Lei the question uses the lui/lei form: Come si chiama? To a friend: Come ti chiami?"},
+    {"id":"s-u01-z27","unit":"u01","type":"sentence","it":["Non mi chiamo Marco, mi chiamo Luca.","Non mi chiamo Marco, sono Luca."],"en":["My name isn't Marco, it's Luca."],"cloze":{"text":"{Non} mi chiamo Marco, mi chiamo Luca.","hint":"negation"},"explanation":"non goes in front of the small pronoun: non mi chiamo, never mi non chiamo."},
+    {"id":"s-u01-z28","unit":"u01","type":"sentence","it":["Sei di Roma, vero?","Sei di Roma, no?","Tu sei di Roma, vero?"],"en":["You're from Rome, aren't you?"],"cloze":{"text":"Sei di Roma, {vero|no}?","hint":"asking for confirmation"},"explanation":"vero? or no? at the end asks for confirmation, like aren't you? in English."},
+    {"id":"s-u01-z29","unit":"u01","type":"sentence","it":["È stanco Marco?","Marco è stanco?"],"en":["Is Marco tired?"],"cloze":{"text":"{È} stanco Marco?","hint":"essere"},"explanation":"In a question a noun subject often moves to the end: È stanco Marco? The words are the same as in the statement."},
+    {"id":"s-u01-z30","unit":"u01","type":"sentence","it":["I bambini sono a scuola."],"en":["The children are at school."],"cloze":{"text":"I bambini sono {a} scuola.","hint":"at, in a fixed phrase"},"explanation":"a scuola, a casa and in ufficio are fixed phrases with no article: i bambini sono a scuola."},
+    {"id":"t-u01-z01","unit":"u01","type":"transform","it":"Sono stanco.","task":"Make it negative","answer":["Non sono stanco.","Io non sono stanco."],"explanation":"non goes directly before the verb: non sono."},
+    {"id":"t-u01-z02","unit":"u01","type":"transform","it":"Marco è di Roma.","task":"Ask for confirmation, with vero at the end","answer":["Marco è di Roma, vero?"],"explanation":"The statement stays as it is; vero? at the end turns it into “isn't he?”."},
+    {"id":"t-u01-z03","unit":"u01","type":"transform","it":"Anna è stanca.","task":"Change Anna to Anna e Sara","answer":["Anna e Sara sono stanche."],"explanation":"Two women make a feminine plural subject: sono stanche."},
+    {"id":"t-u01-z04","unit":"u01","type":"transform","it":"Il ragazzo è italiano.","task":"Make it plural","answer":["I ragazzi sono italiani."],"explanation":"il ragazzo → i ragazzi, è → sono, italiano → italiani: every word changes."},
+    {"id":"t-u01-z05","unit":"u01","type":"transform","it":"La studentessa è inglese.","task":"Make it plural","answer":["Le studentesse sono inglesi."],"explanation":"la → le, studentessa → studentesse, è → sono; inglese has one plural form, inglesi."},
+    {"id":"t-u01-z06","unit":"u01","type":"transform","it":"Sono pronto.","task":"Change io to noi","answer":["Siamo pronti.","Noi siamo pronti.","Siamo pronte.","Noi siamo pronte."],"explanation":"io sono → noi siamo, and the adjective goes plural: pronti (all women: pronte)."},
+    {"id":"t-u01-z07","unit":"u01","type":"transform","it":"Sei americano?","task":"Ask the same question formally (Lei)","answer":["Lei è americano?","È americano?"],"explanation":"Lei takes the lui/lei form, è; the adjective still agrees with the real person."},
+    {"id":"t-u01-z08","unit":"u01","type":"transform","it":"Come ti chiami?","task":"Ask formally (Lei)","answer":["Come si chiama?","Lei come si chiama?","Come si chiama Lei?"],"explanation":"ti chiami is the tu form; with Lei it is si chiama."},
+    {"id":"t-u01-z09","unit":"u01","type":"transform","it":"Di dove sei?","task":"Ask formally (Lei)","answer":["Di dov'è?","Di dove è?","Lei di dov'è?","Di dov'è Lei?"],"explanation":"sei becomes è, and dove usually shortens before it: Di dov'è?"},
+    {"id":"t-u01-z10","unit":"u01","type":"transform","it":"C'è un turista.","task":"Make it plural: due turisti","answer":["Ci sono due turisti."],"explanation":"c'è is for one; for more than one, ci sono."},
+    {"id":"t-u01-z11","unit":"u01","type":"transform","it":"Ci sono molti bambini.","task":"Make it singular: un bambino","answer":["C'è un bambino."],"explanation":"With one thing or person, ci sono becomes c'è."},
+    {"id":"t-u01-z12","unit":"u01","type":"transform","it":"Marco è simpatico.","task":"Change Marco to Marco e Luca","answer":["Marco e Luca sono simpatici."],"explanation":"Two names joined by e make a plural: sono simpatici, with no h (sim-PA-ti-co)."},
+    {"id":"t-u01-z13","unit":"u01","type":"transform","it":"Io sono di Milano.","task":"Change io to lui","answer":["Lui è di Milano.","È di Milano."],"explanation":"lui takes è; di + city stays the same."},
+    {"id":"t-u01-z14","unit":"u01","type":"transform","it":"Tu sei gentile.","task":"Change tu to voi","answer":["Voi siete gentili.","Siete gentili."],"explanation":"tu sei → voi siete, and gentile goes plural: gentili."},
+    {"id":"t-u01-z15","unit":"u01","type":"transform","it":"Lei sei italiana?","task":"Correct the mistake","answer":["Lei è italiana?","È italiana?"],"explanation":"Lei, whether it means she or the formal you, always takes the lui/lei form: è."},
+    {"id":"t-u01-z16","unit":"u01","type":"transform","it":"Marco è medico.","task":"Add bravo: he's a good doctor","answer":["Marco è un bravo medico."],"explanation":"With an adjective, the article comes back: è un bravo medico."},
+    {"id":"t-u01-z17","unit":"u01","type":"transform","it":"Sono stanco.","task":"Say it as a woman would","answer":["Sono stanca.","Io sono stanca."],"explanation":"With io the ending follows the speaker: a woman says stanca."},
+    {"id":"g-u01-z01","unit":"u01","type":"grammar_mc","prompt":"Odd one out: which is NOT a form of essere?","options":["sono","siamo","sei","sai"],"answer":"sai","explanation":"sai comes from sapere (to know): tu sai. The present of essere is sono, sei, è, siamo, siete, sono.","distractorNotes":{"sono":"sono is a form of essere: io sono, loro sono.","siamo":"siamo is the noi form of essere.","sei":"sei is the tu form of essere (and also the number six)."}},
+    {"id":"g-u01-z02","unit":"u01","type":"grammar_mc","prompt":"Odd one out: which one only says goodbye?","options":["arrivederci","ciao","buongiorno","buonasera"],"answer":"arrivederci","explanation":"arrivederci only says goodbye; ciao, buongiorno and buonasera work as hello and as goodbye.","distractorNotes":{"ciao":"ciao is both hi and bye, between friends.","buongiorno":"buongiorno is good morning, and also works as a goodbye during the day.","buonasera":"buonasera is good evening, as a hello or a goodbye."}},
+    {"id":"g-u01-z03","unit":"u01","type":"grammar_mc","prompt":"At the door: Chi è? How do you say “It's me”?","options":["Sono io.","È io.","Sono me.","È me."],"answer":"Sono io.","explanation":"Italian says “I am I”: after essere comes the subject form, and the verb agrees with it: sono io, sei tu, è lui.","distractorNotes":{"È io.":"The verb agrees with io: sono io.","Sono me.":"After essere Italian uses the subject form io, not me.","È me.":"Both words change: the subject form io, and the verb that goes with it, sono."}},
+    {"id":"g-u01-z04","unit":"u01","type":"grammar_mc","prompt":"Which is the formal way to ask someone's name?","options":["Come si chiama?","Come ti chiami?","Come chiama?","Come sei?"],"answer":"Come si chiama?","explanation":"Lei takes the lui/lei form: Come si chiama? To a friend: Come ti chiami?","distractorNotes":{"Come ti chiami?":"That is the informal question, to someone you call tu.","Come chiama?":"chiamarsi needs its small pronoun: Come si chiama?","Come sei?":"Come sei? asks what someone is like."}},
+    {"id":"g-u01-z05","unit":"u01","type":"grammar_mc","prompt":"Where does anche go?","options":["directly before the word it refers to","always at the end of the sentence","always after the verb","only after io"],"answer":"directly before the word it refers to","explanation":"Anche Marco è stanco (Marco too); Marco è anche stanco (also tired). Moving anche changes what it adds.","distractorNotes":{"always at the end of the sentence":"anche goes before the word it adds, wherever that is: anche Marco, anch'io.","always after the verb":"Only when it adds to what follows the verb (è anche stanco); before a subject it comes first: Anche Marco è stanco.","only after io":"It goes before io, not after it: anch'io."}},
+    {"id":"g-u01-z06","unit":"u01","type":"grammar_mc","prompt":"Before a word starting with e-, the word e (and) often becomes:","options":["ed","è","ad","et"],"answer":"ed","explanation":"Marco ed Elena: the d keeps the two vowels apart. Plain e is also fine.","distractorNotes":{"è":"è with the accent means is, not and.","ad":"ad is the form of a (to, at) before a vowel: ad Anna.","et":"et is Latin and French; Italian has e and ed."}},
+    {"id":"g-u01-z07","unit":"u01","type":"grammar_mc","prompt":"How do you say “It's true”?","options":["È vero.","Esso è vero.","Lui è vero.","C'è vero."],"answer":"È vero.","explanation":"There is no everyday word for “it” as a subject: the verb alone does the job.","distractorNotes":{"Esso è vero.":"esso is an old, literary “it”; everyday Italian leaves it out.","Lui è vero.":"lui means he, a person.","C'è vero.":"c'è means there is."}},
+    {"id":"g-u01-z08","unit":"u01","type":"grammar_mc","prompt":"Di chi è? asks:","options":["whose it is","where it is from","who it is","what it is"],"answer":"whose it is","explanation":"essere di + a person says who owns something (È di Marco), and Di chi è? asks.","distractorNotes":{"where it is from":"Where something is from is Di dov'è?","who it is":"Who it is: Chi è?","what it is":"What it is: Che cos'è?"}},
+    {"id":"g-u01-z09","unit":"u01","type":"grammar_mc","prompt":"Come sono i tuoi amici? asks:","options":["what your friends are like","how your friends are feeling","where your friends are","who your friends are"],"answer":"what your friends are like","explanation":"come + essere asks what someone is like. How they are, well or ill, uses stare: Come stanno?","distractorNotes":{"how your friends are feeling":"That uses stare: Come stanno i tuoi amici?","where your friends are":"That is Dove sono i tuoi amici?","who your friends are":"That is Chi sono i tuoi amici?"}},
+    {"id":"g-u01-z10","unit":"u01","type":"grammar_mc","prompt":"Which is right for “Where's Marco?”","options":["Dov'è Marco?","Dove Marco è?","Dov' Marco è?","È dove Marco?"],"answer":"Dov'è Marco?","explanation":"The question word comes first and the verb follows it; dove shortens before è: Dov'è Marco? (In speech, Marco dov'è? is common too.)","distractorNotes":{"Dove Marco è?":"The verb follows the question word: Dov'è Marco?","Dov' Marco è?":"dove only shortens before è, joined to it: dov'è.","È dove Marco?":"The question word comes first: Dov'è Marco?"}},
+    {"id":"g-u01-z11","unit":"u01","type":"grammar_mc","prompt":"Lei è stanca, signora? Why stanca?","options":["the person spoken to is a woman","Lei is always feminine","because it is a question","stanco has no masculine form"],"answer":"the person spoken to is a woman","explanation":"Lei takes the lui/lei verb form, but the adjective agrees with the real person: Lei è stanco, signore? Lei è stanca, signora?","distractorNotes":{"Lei is always feminine":"To a man it is Lei è stanco, signore?","because it is a question":"A question changes nothing: È stanca. È stanca?","stanco has no masculine form":"stanco is the masculine: Lei è stanco, signore?"}},
+    {"id":"g-u01-z12","unit":"u01","type":"grammar_mc","prompt":"Before a surname, signore becomes:","options":["signor","signori","signora","signorino"],"answer":"signor","explanation":"signore drops its -e before a name: il signor Rossi, Buongiorno, signor Rossi!","distractorNotes":{"signori":"signori is the plural: gentlemen, or Mr and Mrs together.","signora":"signora is for a woman: la signora Rossi.","signorino":"signorino means young man and sounds old-fashioned; before a surname, signore becomes signor."}},
+    {"id":"g-u01-z13","unit":"u01","type":"grammar_mc","prompt":"Which sentence means “There's nobody here”?","options":["Non c'è nessuno.","Nessuno non c'è.","Non è nessuno.","Non ci sono nessuno."],"answer":"Non c'è nessuno.","explanation":"nessuno after the verb needs non in front of the verb as well: Non c'è nessuno.","distractorNotes":{"Nessuno non c'è.":"When nessuno comes before the verb, non is dropped: Nessuno è qui.","Non è nessuno.":"That means it's nobody (nobody important).","Non ci sono nessuno.":"nessuno is singular, so c'è, not ci sono."}},
+    {"id":"g-u01-z14","unit":"u01","type":"grammar_mc","prompt":"Which reply to Come stai? is the most positive?","options":["Benissimo!","Bene.","Non c'è male.","Così così."],"answer":"Benissimo!","explanation":"From best to worst: benissimo, bene, abbastanza bene, non c'è male, così così, male.","distractorNotes":{"Bene.":"bene is well; benissimo is very well.","Non c'è male.":"non c'è male is not bad, below bene.","Così così.":"così così is so-so."}},
+    {"id":"sp-u01-z01","unit":"u01","type":"spot","it":"Anna è stanco.","wrong":"stanco","fix":["stanca"],"en":"Anna is tired.","explanation":"The adjective agrees with Anna, a woman: stanca.","notes":{"è":"è is right: Anna is one person, so the lui/lei form."}},
+    {"id":"sp-u01-z02","unit":"u01","type":"spot","it":"Marco e stanco.","wrong":"e","fix":["è"],"en":"Marco is tired.","explanation":"Without its accent, e means and; is is è, accent and all.","notes":{"stanco":"stanco agrees with Marco: masculine singular."}},
+    {"id":"sp-u01-z03","unit":"u01","type":"spot","it":"Noi siete amici.","wrong":"siete","fix":["siamo"],"en":"We are friends.","explanation":"noi takes siamo; siete is the voi form.","notes":{"amici":"amici is right for a male or mixed group."}},
+    {"id":"sp-u01-z04","unit":"u01","type":"spot","it":"Lei sei italiana, signora?","wrong":"sei","fix":["è"],"en":"Are you Italian, madam?","explanation":"Lei, the formal you, takes the lui/lei form: Lei è.","notes":{"Lei":"Lei is right: signora calls for the formal you.","italiana":"italiana agrees with the real person, a woman."}},
+    {"id":"sp-u01-z05","unit":"u01","type":"spot","it":"Sono di Roma, ma adesso sono a Milano.","wrong":null,"en":"I'm from Rome, but I'm in Milan now.","explanation":"Right as it stands: di + city says where you come from, a + city where you are now.","notes":{"di":"di + city is where you come from: sono di Roma.","a":"a + city is where you are: sono a Milano."}},
+    {"id":"sp-u01-z06","unit":"u01","type":"spot","it":"C'è due ragazzi.","wrong":"C'è","fix":["Ci sono"],"en":"There are two boys.","explanation":"c'è is for one thing or person; for more than one, ci sono.","notes":{"due":"due (two) is right; it is why the verb must be plural.","ragazzi":"ragazzi is the plural of ragazzo."}},
+    {"id":"sp-u01-z07","unit":"u01","type":"spot","it":"I miei colleghi sono simpatichi.","wrong":"simpatichi","fix":["simpatici"],"en":"My colleagues are nice.","explanation":"simpatico is stressed on the third-last syllable (sim-PA-ti-co), so its masculine plural softens: simpatici.","notes":{"colleghi":"colleghi is right: collega keeps its hard sound in the masculine plural."}},
+    {"id":"sp-u01-z08","unit":"u01","type":"spot","it":"Sono Italiano.","wrong":"Italiano","fix":["italiano"],"en":"I'm Italian.","explanation":"Nationalities take a small letter in Italian: italiano. Only the country has a capital: l'Italia."},
+    {"id":"sp-u01-z09","unit":"u01","type":"spot","it":"Il signore Rossi è qui.","wrong":"signore","fix":["signor"],"en":"Mr Rossi is here.","explanation":"Before a surname, signore drops its -e: il signor Rossi.","notes":{"Il":"The article is right: you are talking about Mr Rossi, not to him."}},
+    {"id":"sp-u01-z10","unit":"u01","type":"spot","it":"Sono trenta anni.","wrong":"Sono","fix":["Ho"],"en":"I'm thirty.","explanation":"Age uses avere, “to have”: Ho trent'anni, usually with trenta shortened before anni.","notes":{"trenta":"trenta is not the mistake (though before anni it is usually shortened: trent'anni); the verb is."}},
+    {"id":"sp-u01-z11","unit":"u01","type":"spot","it":"Ciao Marco, come sei?","wrong":"sei","fix":["stai"],"en":"Hi Marco, how are you?","explanation":"Asking how someone is uses stare: Come stai? Come sei? asks what someone is like."},
+    {"id":"sp-u01-z12","unit":"u01","type":"spot","it":"Anna e Sara sono stanchi.","wrong":"stanchi","fix":["stanche"],"en":"Anna and Sara are tired.","explanation":"Two women make a feminine plural: stanche. stanchi is for men or a mixed group.","notes":{"sono":"sono is right: two people joined by e make loro."}},
+    {"id":"sp-u01-z13","unit":"u01","type":"spot","it":"Marco è medico.","wrong":null,"en":"Marco is a doctor.","explanation":"Right as it stands: a job after essere usually takes no article.","notes":{"medico":"No article is needed: after essere a job stands alone, è medico."}},
+    {"id":"sp-u01-z14","unit":"u01","type":"spot","it":"Lei è stanco, signore?","wrong":null,"en":"Are you tired, sir?","explanation":"Right as it stands: Lei takes è, and the adjective agrees with the real person, a man.","notes":{"è":"Lei takes the lui/lei form: è.","stanco":"stanco agrees with the man spoken to."}},
+    {"id":"sp-u01-z15","unit":"u01","type":"spot","it":"Anna e io siete contente.","wrong":"siete","fix":["siamo"],"en":"Anna and I (f.) are glad.","explanation":"Any subject that includes io is noi: siamo.","notes":{"contente":"contente is right: Anna and the speaker are both women here."}},
+    {"id":"sp-u01-z16","unit":"u01","type":"spot","it":"Tu e Anna siamo bravi.","wrong":"siamo","fix":["siete"],"en":"You and Anna are good.","explanation":"A subject that includes tu but not io is voi: siete.","notes":{"bravi":"bravi is right for a mixed pair."}},
+    {"id":"sp-u01-z17","unit":"u01","type":"spot","it":"Non sono mai stanco.","wrong":null,"en":"I'm never tired.","explanation":"Right as it stands: mai (never) needs non before the verb as well, which English would call a double negative.","notes":{"Non":"non is needed: mai after the verb takes non in front of it.","mai":"mai means never, and it comes after the verb."}},
+    {"id":"sp-u01-z18","unit":"u01","type":"spot","it":"Siamo stanche, ma non siamo triste.","wrong":"triste","fix":["tristi"],"en":"We (f.) are tired, but we aren't sad.","explanation":"triste is an -e adjective: one form for the singular, and tristi for any plural.","notes":{"stanche":"stanche is right for a group of women."}},
+    {"id":"en-u01-z01","unit":"u01","type":"endings","text":"Le ragazz{e} sono stanc{he}.","en":"The girls are tired.","explanation":"ragazza → ragazze; stanco → stanche, where the h keeps the hard c sound."},
+    {"id":"en-u01-z02","unit":"u01","type":"endings","text":"I ragazz{i} sono stanc{hi}.","en":"The boys are tired.","explanation":"ragazzo → ragazzi. STAN-co is stressed on the second-last syllable, so stanchi keeps its hard sound with an h."},
+    {"id":"en-u01-z03","unit":"u01","type":"endings","text":"Marco e Anna sono italian{i}.","en":"Marco and Anna are Italian.","explanation":"A mixed pair takes the masculine plural: italiani."},
+    {"id":"en-u01-z04","unit":"u01","type":"endings","text":"Giulia è american{a}, ma Tom è ingles{e}.","en":"Giulia is American, but Tom is English.","explanation":"americano has four forms (for Giulia, americana); inglese has one singular form for men and women."},
+    {"id":"en-u01-z05","unit":"u01","type":"endings","text":"Siamo amic{he}.","en":"We (f.) are friends.","explanation":"amica → amiche: the feminine plural keeps the hard sound with h. Only the masculine softens: amici."},
+    {"id":"en-u01-z06","unit":"u01","type":"endings","text":"I miei colleghi sono simpatic{i}.","en":"My colleagues are nice.","explanation":"simpatico is stressed on the third-last syllable (sim-PA-ti-co), so the masculine plural softens: simpatici."},
+    {"id":"en-u01-z07","unit":"u01","type":"endings","text":"Le mie amiche sono tedesc{he}.","en":"My friends (f.) are German.","explanation":"tedesco → tedesche: a feminine plural in -che always keeps the hard sound."},
+    {"id":"en-u01-z08","unit":"u01","type":"endings","text":"La signora è molto gentil{e}.","en":"The lady is very kind.","explanation":"gentile has one singular form for both genders, and molto before an adjective never changes."},
+    {"id":"en-u01-z09","unit":"u01","type":"endings","text":"Voi siete pront{i|e}?","en":"Are you (plural) ready?","explanation":"voi is plural: pronti for men or a mixed group, pronte for women."},
+    {"id":"en-u01-z10","unit":"u01","type":"endings","text":"Lui è alt{o} e lei è bass{a}.","en":"He is tall and she is short.","explanation":"Each adjective agrees with its own subject: alto for him, bassa for her."},
+    {"id":"en-u01-z11","unit":"u01","type":"endings","text":"Sono felic{i} e content{i|e}.","en":"They are happy and pleased.","explanation":"felice is an -e adjective, so felici for any plural; contento has a masculine plural (contenti) and a feminine one (contente)."},
+    {"id":"en-u01-z12","unit":"u01","type":"endings","text":"Le studentess{e} sono spagnol{e}.","en":"The students (f.) are Spanish.","explanation":"studentessa → studentesse, and spagnolo → spagnole for women."},
+    {"id":"en-u01-z13","unit":"u01","type":"endings","text":"Anna è un'amic{a} simpatic{a}.","en":"Anna is a nice friend.","explanation":"un' shows a feminine noun, and the adjective agrees with it: un'amica simpatica."},
+    {"id":"en-u01-z14","unit":"u01","type":"endings","text":"Gli studenti sono irlandes{i} e scozzes{i}.","en":"The students are Irish and Scottish.","explanation":"-ese adjectives have one plural form, -esi, for any group."},
+    {"id":"re-u01-z01","unit":"u01","type":"reply","who":"Luca","line":"Ciao! Come ti chiami?","cue":"Say your name is Anna.","answer":["Mi chiamo Anna.","Sono Anna.","Il mio nome è Anna."],"options":["Ti chiami Anna.","Si chiama Anna.","Mi chiama Anna."],"notes":{"Ti chiami Anna.":"ti chiami is “your name is”; for your own name, mi chiamo.","Si chiama Anna.":"si chiama is “his or her name is”; for your own name, mi chiamo.","Mi chiama Anna.":"mi chiama means “he or she calls me”; the form for your name is mi chiamo."},"explanation":"chiamarsi carries a small pronoun: mi chiamo, ti chiami, si chiama. Sono Anna works too."},
+    {"id":"re-u01-z02","unit":"u01","type":"reply","who":"Sara","line":"Piacere!","cue":"Reply: the pleasure is mine.","answer":["Piacere mio.","Piacere.","Il piacere è mio."],"options":["Prego.","Mi dispiace.","Permesso."],"notes":{"Prego.":"prego answers grazie (you're welcome).","Mi dispiace.":"mi dispiace means I'm sorry.","Permesso.":"permesso asks to get past someone, or to come in."},"explanation":"Piacere! is answered with Piacere mio, or simply Piacere again."},
+    {"id":"re-u01-z03","unit":"u01","type":"reply","who":"Marco","line":"Grazie mille!","cue":"Say you're welcome.","answer":["Prego.","Di niente.","Di nulla."],"options":["Grazie.","Piacere.","Scusa."],"notes":{"Grazie.":"grazie is what Marco just said; the answer to it is prego.","Piacere.":"piacere is said on meeting someone.","Scusa.":"scusa means sorry or excuse me."},"explanation":"prego is the usual answer to grazie; di niente is common too."},
+    {"id":"re-u01-z04","unit":"u01","type":"reply","who":"Luca","line":"Di dove sei?","cue":"Say you're from Manchester.","answer":["Sono di Manchester.","Di Manchester.","Vengo da Manchester."],"options":["Sono da Manchester.","Sei di Manchester.","Sono a Manchester."],"notes":{"Sono da Manchester.":"With essere, origin takes di: sono di Manchester (vengo da… uses venire).","Sei di Manchester.":"sei is you are; about yourself, sono.","Sono a Manchester.":"sono a Manchester says you are in Manchester now, not that you come from there."},"explanation":"Answer Di dove sei? with di + town: Sono di Manchester."},
+    {"id":"re-u01-z05","unit":"u01","type":"reply","who":"Giulia","line":"Ciao! Come stai?","cue":"Say you're very well, thanks.","answer":["Benissimo, grazie.","Sto benissimo, grazie.","Molto bene, grazie.","Sto molto bene, grazie."],"options":["Sono benissimo, grazie.","Male, grazie.","Così così, grazie."],"notes":{"Sono benissimo, grazie.":"How you are uses stare, not essere: sto benissimo, or just benissimo.","Male, grazie.":"male means badly.","Così così, grazie.":"così così means so-so."},"explanation":"Come stai? uses stare, and so does the answer: (Sto) benissimo, grazie."},
+    {"id":"re-u01-z06","unit":"u01","type":"reply","line":"Chi è?","cue":"Someone at the door asks. Say it's you.","answer":["Sono io!"],"options":["È io!","Sono me!","Io sono!"],"notes":{"È io!":"The verb agrees with io: sono io.","Sono me!":"After essere comes the subject form, io: sono io.","Io sono!":"The pronoun comes after the verb: sono io."},"explanation":"Italian says “I am I”: Sono io!"},
+    {"id":"re-u01-z07","unit":"u01","type":"reply","who":"Un signore","line":"Lei è inglese?","cue":"Say no, you're Scottish.","answer":["No, sono scozzese.","No, non sono inglese, sono scozzese.","No, io sono scozzese."],"options":["No, non sono scozzese.","No, è scozzese.","Sì, sono scozzese."],"notes":{"No, non sono scozzese.":"That says you aren't Scottish: drop the non.","No, è scozzese.":"è is he, she or the formal you; about yourself, sono.","Sì, sono scozzese.":"sì would agree that you are English."},"explanation":"scozzese, like inglese, has one singular form for men and women."},
+    {"id":"re-u01-z08","unit":"u01","type":"reply","who":"Marco","line":"Sono stanco!","cue":"Say: me too!","answer":["Anch'io!","Anche io!","Anch'io sono stanco!","Anche io sono stanco!","Anch'io sono stanca!","Anche io sono stanca!","Sono stanco anch'io!","Sono stanca anch'io!"],"options":["Io anche!","Anche me!","Neanche io!"],"notes":{"Io anche!":"anche goes before the word it adds: anch'io.","Anche me!":"me is the object form; as the subject, Italian says anch'io.","Neanche io!":"neanche io means me neither, after a negative sentence."},"explanation":"anche + io, usually shortened: Anch'io!"},
+    {"id":"re-u01-z09","unit":"u01","type":"reply","who":"La signora","line":"Come si chiama?","cue":"Say your name is Laura Martin, and ask hers back.","answer":["Mi chiamo Laura Martin. E Lei?","Sono Laura Martin. E Lei?","Mi chiamo Laura Martin. E Lei come si chiama?","Sono Laura Martin. E Lei come si chiama?"],"options":["Mi chiamo Laura Martin. E tu?","Si chiama Laura Martin. E Lei?","Mi chiamo Laura Martin. E lui?"],"notes":{"Mi chiamo Laura Martin. E tu?":"E tu? is informal; the lady used Lei, so ask back with E Lei?","Si chiama Laura Martin. E Lei?":"si chiama is “his or her name is”; for yours, mi chiamo.","Mi chiamo Laura Martin. E lui?":"E lui? asks about him, someone else."},"explanation":"Answer in the same register: a formal Come si chiama? gets E Lei? back."},
+    {"id":"re-u01-z10","unit":"u01","type":"reply","who":"Anna","line":"Arrivederci!","cue":"Say goodbye: see you soon.","answer":["Arrivederci, a presto!","A presto!","Ciao, a presto!"],"options":["Piacere, a presto!","Prego, a presto!","Permesso, a presto!"],"notes":{"Piacere, a presto!":"piacere is said on meeting someone, not on leaving.","Prego, a presto!":"prego answers grazie.","Permesso, a presto!":"permesso asks to get past someone."},"explanation":"a presto (see you soon), a dopo (later today) and a domani (tomorrow) all follow a goodbye."},
+    {"id":"re-u01-z11","unit":"u01","type":"reply","who":"Al telefono","line":"Pronto? C'è Marco?","cue":"Say no, he isn't in.","answer":["No, non c'è.","No, Marco non c'è.","Non c'è."],"options":["No, non è.","No, c'è.","No, non ci sono."],"notes":{"No, non è.":"Being in uses c'è: non c'è.","No, c'è.":"c'è means he is here; to say he isn't, non c'è.","No, non ci sono.":"ci sono is for more than one person; Marco is one: non c'è."},"explanation":"C'è Marco? asks whether he is in, and the answer is non c'è."},
+    {"id":"re-u01-z12","unit":"u01","type":"reply","who":"La guida","line":"Siete pronti?","cue":"Say yes, we're ready.","answer":["Sì, siamo pronti.","Sì, siamo pronte.","Sì, noi siamo pronti.","Sì, noi siamo pronte."],"options":["Sì, siete pronti.","Sì, sono pronti.","Sì, siamo pronto."],"notes":{"Sì, siete pronti.":"siete is you (plural); about your own group, siamo.","Sì, sono pronti.":"sono pronti means they are ready.","Sì, siamo pronto.":"The adjective agrees with noi: pronti."},"explanation":"The question uses voi; the answer about your own group uses noi: siamo pronti."},
+    {"id":"re-u01-z13","unit":"u01","type":"reply","who":"Anna","line":"Com'è la casa?","cue":"Say it's old but beautiful.","answer":["È vecchia ma bella.","La casa è vecchia ma bella."],"options":["È vecchio ma bello.","Sono vecchia ma bella.","C'è vecchia ma bella."],"notes":{"È vecchio ma bello.":"casa is feminine: vecchia, bella.","Sono vecchia ma bella.":"sono vecchia means I am old; for the house, è.","C'è vecchia ma bella.":"c'è means there is; to describe the house, è."},"explanation":"Com'è…? asks what something is like, and the adjectives agree with la casa."},
+    {"id":"re-u01-z14","unit":"u01","type":"reply","who":"Il professore","line":"Buongiorno! Come sta?","cue":"Say not bad, thanks, and ask him back.","answer":["Non c'è male, grazie. E Lei?","Buongiorno! Non c'è male, grazie. E Lei?"],"options":["Non c'è male, grazie. E tu?","Non è male, grazie. E Lei?","Non c'è male, prego. E Lei?"],"notes":{"Non c'è male, grazie. E tu?":"The professor used Lei (Come sta?), so ask back with E Lei?","Non è male, grazie. E Lei?":"The fixed phrase is non c'è male.","Non c'è male, prego. E Lei?":"prego answers grazie; here you are the one thanking: grazie."},"explanation":"Come sta? is the formal how are you; answer, then ask back in the same register: E Lei?"},
+    {"id":"so-u01-z01","unit":"u01","type":"sort","prompt":"c'è or ci sono?","groups":["c'è","ci sono"],"rows":[{"it":"un problema","group":"c'è","say":"c'è un problema","note":"One problem: c'è."},{"it":"due ragazzi","group":"ci sono","say":"ci sono due ragazzi","note":"Two of them: ci sono."},{"it":"molti turisti","group":"ci sono","say":"ci sono molti turisti","note":"molti turisti is plural: ci sono."},{"it":"un bar qui vicino","group":"c'è","say":"c'è un bar qui vicino","note":"One bar: c'è."},{"it":"Marco","group":"c'è","say":"c'è Marco","note":"One person: C'è Marco? asks whether he is in."},{"it":"tre studenti","group":"ci sono","say":"ci sono tre studenti","note":"tre studenti is plural: ci sono."}],"explanation":"c'è goes with one thing or person, ci sono with more than one: match the noun that follows."},
+    {"id":"so-u01-z02","unit":"u01","type":"sort","prompt":"Informal (tu) or formal (Lei)?","groups":["tu","Lei"],"rows":[{"it":"Come stai?","group":"tu","note":"stai is the tu form of stare."},{"it":"Come sta?","group":"Lei","note":"sta is the lui/lei form, used with Lei."},{"it":"Di dov'è?","group":"Lei","note":"è is the form that goes with Lei."},{"it":"Come ti chiami?","group":"tu","note":"ti chiami is the tu form."},{"it":"Scusi!","group":"Lei","note":"scusi is the formal excuse me."},{"it":"Sei stanco?","group":"tu","note":"sei is the tu form of essere."}],"explanation":"Lei takes the lui/lei form of every verb: sta, è, si chiama, scusi."},
+    {"id":"so-u01-z03","unit":"u01","type":"sort","prompt":"Which form of essere goes with each subject?","groups":["è","sono","siamo","siete"],"rows":[{"it":"Marco","group":"è","say":"Marco è","note":"One person: è."},{"it":"Marco e Luca","group":"sono","say":"Marco e Luca sono","note":"Two names joined by e make loro: sono."},{"it":"Anna e io","group":"siamo","say":"Anna e io siamo","note":"A subject with io in it is noi: siamo."},{"it":"tu e Anna","group":"siete","say":"tu e Anna siete","note":"With tu but not io, the subject is voi: siete."},{"it":"la casa","group":"è","say":"la casa è","note":"A singular noun takes è."},{"it":"i bambini","group":"sono","say":"i bambini sono","note":"A plural noun takes sono."}],"explanation":"Any subject that includes io is noi; one that includes tu but not io is voi; any other plural is loro."},
+    {"id":"so-u01-z04","unit":"u01","type":"sort","prompt":"Masculine plural: -chi or -ci?","groups":["-chi","-ci"],"rows":[{"it":"stanco","group":"-chi","say":"stanchi","note":"STAN-co is stressed on the second-last syllable: stanchi."},{"it":"tedesco","group":"-chi","say":"tedeschi","note":"te-DE-sco is stressed on the second-last syllable: tedeschi."},{"it":"simpatico","group":"-ci","say":"simpatici","note":"sim-PA-ti-co is stressed on the third-last syllable: simpatici."},{"it":"amico","group":"-ci","say":"amici","note":"An exception: amici, though the stress is on a-MI-co."},{"it":"bianco","group":"-chi","say":"bianchi","note":"BIAN-co is stressed on the second-last syllable: bianchi."},{"it":"greco","group":"-ci","say":"greci","note":"An exception, like amico: greci."}],"explanation":"Stress on the second-last syllable keeps the hard sound (-chi); on the third-last it usually softens (-ci). amico and greco are exceptions."},
+    {"id":"so-u01-z05","unit":"u01","type":"sort","prompt":"Hello, goodbye, or both?","groups":["hello","goodbye","both"],"rows":[{"it":"ciao","group":"both","note":"ciao is hi and bye, between friends."},{"it":"arrivederci","group":"goodbye","note":"arrivederci only says goodbye."},{"it":"buongiorno","group":"both","note":"buongiorno works on arriving and on leaving."},{"it":"a presto","group":"goodbye","note":"a presto is see you soon."},{"it":"buonanotte","group":"goodbye","note":"buonanotte is said going to bed, or leaving late at night."},{"it":"buonasera","group":"both","note":"buonasera works as hello and as goodbye in the evening."}],"explanation":"ciao, buongiorno and buonasera work both ways; arrivederci, a presto and buonanotte are for leaving."},
+    {"id":"so-u01-z06","unit":"u01","type":"sort","prompt":"In the singular: one form for men and women, or two?","groups":["one form","two forms"],"rows":[{"it":"inglese","group":"one form","note":"-ese: inglese for him and for her."},{"it":"italiano","group":"two forms","note":"Two forms: italiano for him, italiana for her."},{"it":"francese","group":"one form","note":"-ese: francese for him and for her."},{"it":"tedesco","group":"two forms","note":"Two forms: tedesco for him, tedesca for her."},{"it":"canadese","group":"one form","note":"-ese: canadese for him and for her."},{"it":"spagnolo","group":"two forms","note":"Two forms: spagnolo for him, spagnola for her."}],"explanation":"Adjectives in -o have a masculine and a feminine form; adjectives in -e, among them every nationality in -ese, have one."},
+    {"id":"so-u01-z07","unit":"u01","type":"sort","prompt":"è (is) or e (and)?","groups":["è","e"],"rows":[{"it":"Marco … stanco","group":"è","say":"Marco è stanco","note":"Marco is tired: è."},{"it":"Marco … Anna","group":"e","say":"Marco e Anna","note":"Marco and Anna: e."},{"it":"La casa … grande","group":"è","say":"La casa è grande","note":"The house is big: è."},{"it":"pane … vino","group":"e","say":"pane e vino","note":"bread and wine: e."},{"it":"Chi …?","group":"è","say":"Chi è?","note":"Who is it?: è."},{"it":"io … tu","group":"e","say":"io e tu","note":"you and I: e."}],"explanation":"è with the accent is is; e without it is and."},
+    {"id":"ma-u01-z01","unit":"u01","type":"match","prompt":"Match each subject with its form of essere","pairs":[["io","sono"],["tu","sei"],["lui","è"],["noi","siamo"],["voi","siete"]],"explanation":"io sono, tu sei, lui è, noi siamo, voi siete (and loro sono)."},
+    {"id":"ma-u01-z02","unit":"u01","type":"match","prompt":"Match each question with its answer","pairs":[["Come ti chiami?","Mi chiamo Sara."],["Di dove sei?","Sono di Bologna."],["Come stai?","Bene, grazie."],["Chi è?","È Marco."],["Quanti anni hai?","Ho vent'anni."]],"explanation":"Each answer uses the verb of its question: chiamarsi, essere, stare, essere, avere."},
+    {"id":"ma-u01-z03","unit":"u01","type":"match","prompt":"Match each greeting with its meaning","right":"en","pairs":[["buongiorno","good morning"],["buonasera","good evening"],["buonanotte","good night"],["a presto","see you soon"],["a domani","see you tomorrow"]],"explanation":"buongiorno until early afternoon, buonasera after that, buonanotte when going to bed."},
+    {"id":"ma-u01-z04","unit":"u01","type":"match","prompt":"Match each informal question with its formal version","pairs":[["Come stai?","Come sta?"],["Di dove sei?","Di dov'è?"],["Come ti chiami?","Come si chiama?"],["Sei stanco?","È stanco?"],["Scusa!","Scusi!"]],"explanation":"The formal versions use the lui/lei form of the verb, as Lei requires."},
+    {"id":"ma-u01-z05","unit":"u01","type":"match","prompt":"Match each courtesy word with its meaning","right":"en","pairs":[["prego","you're welcome"],["per favore","please"],["mi dispiace","I'm sorry"],["permesso","excuse me (to get past)"],["grazie mille","thanks a lot"]],"explanation":"prego is the most versatile: after grazie it means you're welcome, and it also means after you, or come in."},
+    {"id":"ma-u01-z06","unit":"u01","type":"match","prompt":"Match each country with its nationality","pairs":[["l'Italia","italiano"],["la Francia","francese"],["la Germania","tedesco"],["la Spagna","spagnolo"],["l'Irlanda","irlandese"]],"explanation":"Countries take a capital letter and an article; nationalities take a small letter."},
+    {"id":"ma-u01-z07","unit":"u01","type":"match","prompt":"Match each adjective with its opposite","pairs":[["alto","basso"],["giovane","vecchio"],["libero","occupato"],["felice","triste"],["simpatico","antipatico"]],"explanation":"alto / basso (tall / short), giovane / vecchio (young / old), libero / occupato (free / taken), felice / triste (happy / sad), simpatico / antipatico (nice / unpleasant)."},
+    {"id":"ma-u01-z08","unit":"u01","type":"match","prompt":"Match each subject with the pronoun it counts as","pairs":[["Marco e Luca","loro"],["Anna e io","noi"],["tu e Anna","voi"],["la signora","lei"],["il ragazzo","lui"]],"explanation":"Subjects add up: with io in them they are noi; with tu but not io, voi; any other plural is loro."},
     {"id":"v-u02-y-piazza","unit":"u02","type":"vocab","it":"piazza","en":["square"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"piazze","artPl":"le"},
     {"id":"v-u02-y-strada","unit":"u02","type":"vocab","it":"strada","en":["road","street"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"strade","artPl":"le"},
     {"id":"v-u02-y-negozio","unit":"u02","type":"vocab","it":"negozio","en":["shop"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"negozi","artPl":"i","note":"Unstressed -io → -i."},
@@ -2378,6 +2589,172 @@ const BUILTIN = {
     {"id":"g-u02-y08","unit":"u02","type":"grammar_mc","prompt":"Which body parts have a feminine plural in -a?","options":["braccio, dito, ginocchio, labbro, osso","mano, naso, occhio","testa, bocca, gamba","piede, dente, cuore"],"answer":"braccio, dito, ginocchio, labbro, osso","explanation":"le braccia, le dita, le ginocchia, le labbra, le ossa.","distractorNotes":{"mano, naso, occhio":"mano → mani, naso → nasi, occhio → occhi.","testa, bocca, gamba":"Regular feminine plurals.","piede, dente, cuore":"piedi, denti, cuori."}},
     {"id":"g-u02-y09","unit":"u02","type":"grammar_mc","prompt":"Foreign words like bar, sport, film:","options":["are invariable and usually masculine","take -s in the plural","are feminine","take -i in the plural"],"answer":"are invariable and usually masculine","explanation":"il bar, i bar; lo sport, gli sport.","distractorNotes":{"take -s in the plural":"Italian never adds -s.","are feminine":"Most are masculine (il bar, lo sport, il film); only a few, such as la chat, are feminine.","take -i in the plural":"They don't change."}},
     {"id":"g-u02-y10","unit":"u02","type":"grammar_mc","prompt":"One-syllable and accented-vowel nouns (re, città, caffè):","options":["don't change in the plural","take -i","take -e","double the final letter"],"answer":"don't change in the plural","explanation":"il re / i re, la città / le città.","distractorNotes":{"take -i":"They are invariable.","take -e":"Only regular feminine -a nouns take -e; these do not change.","double the final letter":"These nouns stay exactly the same: nothing is added or doubled."}},
+    {"id":"v-u02-z-mamma","unit":"u02","type":"vocab","it":"mamma","en":["mum","mummy"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"mamme","artPl":"le","note":"An ordinary feminine noun, unlike the Greek -ma words: la mamma, le mamme."},
+    {"id":"v-u02-z-pianeta","unit":"u02","type":"vocab","it":"pianeta","en":["planet"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"pianeti","artPl":"i","note":"Masculine despite its -a, like il poeta: i pianeti."},
+    {"id":"v-u02-z-crisi","unit":"u02","type":"vocab","it":"crisi","en":["crisis"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"crisi","artPl":"le","note":"Nouns in -i are mostly feminine and don't change in the plural: le crisi."},
+    {"id":"v-u02-z-analisi","unit":"u02","type":"vocab","it":"analisi","en":["analysis","test (medical)"],"pos":"noun","gender":"f","art":"l'","indef":"un'","plural":"analisi","artPl":"le","note":"Feminine and invariable, like la crisi: le analisi del sangue (blood tests)."},
+    {"id":"v-u02-z-virtu","unit":"u02","type":"vocab","it":"virtù","en":["virtue"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"virtù","artPl":"le","note":"Nouns in -tù are feminine and invariable, like those in -tà."},
+    {"id":"v-u02-z-serie","unit":"u02","type":"vocab","it":"serie","en":["series"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"serie","artPl":"le","note":"Nouns in -ie don't change in the plural: le serie (a TV series too)."},
+    {"id":"v-u02-z-computer","unit":"u02","type":"vocab","it":"computer","en":["computer"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"computer","artPl":"i","note":"Borrowed words never add -s: i computer."},
+    {"id":"v-u02-z-hotel","unit":"u02","type":"vocab","it":"hotel","en":["hotel"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"hotel","artPl":"gli","note":"The h is silent, so it counts as a vowel: l'hotel, gli hotel."},
+    {"id":"v-u02-z-sale","unit":"u02","type":"vocab","it":"sale","en":["salt"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"sali","artPl":"i","note":"s + vowel is an ordinary consonant: il sale, not lo."},
+    {"id":"v-u02-z-sole","unit":"u02","type":"vocab","it":"sole","en":["sun"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"soli","artPl":"i","note":"s + vowel takes il: il sole."},
+    {"id":"v-u02-z-zucchero","unit":"u02","type":"vocab","it":"zucchero","en":["sugar"],"pos":"noun","gender":"m","art":"lo","indef":"uno","plural":"zuccheri","artPl":"gli","note":"lo before z-: lo zucchero."},
+    {"id":"v-u02-z-yogurt","unit":"u02","type":"vocab","it":"yogurt","en":["yoghurt","yogurt"],"pos":"noun","gender":"m","art":"lo","indef":"uno","plural":"yogurt","artPl":"gli","note":"lo before y-; borrowed, so invariable: gli yogurt."},
+    {"id":"v-u02-z-gnomo","unit":"u02","type":"vocab","it":"gnomo","en":["gnome"],"pos":"noun","gender":"m","art":"lo","indef":"uno","plural":"gnomi","artPl":"gli","note":"lo before gn-, like lo gnocco."},
+    {"id":"v-u02-z-attrice","unit":"u02","type":"vocab","it":"attrice","en":["actress"],"pos":"noun","gender":"f","art":"l'","indef":"un'","plural":"attrici","artPl":"le","note":"-tore becomes -trice for a woman: l'attore, l'attrice."},
+    {"id":"v-u02-z-pittore","unit":"u02","type":"vocab","it":"pittore","en":["painter"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"pittori","artPl":"i","note":"A woman is la pittrice."},
+    {"id":"v-u02-z-pittrice","unit":"u02","type":"vocab","it":"pittrice","en":["painter (female)"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"pittrici","artPl":"le","note":"-trice nouns are feminine, with the plural -trici."},
+    {"id":"v-u02-z-scrittore","unit":"u02","type":"vocab","it":"scrittore","en":["writer"],"pos":"noun","gender":"m","art":"lo","indef":"uno","plural":"scrittori","artPl":"gli","note":"lo before s + consonant: lo scrittore, gli scrittori. A woman is la scrittrice."},
+    {"id":"v-u02-z-scrittrice","unit":"u02","type":"vocab","it":"scrittrice","en":["writer (female)"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"scrittrici","artPl":"le"},
+    {"id":"v-u02-z-regina","unit":"u02","type":"vocab","it":"regina","en":["queen"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"regine","artPl":"le","note":"A different word from il re (king)."},
+    {"id":"v-u02-z-fratello","unit":"u02","type":"vocab","it":"fratello","en":["brother"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"fratelli","artPl":"i","note":"i fratelli can mean brothers, or brothers and sisters."},
+    {"id":"v-u02-z-sorella","unit":"u02","type":"vocab","it":"sorella","en":["sister"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"sorelle","artPl":"le"},
+    {"id":"v-u02-z-dottoressa","unit":"u02","type":"vocab","it":"dottoressa","en":["doctor (female)"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"dottoresse","artPl":"le","note":"-e becomes -essa, as in lo studente, la studentessa."},
+    {"id":"v-u02-z-psicologa","unit":"u02","type":"vocab","it":"psicologa","en":["psychologist (female)"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"psicologhe","artPl":"le","note":"The feminine plural keeps the hard sound: le psicologhe, against i psicologi for men."},
+    {"id":"v-u02-z-luogo","unit":"u02","type":"vocab","it":"luogo","en":["place"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"luoghi","artPl":"i","note":"-go keeps its hard sound: luoghi."},
+    {"id":"v-u02-z-biologo","unit":"u02","type":"vocab","it":"biologo","en":["biologist"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"biologi","artPl":"i","note":"-logo nouns for people soften: i biologi."},
+    {"id":"v-u02-z-catalogo","unit":"u02","type":"vocab","it":"catalogo","en":["catalogue"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"cataloghi","artPl":"i","note":"Things in -logo keep the h: cataloghi."},
+    {"id":"v-u02-z-addio","unit":"u02","type":"vocab","it":"addio","en":["farewell","goodbye (for ever)"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"addii","artPl":"gli","note":"The i is stressed (ad-DI-o), so both stay in the plural: addii."},
+    {"id":"v-u02-z-valigia","unit":"u02","type":"vocab","it":"valigia","en":["suitcase"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"valigie","artPl":"le","note":"A vowel comes before -gia, so the i stays: valigie."},
+    {"id":"v-u02-z-arancia","unit":"u02","type":"vocab","it":"arancia","en":["orange (fruit)"],"pos":"noun","gender":"f","art":"l'","indef":"un'","plural":"arance","artPl":"le","note":"A consonant comes before -cia, so the i drops: arance. The tree is l'arancio."},
+    {"id":"v-u02-z-bugia","unit":"u02","type":"vocab","it":"bugia","en":["lie"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"bugie","artPl":"le","note":"The i is stressed (bu-GI-a), so it always stays: bugie."},
+    {"id":"v-u02-z-migliaio","unit":"u02","type":"vocab","it":"migliaio","en":["about a thousand"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"migliaia","artPl":"le","note":"Like il centinaio: the plural le migliaia is feminine."},
+    {"id":"v-u02-z-portachiavi","unit":"u02","type":"vocab","it":"portachiavi","en":["key ring"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"portachiavi","artPl":"i","note":"The second part, chiavi, is already plural, so nothing changes: i portachiavi."},
+    {"id":"v-u02-z-pomodoro","unit":"u02","type":"vocab","it":"pomodoro","en":["tomato"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"pomodori","artPl":"i","note":"A compound noun that changes only at the end: i pomodori."},
+    {"id":"v-u02-z-francobollo","unit":"u02","type":"vocab","it":"francobollo","en":["stamp"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"francobolli","artPl":"i"},
+    {"id":"v-u02-z-grattacielo","unit":"u02","type":"vocab","it":"grattacielo","en":["skyscraper"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"grattacieli","artPl":"i","note":"gratta + cielo (scratch + sky): only the end changes, i grattacieli."},
+    {"id":"v-u02-z-capitale","unit":"u02","type":"vocab","it":"capitale","en":["capital (city)"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"capitali","artPl":"le","note":"Masculine il capitale is capital in the sense of money."},
+    {"id":"v-u02-z-fronte","unit":"u02","type":"vocab","it":"fronte","en":["forehead"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"fronti","artPl":"le","note":"Masculine il fronte is the front line."},
+    {"id":"v-u02-z-muro","unit":"u02","type":"vocab","it":"muro","en":["wall"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"muri","artPl":"i","note":"i muri are the walls of a room or house; le mura are city walls."},
+    {"id":"v-u02-z-portone","unit":"u02","type":"vocab","it":"portone","en":["main door","front door (of a building)"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"portoni","artPl":"i","note":"la porta + -one becomes masculine: il portone."},
+    {"id":"v-u02-z-gattino","unit":"u02","type":"vocab","it":"gattino","en":["kitten"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"gattini","artPl":"i","note":"gatto + -ino (small, endearing)."},
+    {"id":"v-u02-z-parolaccia","unit":"u02","type":"vocab","it":"parolaccia","en":["swear word"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"parolacce","artPl":"le","note":"parola + -accia (bad, nasty); a consonant comes before -cia, so parolacce."},
+    {"id":"v-u02-z-fuoco","unit":"u02","type":"vocab","it":"fuoco","en":["fire"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"fuochi","artPl":"i","note":"FUO-co is stressed on the second-last syllable, so fuochi."},
+    {"id":"v-u02-z-parco","unit":"u02","type":"vocab","it":"parco","en":["park"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"parchi","artPl":"i","note":"PAR-co → parchi."},
+    {"id":"v-u02-z-piede","unit":"u02","type":"vocab","it":"piede","en":["foot"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"piedi","artPl":"i","note":"An -e noun that is masculine: il piede, i piedi."},
+    {"id":"v-u02-z-mela","unit":"u02","type":"vocab","it":"mela","en":["apple"],"pos":"noun","gender":"f","art":"la","indef":"una","plural":"mele","artPl":"le","note":"The tree is il melo: fruit trees are masculine, their fruit feminine."},
+    {"id":"v-u02-z-euro","unit":"u02","type":"vocab","it":"euro","en":["euro"],"pos":"noun","gender":"m","art":"l'","indef":"un","plural":"euro","artPl":"gli","note":"Invariable: un euro, dieci euro."},
+    {"id":"v-u02-z-te","unit":"u02","type":"vocab","it":"tè","en":["tea"],"pos":"noun","gender":"m","art":"il","indef":"un","plural":"tè","artPl":"i","note":"An accented final vowel: invariable, i tè."},
+    {"id":"s-u02-z01","unit":"u02","type":"sentence","it":["Il sale è sul tavolo."],"en":["The salt is on the table."],"cloze":{"text":"{Il} sale è sul tavolo.","hint":"definite article","options":["Lo","La"],"notes":{"Lo":"lo is for s + consonant (lo studente); sale has s + vowel, so il.","La":"sale is masculine: il sale."}},"explanation":"An s followed by a vowel is an ordinary consonant, so sale takes il; lo is only for s + consonant."},
+    {"id":"s-u02-z02","unit":"u02","type":"sentence","it":["Lo zucchero è finito."],"en":["The sugar has run out."],"cloze":{"text":"{Lo} zucchero è finito.","hint":"definite article"},"explanation":"zucchero starts with z, so lo; finito agrees with it, masculine singular."},
+    {"id":"s-u02-z03","unit":"u02","type":"sentence","it":["Gli hotel sono pieni."],"en":["The hotels are full."],"cloze":{"text":"{Gli} hotel sono pieni.","hint":"definite article, plural"},"explanation":"The h of hotel is silent, so it counts as a vowel: l'hotel, gli hotel. Borrowed words don't change in the plural."},
+    {"id":"s-u02-z04","unit":"u02","type":"sentence","it":["La gente è simpatica."],"en":["People are nice."],"cloze":{"text":"La gente {è} simpatica.","hint":"essere, la gente","options":["sono","siete"],"notes":{"sono":"la gente is grammatically singular, like the crowd: è, not sono.","siete":"siete is the voi form; la gente takes the singular, è."}},"explanation":"la gente means people but is singular, so its verb and adjective are too: la gente è simpatica."},
+    {"id":"s-u02-z05","unit":"u02","type":"sentence","it":["I soldi sono sul tavolo."],"en":["The money is on the table."],"cloze":{"text":"I soldi {sono} sul tavolo.","hint":"essere, i soldi"},"explanation":"i soldi (money) is plural in Italian, so the verb is sono."},
+    {"id":"s-u02-z06","unit":"u02","type":"sentence","it":["L'uva è dolce."],"en":["The grapes are sweet."],"cloze":{"text":"L'uva {è} dolce.","hint":"essere, l'uva"},"explanation":"l'uva is singular in Italian, though English says grapes: l'uva è dolce."},
+    {"id":"s-u02-z07","unit":"u02","type":"sentence","it":["Ho i capelli corti.","Io ho i capelli corti."],"en":["My hair is short."],"cloze":{"text":"Ho {i} capelli corti.","hint":"definite article, plural"},"explanation":"i capelli (the hair on your head) is plural, and for your own body Italian uses the article, not a possessive."},
+    {"id":"s-u02-z08","unit":"u02","type":"sentence","it":["Le crisi sono difficili."],"en":["Crises are difficult."],"cloze":{"text":"Le {crisi} sono difficili.","hint":"crisi, plural"},"explanation":"Nouns ending in -i don't change in the plural: la crisi, le crisi."},
+    {"id":"s-u02-z09","unit":"u02","type":"sentence","it":["Ci sono due computer."],"en":["There are two computers."],"cloze":{"text":"Ci sono due {computer}.","hint":"computer, plural"},"explanation":"Borrowed words never add -s: un computer, due computer."},
+    {"id":"s-u02-z10","unit":"u02","type":"sentence","it":["Ho due fratelli e una sorella.","Io ho due fratelli e una sorella."],"en":["I have two brothers and a sister."],"cloze":{"text":"Ho due {fratelli} e una sorella.","hint":"fratello, plural"},"explanation":"fratello → fratelli. For a mixed group, i fratelli can also mean brothers and sisters."},
+    {"id":"s-u02-z11","unit":"u02","type":"sentence","it":["Le valigie sono pronte."],"en":["The suitcases are ready."],"cloze":{"text":"Le {valigie} sono pronte.","hint":"valigia, plural"},"explanation":"A vowel comes before -gia in va-LI-gia, so the i stays: valigie."},
+    {"id":"s-u02-z12","unit":"u02","type":"sentence","it":["Le arance sono dolci."],"en":["The oranges are sweet."],"cloze":{"text":"Le {arance} sono dolci.","hint":"arancia, plural"},"explanation":"A consonant (n) comes before -cia, so the i drops: arance."},
+    {"id":"s-u02-z13","unit":"u02","type":"sentence","it":["Sono tutte bugie."],"en":["They're all lies."],"cloze":{"text":"Sono tutte {bugie}.","hint":"bugia, plural"},"explanation":"The i of bugia is stressed (bu-GI-a), so it always stays: bugie."},
+    {"id":"s-u02-z14","unit":"u02","type":"sentence","it":["Gli alberghi sono cari."],"en":["The hotels are expensive."],"cloze":{"text":"Gli {alberghi} sono cari.","hint":"albergo, plural"},"explanation":"-go nouns keep their hard sound with h: albergo → alberghi."},
+    {"id":"s-u02-z15","unit":"u02","type":"sentence","it":["I parchi sono belli."],"en":["The parks are beautiful."],"cloze":{"text":"I {parchi} sono belli.","hint":"parco, plural"},"explanation":"PAR-co is stressed on the second-last syllable, so it keeps the hard sound: parchi."},
+    {"id":"s-u02-z16","unit":"u02","type":"sentence","it":["Lo scrittore è famoso."],"en":["The writer is famous."],"cloze":{"text":"{Lo} scrittore è famoso.","hint":"definite article"},"explanation":"scrittore starts with s + consonant, so lo; the plural is gli scrittori."},
+    {"id":"s-u02-z17","unit":"u02","type":"sentence","it":["È un'attrice molto brava.","Lei è un'attrice molto brava."],"en":["She's a very good actress."],"cloze":{"text":"È {un'}attrice molto brava.","hint":"indefinite article"},"explanation":"attrice is feminine and starts with a vowel: un'. With an adjective, a job takes the article: è un'attrice molto brava."},
+    {"id":"s-u02-z18","unit":"u02","type":"sentence","it":["La Terra è un pianeta."],"en":["The Earth is a planet."],"cloze":{"text":"La Terra è {un} pianeta.","hint":"indefinite article"},"explanation":"pianeta is masculine despite its -a, so un pianeta (plural i pianeti)."},
+    {"id":"s-u02-z19","unit":"u02","type":"sentence","it":["Ecco i francobolli."],"en":["Here are the stamps."],"cloze":{"text":"Ecco i {francobolli}.","hint":"francobollo, plural"},"explanation":"A compound noun usually changes only its last part: francobollo → francobolli."},
+    {"id":"s-u02-z20","unit":"u02","type":"sentence","it":["Roma è la capitale d'Italia.","Roma è la capitale dell'Italia."],"en":["Rome is the capital of Italy."],"cloze":{"text":"Roma è {la} capitale d'Italia.","hint":"definite article"},"explanation":"The city is la capitale, feminine; il capitale, masculine, is money."},
+    {"id":"s-u02-z21","unit":"u02","type":"sentence","it":["Il gattino è piccolo."],"en":["The kitten is small."],"cloze":{"text":"Il {gattino} è piccolo.","hint":"gatto + -ino"},"explanation":"-ino makes a noun small or endearing: gatto → gattino. The gender stays the same."},
+    {"id":"s-u02-z22","unit":"u02","type":"sentence","it":["Non è una parolaccia."],"en":["It isn't a swear word.","It's not a swear word."],"cloze":{"text":"Non è una {parolaccia}.","hint":"parola + -accia"},"explanation":"-accia adds a bad or nasty sense: parola → parolaccia. The gender stays feminine."},
+    {"id":"s-u02-z23","unit":"u02","type":"sentence","it":["Il portone è chiuso."],"en":["The main door is closed."],"cloze":{"text":"{Il} portone è chiuso.","hint":"article for portone"},"explanation":"-one tends to make a feminine noun masculine: la porta → il portone."},
+    {"id":"s-u02-z24","unit":"u02","type":"sentence","it":["Gli gnomi sono piccoli."],"en":["The gnomes are small."],"cloze":{"text":"{Gli} gnomi sono piccoli.","hint":"definite article, plural"},"explanation":"gn- takes lo in the singular and gli in the plural: lo gnomo, gli gnomi."},
+    {"id":"s-u02-z25","unit":"u02","type":"sentence","it":["Lo yogurt è buono."],"en":["Yoghurt is good."],"cloze":{"text":"{Lo} yogurt è buono.","hint":"definite article"},"explanation":"y- takes lo. A general statement uses the article in Italian: lo yogurt è buono."},
+    {"id":"s-u02-z26","unit":"u02","type":"sentence","it":["Le serie sono nuove."],"en":["The series are new."],"cloze":{"text":"Le {serie} sono nuove.","hint":"serie, plural"},"explanation":"Nouns in -ie don't change in the plural: la serie, le serie."},
+    {"id":"s-u02-z27","unit":"u02","type":"sentence","it":["Ci sono molti luoghi interessanti."],"en":["There are many interesting places."],"cloze":{"text":"Ci sono molti {luoghi} interessanti.","hint":"luogo, plural"},"explanation":"-go nouns keep the hard sound: luogo → luoghi."},
+    {"id":"s-u02-z28","unit":"u02","type":"sentence","it":["Le psicologhe sono brave."],"en":["The psychologists (f.) are good."],"cloze":{"text":"Le {psicologhe} sono brave.","hint":"psicologa, plural"},"explanation":"Feminine -ga nouns always keep the hard sound: psicologhe. Only the masculine softens: psicologi."},
+    {"id":"s-u02-z29","unit":"u02","type":"sentence","it":["Migliaia di persone."],"en":["Thousands of people."],"cloze":{"text":"{Migliaia} di persone.","hint":"migliaio, plural"},"explanation":"il migliaio has a feminine plural in -a, le migliaia, like le centinaia."},
+    {"id":"s-u02-z30","unit":"u02","type":"sentence","it":["La frutta è fresca."],"en":["The fruit is fresh."],"cloze":{"text":"La frutta è {fresca}.","hint":"fresco, agree"},"explanation":"la frutta is singular and feminine: fresca. One single fruit is un frutto."},
+    {"id":"t-u02-z01","unit":"u02","type":"transform","it":"L'amico è simpatico.","task":"Make it plural","answer":["Gli amici sono simpatici."],"explanation":"l'amico → gli amici (masculine l' becomes gli), and simpatico → simpatici."},
+    {"id":"t-u02-z02","unit":"u02","type":"transform","it":"La camicia è bianca.","task":"Make it plural","answer":["Le camicie sono bianche."],"explanation":"camicia keeps its i (a vowel comes before -cia): camicie; bianca → bianche, keeping the hard sound."},
+    {"id":"t-u02-z03","unit":"u02","type":"transform","it":"Il lago è grande.","task":"Make it plural","answer":["I laghi sono grandi."],"explanation":"lago → laghi, with h to keep the hard g; grande → grandi."},
+    {"id":"t-u02-z04","unit":"u02","type":"transform","it":"L'uovo è fresco.","task":"Make it plural","answer":["Le uova sono fresche."],"explanation":"uovo has a feminine plural, le uova, so the adjective is feminine too: fresche."},
+    {"id":"t-u02-z05","unit":"u02","type":"transform","it":"Lo specchio è vecchio.","task":"Make it plural","answer":["Gli specchi sono vecchi."],"explanation":"lo → gli, and the unstressed -io leaves one i: specchi, vecchi."},
+    {"id":"t-u02-z06","unit":"u02","type":"transform","it":"La città è bella.","task":"Make it plural","answer":["Le città sono belle."],"explanation":"città doesn't change: only the article, the verb and the adjective show the plural."},
+    {"id":"t-u02-z07","unit":"u02","type":"transform","it":"Il problema è difficile.","task":"Make it plural","answer":["I problemi sono difficili."],"explanation":"problema is masculine: il problema, i problemi."},
+    {"id":"t-u02-z08","unit":"u02","type":"transform","it":"Le mani sono fredde.","task":"Make it singular","answer":["La mano è fredda."],"explanation":"mano is feminine though it ends in -o: la mano è fredda."},
+    {"id":"t-u02-z09","unit":"u02","type":"transform","it":"Gli uomini sono alti.","task":"Make it singular","answer":["L'uomo è alto."],"explanation":"uomini is the irregular plural of uomo; gli becomes l' before the vowel."},
+    {"id":"t-u02-z10","unit":"u02","type":"transform","it":"Le dita sono lunghe.","task":"Make it singular","answer":["Il dito è lungo."],"explanation":"le dita is the feminine plural of a masculine noun: il dito è lungo."},
+    {"id":"t-u02-z11","unit":"u02","type":"transform","it":"C'è un'isola.","task":"Make it plural: due isole","answer":["Ci sono due isole."],"explanation":"c'è becomes ci sono, and isola → isole."},
+    {"id":"t-u02-z12","unit":"u02","type":"transform","it":"Ecco lo studente.","task":"Change it to the female student","answer":["Ecco la studentessa."],"explanation":"lo studente → la studentessa: -e becomes -essa for a woman."},
+    {"id":"t-u02-z13","unit":"u02","type":"transform","it":"Il turista è inglese.","task":"Change it to a woman","answer":["La turista è inglese."],"explanation":"-ista nouns keep their form and only the article changes: la turista. inglese has one singular form."},
+    {"id":"t-u02-z14","unit":"u02","type":"transform","it":"L'attore è bravo.","task":"Change it to a woman","answer":["L'attrice è brava."],"explanation":"-tore becomes -trice: l'attrice, and the adjective agrees: brava."},
+    {"id":"t-u02-z15","unit":"u02","type":"transform","it":"Lo studente è qui.","task":"Add nuovo before studente","answer":["Il nuovo studente è qui."],"explanation":"The article follows the word right after it: before nuovo, lo becomes il."},
+    {"id":"t-u02-z16","unit":"u02","type":"transform","it":"L'amico è qui.","task":"Add vecchio before amico","answer":["Il vecchio amico è qui."],"explanation":"Before vecchio, a consonant, l' becomes il; the noun is still masculine."},
+    {"id":"t-u02-z17","unit":"u02","type":"transform","it":"Gli zaini sono pesanti.","task":"Add piccoli before zaini","answer":["I piccoli zaini sono pesanti."],"explanation":"Before piccoli, an ordinary consonant, gli becomes i."},
+    {"id":"g-u02-z01","unit":"u02","type":"grammar_mc","prompt":"Odd one out: which noun is NOT masculine?","options":["mamma","problema","pianeta","programma"],"answer":"mamma","explanation":"mamma is an ordinary feminine noun; problema, pianeta and programma are masculine despite their -a.","distractorNotes":{"problema":"il problema: a masculine -ma noun from Greek.","pianeta":"il pianeta is masculine, like il poeta.","programma":"il programma: a masculine -ma noun from Greek."}},
+    {"id":"g-u02-z02","unit":"u02","type":"grammar_mc","prompt":"Odd one out: which noun is NOT feminine?","options":["cinema","mano","foto","moto"],"answer":"cinema","explanation":"il cinema is short for il cinematografo, so it stays masculine.","distractorNotes":{"mano":"la mano: feminine despite its -o.","foto":"la foto, short for la fotografia.","moto":"la moto, short for la motocicletta."}},
+    {"id":"g-u02-z03","unit":"u02","type":"grammar_mc","prompt":"Which of these nouns DOES change in the plural?","options":["fiore","crisi","serie","virtù"],"answer":"fiore","explanation":"fiore → fiori; the other three are invariable.","distractorNotes":{"crisi":"-i nouns don't change: le crisi.","serie":"-ie nouns don't change: le serie.","virtù":"An accented final vowel doesn't change: le virtù."}},
+    {"id":"g-u02-z04","unit":"u02","type":"grammar_mc","prompt":"Which article goes with sale?","options":["il","lo","l'","la"],"answer":"il","explanation":"An s followed by a vowel is an ordinary consonant: il sale, il sole.","distractorNotes":{"lo":"lo is for s + consonant (lo studente); sale has s + vowel.","l'":"l' is for a vowel; sale starts with a consonant.","la":"sale is masculine."}},
+    {"id":"g-u02-z05","unit":"u02","type":"grammar_mc","prompt":"Which article goes with hotel?","options":["l'","il","lo","la"],"answer":"l'","explanation":"In borrowed words a silent h counts as a vowel: l'hotel, gli hotel.","distractorNotes":{"il":"The h of hotel is silent, so it counts as a vowel: l'.","lo":"lo is for z, s + consonant and the like; a silent h counts as a vowel: l'.","la":"hotel is masculine, and before a vowel sound the article is l'."}},
+    {"id":"g-u02-z06","unit":"u02","type":"grammar_mc","prompt":"The plural of l'arancia is:","options":["le arance","le arancie","gli aranci","le arancia"],"answer":"le arance","explanation":"l'arancia → le arance: a consonant before -cia drops the i.","distractorNotes":{"le arancie":"A consonant (n) comes before -cia, so the i drops: arance.","gli aranci":"gli aranci are orange trees (l'arancio).","le arancia":"arancia is the singular; the plural ends in -e."}},
+    {"id":"g-u02-z07","unit":"u02","type":"grammar_mc","prompt":"The plural of il biologo is:","options":["i biologi","i biologhi","le biologhe","i biologo"],"answer":"i biologi","explanation":"-logo nouns naming people soften in the plural: psicologi, biologi.","distractorNotes":{"i biologhi":"-logo nouns for people soften: biologi (things keep the h: cataloghi).","le biologhe":"le biologhe is the plural of the feminine, la biologa.","i biologo":"biologo changes in the plural: biologi."}},
+    {"id":"g-u02-z08","unit":"u02","type":"grammar_mc","prompt":"Which pair is right?","options":["l'attore, l'attrice","l'attore, l'attora","l'attore, l'attoressa","l'attore, la attrice"],"answer":"l'attore, l'attrice","explanation":"-tore becomes -trice: l'attore, l'attrice; il pittore, la pittrice.","distractorNotes":{"l'attore, l'attora":"-tore becomes -trice for a woman: l'attrice.","l'attore, l'attoressa":"-essa is for nouns like studente and dottore; -tore becomes -trice.","l'attore, la attrice":"Before a vowel, la becomes l': l'attrice."}},
+    {"id":"g-u02-z09","unit":"u02","type":"grammar_mc","prompt":"la gente takes:","options":["a singular verb: la gente è","a plural verb: la gente sono","either","no verb"],"answer":"a singular verb: la gente è","explanation":"la gente means people, but its verb and adjectives are singular: la gente è simpatica.","distractorNotes":{"a plural verb: la gente sono":"la gente is grammatically singular, like the crowd: la gente è.","either":"Only the singular is right: la gente è simpatica.","no verb":"la gente takes a verb like any noun: la gente è qui."}},
+    {"id":"g-u02-z10","unit":"u02","type":"grammar_mc","prompt":"la fronte means:","options":["forehead","front line","front door","forest"],"answer":"forehead","explanation":"Gender can change the meaning: la fronte is the forehead, il fronte the front line.","distractorNotes":{"front line":"The front line is il fronte, masculine.","front door":"The main door of a building is il portone.","forest":"A forest is la foresta (or il bosco)."}},
+    {"id":"g-u02-z11","unit":"u02","type":"grammar_mc","prompt":"Odd one out: which -co noun keeps its hard sound (-chi) in the plural?","options":["fuoco","medico","amico","greco"],"answer":"fuoco","explanation":"FUO-co is stressed on the second-last syllable, so its plural keeps the hard sound: fuochi.","distractorNotes":{"medico":"ME-di-co is stressed on the third-last syllable: medici.","amico":"An exception that softens: amici.","greco":"An exception that softens: greci."}},
+    {"id":"g-u02-z12","unit":"u02","type":"grammar_mc","prompt":"Odd one out: which -logo noun keeps its h in the plural?","options":["catalogo","psicologo","biologo"],"answer":"catalogo","explanation":"-logo nouns for people soften (psicologi, biologi); things keep the h: cataloghi, dialoghi.","distractorNotes":{"psicologo":"A person, so it softens: psicologi.","biologo":"A person, so it softens: biologi."}},
+    {"id":"g-u02-z13","unit":"u02","type":"grammar_mc","prompt":"l'uva is:","options":["singular, though English says grapes","plural, like English grapes","masculine"],"answer":"singular, though English says grapes","explanation":"l'uva is a feminine singular noun for grapes in general: l'uva è dolce. la frutta works the same way.","distractorNotes":{"plural, like English grapes":"l'uva is singular: l'uva è dolce.","masculine":"l'uva is feminine: l'uva è buona."}},
+    {"id":"g-u02-z14","unit":"u02","type":"grammar_mc","prompt":"lo studente, but ___ nuovo studente:","options":["il","lo","l'","la"],"answer":"il","explanation":"The article's shape depends on the word straight after it: lo studente, but il nuovo studente.","distractorNotes":{"lo":"lo depends on the next word, and nuovo starts with a plain consonant: il.","l'":"l' is for a vowel; nuovo starts with n.","la":"studente is masculine."}},
+    {"id":"g-u02-z15","unit":"u02","type":"grammar_mc","prompt":"The plural of il portachiavi is:","options":["i portachiavi","i portachiave","i portichiavi","le portachiavi"],"answer":"i portachiavi","explanation":"When the second part of a compound is already plural, nothing changes: i portachiavi.","distractorNotes":{"i portachiave":"The second part, chiavi, is already plural, so it stays.","i portichiavi":"porta- doesn't change: it is a verb form (porta, carries).","le portachiavi":"il portachiavi is masculine, so i."}},
+    {"id":"sp-u02-z01","unit":"u02","type":"spot","it":"Il studente è stanco.","wrong":"Il","fix":["Lo"],"en":"The student is tired.","explanation":"s + consonant takes lo: lo studente.","notes":{"stanco":"stanco agrees with lo studente: masculine singular."}},
+    {"id":"sp-u02-z02","unit":"u02","type":"spot","it":"Un'amico di Marco è qui.","wrong":"Un'amico","fix":["Un amico"],"en":"A friend (m.) of Marco's is here.","explanation":"un never takes an apostrophe: un amico. un' is feminine only: un'amica."},
+    {"id":"sp-u02-z03","unit":"u02","type":"spot","it":"Le problemi sono difficili.","wrong":"Le","fix":["I"],"en":"The problems are difficult.","explanation":"problema is masculine despite its -a: il problema, i problemi.","notes":{"difficili":"difficili is right: an -e adjective has one plural form."}},
+    {"id":"sp-u02-z04","unit":"u02","type":"spot","it":"Le uova sono freschi.","wrong":"freschi","fix":["fresche"],"en":"The eggs are fresh.","explanation":"uovo has a feminine plural, le uova, so the adjective is feminine too: fresche.","notes":{"Le":"le is right: the plural of uovo is feminine.","uova":"uova is the right plural of uovo."}},
+    {"id":"sp-u02-z05","unit":"u02","type":"spot","it":"I films sono lunghi.","wrong":"films","fix":["film"],"en":"The films are long.","explanation":"Borrowed words never add -s in Italian: il film, i film.","notes":{"lunghi":"lunghi is right: lungo keeps its hard sound with h."}},
+    {"id":"sp-u02-z06","unit":"u02","type":"spot","it":"Le foto sono belle.","wrong":null,"en":"The photos are beautiful.","explanation":"Right as it stands: foto is short for fotografia, so it is feminine and invariable: le foto, belle.","notes":{"foto":"foto doesn't change in the plural: le foto.","Le":"le is right: foto is feminine, from fotografia."}},
+    {"id":"sp-u02-z07","unit":"u02","type":"spot","it":"Il problema è difficile.","wrong":null,"en":"The problem is difficult.","explanation":"Right as it stands: problema is one of the masculine -ma nouns from Greek.","notes":{"Il":"il is right: problema is masculine."}},
+    {"id":"sp-u02-z08","unit":"u02","type":"spot","it":"La mano è fredda.","wrong":null,"en":"The hand is cold.","explanation":"Right as it stands: mano is feminine despite its -o.","notes":{"La":"la is right: mano is feminine.","fredda":"fredda agrees with la mano: feminine."}},
+    {"id":"sp-u02-z09","unit":"u02","type":"spot","it":"I medichi sono bravi.","wrong":"medichi","fix":["medici","dottori"],"en":"The doctors are good.","explanation":"ME-di-co is stressed on the third-last syllable, so its plural softens: medici."},
+    {"id":"sp-u02-z10","unit":"u02","type":"spot","it":"Le camice sono bianche.","wrong":"camice","fix":["camicie"],"en":"The shirts are white.","explanation":"A vowel comes before -cia in camicia, so the i stays: camicie. (il camice, a different word, is a lab coat.)","notes":{"bianche":"bianche is right: feminine plural, with h to keep the hard sound."}},
+    {"id":"sp-u02-z11","unit":"u02","type":"spot","it":"La gente è simpatici.","wrong":"simpatici","fix":["simpatica"],"en":"People are nice.","explanation":"la gente is feminine singular, so its adjective is too: simpatica.","notes":{"è":"è is right: la gente takes a singular verb."}},
+    {"id":"sp-u02-z12","unit":"u02","type":"spot","it":"Gli dei greci sono famosi.","wrong":null,"en":"The Greek gods are famous.","explanation":"Right as it stands: dio has the irregular plural dei, which takes gli even before a consonant.","notes":{"Gli":"gli is right: an exception, gli dei.","greci":"greci is right: an exception that softens, like amici."}},
+    {"id":"sp-u02-z13","unit":"u02","type":"spot","it":"Il hotel è vicino.","wrong":"Il","fix":["L'"],"en":"The hotel is near.","explanation":"In borrowed words a silent h counts as a vowel: l'hotel.","notes":{"vicino":"vicino is right: it agrees with hotel, masculine."}},
+    {"id":"sp-u02-z14","unit":"u02","type":"spot","it":"C'è una isola qui vicino.","wrong":"una","fix":["un'"],"en":"There's an island nearby.","explanation":"Before a vowel, una drops its a: un'isola."},
+    {"id":"sp-u02-z15","unit":"u02","type":"spot","it":"I zaini sono pesanti.","wrong":"I","fix":["Gli"],"en":"The backpacks are heavy.","explanation":"z- takes lo in the singular and gli in the plural: gli zaini."},
+    {"id":"sp-u02-z16","unit":"u02","type":"spot","it":"Le braccia sono stanchi.","wrong":"stanchi","fix":["stanche"],"en":"My arms are tired.","explanation":"braccio has a feminine plural, le braccia, so the adjective is feminine too: stanche.","notes":{"braccia":"braccia is the right plural of braccio."}},
+    {"id":"sp-u02-z17","unit":"u02","type":"spot","it":"I caffè sono pronti.","wrong":null,"en":"The coffees are ready.","explanation":"Right as it stands: caffè ends in an accented vowel, so it doesn't change in the plural.","notes":{"caffè":"caffè is invariable: un caffè, due caffè.","pronti":"pronti agrees with i caffè: masculine plural."}},
+    {"id":"sp-u02-z18","unit":"u02","type":"spot","it":"Ho due sorelli.","wrong":"sorelli","fix":["sorelle"],"en":"I have two sisters.","explanation":"sorella is a feminine -a noun: its plural is sorelle."},
+    {"id":"sp-u02-z19","unit":"u02","type":"spot","it":"Lo sport è importante.","wrong":null,"en":"Sport is important.","explanation":"Right as it stands: sport starts with s + consonant, so lo, and a general statement takes the article.","notes":{"Lo":"lo is right: s + consonant.","importante":"importante is an -e adjective, the same for both genders."}},
+    {"id":"en-u02-z01","unit":"u02","type":"endings","text":"Le chiav{i} sono sul tavolo.","en":"The keys are on the table.","explanation":"Nouns in -e make their plural in -i, whatever their gender: la chiave, le chiavi."},
+    {"id":"en-u02-z02","unit":"u02","type":"endings","text":"I fior{i} sono bell{i}.","en":"The flowers are beautiful.","explanation":"il fiore → i fiori, and bello agrees: belli."},
+    {"id":"en-u02-z03","unit":"u02","type":"endings","text":"{Le} isol{e} sono grandi.","en":"The islands are big.","explanation":"l'isola → le isole: le never takes an apostrophe."},
+    {"id":"en-u02-z04","unit":"u02","type":"endings","text":"Gli amic{i} di Anna sono simpatic{i}.","en":"Anna's friends are nice.","explanation":"amico → amici, an exception that softens; simpatico → simpatici, stressed on the third-last syllable."},
+    {"id":"en-u02-z05","unit":"u02","type":"endings","text":"Le camic{ie} sono nuov{e}.","en":"The shirts are new.","explanation":"camicia keeps its i, because a vowel comes before -cia: camicie. nuovo → nuove."},
+    {"id":"en-u02-z06","unit":"u02","type":"endings","text":"Le spiagg{e} sono pien{e}.","en":"The beaches are full.","explanation":"spiaggia drops its i, because a consonant comes before -gia: spiagge. pieno → piene."},
+    {"id":"en-u02-z07","unit":"u02","type":"endings","text":"I lag{hi} sono grandi.","en":"The lakes are big.","explanation":"lago → laghi: the h keeps the hard g sound."},
+    {"id":"en-u02-z08","unit":"u02","type":"endings","text":"Le dit{a} sono fredd{e}.","en":"My fingers are cold.","explanation":"il dito → le dita, a feminine plural in -a, so fredde is feminine too."},
+    {"id":"en-u02-z09","unit":"u02","type":"endings","text":"I problem{i} sono difficil{i}.","en":"The problems are difficult.","explanation":"problema is masculine: il problema, i problemi."},
+    {"id":"en-u02-z10","unit":"u02","type":"endings","text":"Le città sono bell{e} e grand{i}.","en":"The cities are beautiful and big.","explanation":"città doesn't change, but the adjectives show the plural: belle, grandi."},
+    {"id":"en-u02-z11","unit":"u02","type":"endings","text":"Gli uomin{i} sono stanc{hi}.","en":"The men are tired.","explanation":"uomo has the irregular plural uomini; stanco → stanchi."},
+    {"id":"en-u02-z12","unit":"u02","type":"endings","text":"{Un'}amica e {un} amico.","en":"A friend (f.) and a friend (m.).","explanation":"un' is feminine only (un'amica); un never takes an apostrophe (un amico)."},
+    {"id":"en-u02-z13","unit":"u02","type":"endings","text":"La radio è vecchi{a}.","en":"The radio is old.","explanation":"radio is feminine (short for radiofonia), so the adjective is too: vecchia."},
+    {"id":"en-u02-z14","unit":"u02","type":"endings","text":"Gli psicolog{i} e le psicolog{he}.","en":"The psychologists (m.) and the psychologists (f.).","explanation":"Men: psicologi, as -logo nouns for people soften. Women: psicologhe, as feminine plurals keep the hard sound."},
+    {"id":"re-u02-z01","unit":"u02","type":"reply","who":"Il cameriere","line":"Prego?","cue":"Ask for a coffee, please.","answer":["Un caffè, per favore.","Un caffè, per piacere.","Vorrei un caffè, per favore."],"options":["Uno caffè, per favore.","Una caffè, per favore.","Un' caffè, per favore."],"notes":{"Uno caffè, per favore.":"uno is for z, s + consonant and the like; caffè takes un.","Una caffè, per favore.":"caffè is masculine: un caffè.","Un' caffè, per favore.":"un' is feminine and comes only before a vowel; caffè takes un."},"explanation":"caffè is masculine and starts with a plain consonant: un caffè."},
+    {"id":"re-u02-z02","unit":"u02","type":"reply","who":"Anna","line":"Che cos'è?","cue":"Say it's a watch.","answer":["È un orologio.","Un orologio."],"options":["È uno orologio.","È un'orologio.","È una orologio."],"notes":{"È uno orologio.":"uno is for z, s + consonant and the like; before a vowel the masculine is un.","È un'orologio.":"un' is feminine only; orologio is masculine: un orologio.","È una orologio.":"orologio is masculine: un orologio."},"explanation":"A masculine noun starting with a vowel takes un, with no apostrophe."},
+    {"id":"re-u02-z03","unit":"u02","type":"reply","who":"Marco","line":"Hai fratelli?","cue":"Say yes, you have two sisters.","answer":["Sì, ho due sorelle.","Sì, due sorelle.","Sì, io ho due sorelle."],"options":["Sì, ho due sorelli.","Sì, ho due sorella.","Sì, ho due fratelle."],"notes":{"Sì, ho due sorelli.":"sorella is feminine: the plural is sorelle.","Sì, ho due sorella.":"After due the noun is plural: sorelle.","Sì, ho due fratelle.":"A sister is a different word, sorella: due sorelle."},"explanation":"sorella → sorelle, like any feminine -a noun."},
+    {"id":"re-u02-z04","unit":"u02","type":"reply","who":"Il venditore","line":"Buongiorno! Prego?","cue":"Ask for six eggs, please.","answer":["Sei uova, per favore.","Sei uova, per piacere.","Buongiorno! Sei uova, per favore."],"options":["Sei uovi, per favore.","Sei uove, per favore.","Sei uovo, per favore."],"notes":{"Sei uovi, per favore.":"uovo has a feminine plural in -a: uova.","Sei uove, per favore.":"The plural ends in -a: uova.","Sei uovo, per favore.":"After sei the noun is plural: uova."},"explanation":"l'uovo, le uova: masculine in the singular, feminine in the plural."},
+    {"id":"re-u02-z05","unit":"u02","type":"reply","who":"Giulia","line":"Dove sono le chiavi?","cue":"Say they're on the table.","answer":["Sono sul tavolo.","Le chiavi sono sul tavolo.","Sul tavolo."],"options":["È sul tavolo.","Sono sullo tavolo.","Sono sulla tavolo."],"notes":{"È sul tavolo.":"le chiavi is plural: sono.","Sono sullo tavolo.":"tavolo takes il, so su + il = sul.","Sono sulla tavolo.":"tavolo is masculine: sul tavolo."},"explanation":"sul is su + il, the article tavolo takes."},
+    {"id":"re-u02-z06","unit":"u02","type":"reply","who":"Il tecnico","line":"Ci sono problemi?","cue":"Say no, there are no problems.","answer":["No, non ci sono problemi.","No, nessun problema.","Nessun problema."],"options":["No, non c'è problemi.","No, non ci sono problema.","No, non ci sono le problemi."],"notes":{"No, non c'è problemi.":"problemi is plural: ci sono.","No, non ci sono problema.":"After ci sono the noun is plural: problemi.","No, non ci sono le problemi.":"problemi is masculine (i problemi), and non ci sono needs no article."},"explanation":"problema → problemi, masculine; non ci sono problemi needs no article."},
+    {"id":"re-u02-z07","unit":"u02","type":"reply","who":"La signora","line":"Quante arance vuole?","cue":"Say four oranges, please.","answer":["Quattro arance, per favore.","Quattro, per favore.","Quattro arance, per piacere."],"options":["Quattro arancie, per favore.","Quattro arancia, per favore.","Quattro aranci, per favore."],"notes":{"Quattro arancie, per favore.":"A consonant comes before -cia, so the i drops: arance.","Quattro arancia, per favore.":"After quattro the noun is plural: arance.","Quattro aranci, per favore.":"gli aranci are orange trees; the fruit is le arance."},"explanation":"l'arancia → le arance."},
+    {"id":"so-u02-z01","unit":"u02","type":"sort","prompt":"Which article does each noun take?","groups":["il","lo","la","l'"],"rows":[{"it":"zaino","group":"lo","say":"lo zaino","note":"z- takes lo."},{"it":"sale","group":"il","say":"il sale","note":"s + vowel is an ordinary consonant: il sale."},{"it":"sedia","group":"la","say":"la sedia","note":"A feminine noun before a consonant: la."},{"it":"isola","group":"l'","say":"l'isola","note":"Before a vowel: l'."},{"it":"studente","group":"lo","say":"lo studente","note":"s + consonant takes lo."},{"it":"hotel","group":"l'","say":"l'hotel","note":"A silent h counts as a vowel: l'hotel."}],"explanation":"il before most consonants, lo before z and s + consonant, la for feminine nouns, l' before a vowel."},
+    {"id":"so-u02-z02","unit":"u02","type":"sort","prompt":"Masculine or feminine?","groups":["masculine","feminine"],"rows":[{"it":"problema","group":"masculine","say":"il problema","note":"il problema: a masculine -ma noun from Greek."},{"it":"mano","group":"feminine","say":"la mano","note":"la mano: feminine despite its -o."},{"it":"foto","group":"feminine","say":"la foto","note":"la foto, short for la fotografia."},{"it":"pianeta","group":"masculine","say":"il pianeta","note":"il pianeta: masculine, like il poeta."},{"it":"crisi","group":"feminine","say":"la crisi","note":"Nouns in -i are mostly feminine: la crisi."},{"it":"cinema","group":"masculine","say":"il cinema","note":"il cinema, short for il cinematografo."}],"explanation":"Every one of these breaks the -o / -a rule of thumb, so learn each noun with its article."},
+    {"id":"so-u02-z03","unit":"u02","type":"sort","prompt":"Plural article: i, gli or le?","groups":["i","gli","le"],"rows":[{"it":"libri","group":"i","say":"i libri","note":"il libro → i libri."},{"it":"zaini","group":"gli","say":"gli zaini","note":"lo zaino → gli zaini."},{"it":"amici","group":"gli","say":"gli amici","note":"Masculine before a vowel: gli amici."},{"it":"chiavi","group":"le","say":"le chiavi","note":"chiave is feminine: le chiavi."},{"it":"problemi","group":"i","say":"i problemi","note":"problema is masculine: i problemi."},{"it":"dita","group":"le","say":"le dita","note":"il dito has a feminine plural: le dita."}],"explanation":"i is the plural of il; gli of lo and of masculine l'; le of every feminine noun."},
+    {"id":"so-u02-z04","unit":"u02","type":"sort","prompt":"In the plural: does the noun change, or stay the same?","groups":["changes","stays"],"rows":[{"it":"città","group":"stays","say":"le città","note":"An accented final vowel: le città."},{"it":"fiore","group":"changes","say":"i fiori","note":"-e → -i: i fiori."},{"it":"re","group":"stays","say":"i re","note":"One syllable: i re."},{"it":"crisi","group":"stays","say":"le crisi","note":"Ending in -i: le crisi."},{"it":"mano","group":"changes","say":"le mani","note":"mano → mani, a plural to learn."},{"it":"sport","group":"stays","say":"gli sport","note":"A borrowed word: gli sport."}],"explanation":"Nouns ending in an accented vowel, in -i or a consonant, and words of one syllable stay the same; only the article changes."},
+    {"id":"so-u02-z05","unit":"u02","type":"sort","prompt":"Plural: -chi or -ci?","groups":["-chi","-ci"],"rows":[{"it":"fuoco","group":"-chi","say":"i fuochi","note":"FUO-co: stress on the second-last syllable, fuochi."},{"it":"medico","group":"-ci","say":"i medici","note":"ME-di-co: stress on the third-last syllable, medici."},{"it":"amico","group":"-ci","say":"gli amici","note":"An exception that softens: amici."},{"it":"parco","group":"-chi","say":"i parchi","note":"PAR-co: stress on the second-last syllable, parchi."},{"it":"cuoco","group":"-chi","say":"i cuochi","note":"CUO-co: stress on the second-last syllable, cuochi."},{"it":"monaco","group":"-ci","say":"i monaci","note":"MO-na-co: stress on the third-last syllable, monaci."}],"explanation":"Stress on the second-last syllable keeps the hard sound with h; on the third-last it usually softens. amico is an exception."},
+    {"id":"so-u02-z06","unit":"u02","type":"sort","prompt":"Plural: -ghi or -gi?","groups":["-ghi","-gi"],"rows":[{"it":"lago","group":"-ghi","say":"i laghi","note":"-go keeps the hard sound: laghi."},{"it":"psicologo","group":"-gi","say":"gli psicologi","note":"A person in -logo: psicologi."},{"it":"dialogo","group":"-ghi","say":"i dialoghi","note":"A thing in -logo keeps the h: dialoghi."},{"it":"biologo","group":"-gi","say":"i biologi","note":"A person in -logo: biologi."},{"it":"albergo","group":"-ghi","say":"gli alberghi","note":"-go keeps the hard sound: alberghi."},{"it":"catalogo","group":"-ghi","say":"i cataloghi","note":"A thing in -logo keeps the h: cataloghi."}],"explanation":"-go nouns nearly always keep the hard sound; only -logo nouns naming people soften."},
+    {"id":"so-u02-z07","unit":"u02","type":"sort","prompt":"-cia and -gia in the plural: keep the i or drop it?","groups":["keeps i","drops i"],"rows":[{"it":"camicia","group":"keeps i","say":"le camicie","note":"A vowel before -cia: camicie."},{"it":"faccia","group":"drops i","say":"le facce","note":"A consonant before -cia: facce."},{"it":"valigia","group":"keeps i","say":"le valigie","note":"A vowel before -gia: valigie."},{"it":"spiaggia","group":"drops i","say":"le spiagge","note":"A consonant before -gia: spiagge."},{"it":"farmacia","group":"keeps i","say":"le farmacie","note":"The i is stressed (farma-CI-a), so it stays: farmacie."},{"it":"arancia","group":"drops i","say":"le arance","note":"A consonant before -cia: arance."}],"explanation":"A stressed i always stays. An unstressed one stays after a vowel and drops after a consonant."},
+    {"id":"so-u02-z08","unit":"u02","type":"sort","prompt":"What does the suffix add: small, big or nasty?","groups":["small","big","nasty"],"rows":[{"it":"gattino","group":"small","note":"-ino: small, endearing (a kitten)."},{"it":"librone","group":"big","note":"-one: big (a big book)."},{"it":"tempaccio","group":"nasty","note":"-accio: bad (awful weather)."},{"it":"casetta","group":"small","note":"-etta: small (a little house)."},{"it":"portone","group":"big","note":"-one: big (the main door)."},{"it":"parolaccia","group":"nasty","note":"-accia: bad (a swear word)."}],"explanation":"-ino and -etto make things small, -one big, and -accio bad or nasty."},
+    {"id":"so-u02-z09","unit":"u02","type":"sort","prompt":"Singular or plural in Italian?","groups":["singular","plural"],"rows":[{"it":"la gente","group":"singular","note":"la gente (people) is singular: la gente è."},{"it":"i soldi","group":"plural","note":"i soldi (money) is plural: i soldi sono."},{"it":"l'uva","group":"singular","note":"l'uva (grapes) is singular: l'uva è."},{"it":"i capelli","group":"plural","note":"i capelli (hair) is plural: i capelli sono."},{"it":"la frutta","group":"singular","note":"la frutta (fruit) is singular: la frutta è."},{"it":"i mobili","group":"plural","note":"i mobili (furniture) is plural: i mobili sono."}],"explanation":"These count differently from English, and the verb follows the Italian: la gente è, i soldi sono."},
+    {"id":"so-u02-z10","unit":"u02","type":"sort","prompt":"Which indefinite article?","groups":["un","uno","una","un'"],"rows":[{"it":"albero","group":"un","say":"un albero","note":"Masculine before a vowel: un, never with an apostrophe."},{"it":"zaino","group":"uno","say":"uno zaino","note":"z- takes uno, as it takes lo."},{"it":"isola","group":"un'","say":"un'isola","note":"Feminine before a vowel: un'."},{"it":"casa","group":"una","say":"una casa","note":"Feminine before a consonant: una."},{"it":"amico","group":"un","say":"un amico","note":"Masculine before a vowel: un amico."},{"it":"studente","group":"uno","say":"uno studente","note":"s + consonant takes uno."}],"explanation":"un for masculine nouns, uno before the lo sounds, una for feminine nouns, un' for feminine nouns before a vowel."},
+    {"id":"ma-u02-z01","unit":"u02","type":"match","prompt":"Match each singular with its plural","pairs":[["l'uovo","le uova"],["la mano","le mani"],["l'uomo","gli uomini"],["il dio","gli dei"],["il re","i re"]],"explanation":"Five plurals to learn by heart: le uova, le mani, gli uomini, gli dei, i re."},
+    {"id":"ma-u02-z02","unit":"u02","type":"match","prompt":"Match each man with the woman","pairs":[["l'attore","l'attrice"],["il dottore","la dottoressa"],["il cameriere","la cameriera"],["il padre","la madre"],["il re","la regina"]],"explanation":"-tore → -trice, -e → -essa or -a, and some pairs are different words: padre / madre, re / regina."},
+    {"id":"ma-u02-z03","unit":"u02","type":"match","prompt":"Match each noun with its meaning","right":"en","pairs":[["il fine","the aim"],["la fine","the end"],["il capitale","capital (money)"],["la capitale","capital city"],["la fronte","forehead"]],"explanation":"A few nouns change their meaning with their gender: il fine / la fine, il capitale / la capitale, il fronte / la fronte."},
+    {"id":"ma-u02-z04","unit":"u02","type":"match","prompt":"Match each short word with the long one","pairs":[["la foto","la fotografia"],["la moto","la motocicletta"],["l'auto","l'automobile"],["la bici","la bicicletta"],["il cinema","il cinematografo"]],"explanation":"A shortened word keeps the gender of the long one, and doesn't change in the plural."},
+    {"id":"ma-u02-z05","unit":"u02","type":"match","prompt":"Match each fruit tree with its fruit","pairs":[["il melo","la mela"],["il pero","la pera"],["l'arancio","l'arancia"],["il ciliegio","la ciliegia"]],"explanation":"Fruit trees are masculine and their fruit feminine."},
+    {"id":"ma-u02-z06","unit":"u02","type":"match","prompt":"Match each word with its meaning","right":"en","pairs":[["il gattino","kitten"],["il librone","big book"],["il tempaccio","awful weather"],["la casetta","little house"],["il portone","main door"]],"explanation":"-ino and -etto make things small, -one big, and -accio bad."},
+    {"id":"ma-u02-z07","unit":"u02","type":"match","prompt":"Match each singular with its plural","pairs":[["il libro","i libri"],["lo zaino","gli zaini"],["l'amico","gli amici"],["la casa","le case"],["l'isola","le isole"]],"explanation":"il → i, lo → gli, la → le; l' becomes gli for a masculine noun and le for a feminine one."},
     {"id":"vb-u03-y-camminare","unit":"u03","type":"verb","it":"camminare","en":["to walk"],"group":"-are","forms":{"presente":["cammino","cammini","cammina","camminiamo","camminate","camminano"]}},
     {"id":"vb-u03-y-saltare","unit":"u03","type":"verb","it":"saltare","en":["to jump","to skip"],"group":"-are","forms":{"presente":["salto","salti","salta","saltiamo","saltate","saltano"]}},
     {"id":"vb-u03-y-gridare","unit":"u03","type":"verb","it":"gridare","en":["to shout"],"group":"-are","forms":{"presente":["grido","gridi","grida","gridiamo","gridate","gridano"]}},
@@ -2689,7 +3066,7 @@ const BUILTIN = {
     {"id":"s-u04-z38","unit":"u04","type":"sentence","it":["Mi dai una mano?"],"en":["Will you give me a hand?"],"cloze":{"text":"Mi {dai} una mano?","hint":"dare, tu"},"explanation":"dare una mano = to lend a hand. tu → dai, no accent."},
     {"id":"s-u04-z39","unit":"u04","type":"sentence","it":["La musica ti dà fastidio?"],"en":["Does the music bother you?"],"cloze":{"text":"La musica ti {dà} fastidio?","hint":"dare"},"explanation":"dare fastidio = to bother: the thing that bothers is the subject. dà (gives) needs its accent to differ from da (from)."},
     {"id":"s-u04-z40","unit":"u04","type":"sentence","it":["Domani do un esame.","Domani faccio un esame.","Domani ho un esame.","Domani sostengo un esame."],"en":["I'm sitting an exam tomorrow."],"cloze":{"text":"Domani {do} un esame.","hint":"dare"},"explanation":"dare un esame = to sit an exam (passare un esame is to pass it). io → do, with no accent."},
-    {"id":"s-u04-z41","unit":"u04","type":"sentence","it":["Ci diamo del tu?"],"en":["Shall we use tu with each other?"],"cloze":{"text":"Ci {diamo} del tu?","hint":"dare, noi"},"explanation":"dare del tu = to address someone as tu; ci diamo del tu? suggests using it with each other. noi → diamo."},
+    {"id":"s-u04-z41","unit":"u04","type":"sentence","it":["Ci diamo del tu?","Possiamo darci del tu?","Diamoci del tu?"],"en":["Shall we use tu with each other?"],"cloze":{"text":"Ci {diamo} del tu?","hint":"dare, noi"},"explanation":"dare del tu = to address someone as tu; ci diamo del tu? suggests using it with each other. noi → diamo."},
     {"id":"s-u04-z42","unit":"u04","type":"sentence","it":["Dico sempre la verità."],"en":["I always tell the truth."],"cloze":{"text":"{Dico} sempre la verità.","hint":"dire"},"explanation":"dire works from dic-: dico. Telling the truth is dire la verità."},
     {"id":"s-u04-z43","unit":"u04","type":"sentence","it":["Dicono che domani piove.","Dicono che domani pioverà.","Dicono che domani piova."],"en":["They say it's going to rain tomorrow."],"cloze":{"text":"{Dicono} che domani piove.","hint":"dire, loro"},"explanation":"dicono = people say, they say. dire, loro → dicono, from dic-."},
     {"id":"s-u04-z44","unit":"u04","type":"sentence","it":["Posso aprire la finestra?"],"en":["May I open the window?"],"cloze":{"text":"{Posso} aprire la finestra?","hint":"potere"},"explanation":"potere asks permission: posso aprire…? It takes the bare infinitive."},
@@ -4164,6 +4541,11 @@ function sameItemKey(it) {
     case "number": return "n|" + it.value + "|" + n(it.it);
     case "clock": return "c|" + it.value;
     case "transform": return "t|" + n(it.it) + "|" + normalize(it.task) + "|" + n(it.answer);
+    case "spot": return "sp|" + n(it.it) + "|" + normalize(it.wrong || "");
+    case "sort": return "so|" + normalize(it.prompt) + "|" + arr(it.rows).map(r => normalize(r.it) + ":" + r.group).sort().join("|");
+    case "match": return "ma|" + arr(it.pairs).map(p => normalize(p[0]) + "=" + normalize(p[1])).sort().join("|");
+    case "reply": return "re|" + normalize(it.line) + "|" + n(it.answer);
+    case "endings": return "en|" + String(it.text).toLowerCase();
   }
   return null;
 }
@@ -4252,6 +4634,31 @@ function validatePack(obj) {
         if (!Array.isArray(it.options) || it.options.length < 2) problems.push(`${tag}: grammar_mc needs at least 2 options.`);
         else if (!it.options.includes(it.answer)) problems.push(`${tag}: "answer" must be one of the options.`);
         break;
+      case "spot":
+        if (!it.it) problems.push(`${tag}: spot needs "it" (the sentence shown).`);
+        else if (it.wrong != null) {
+          if (spotTokens(it.it).filter(t => t.n === normalize(it.wrong)).length !== 1) problems.push(`${tag}: "wrong" must be one word that occurs once in "it".`);
+          if (!arr(it.fix).length) problems.push(`${tag}: spot with a mistake needs "fix" (the right word).`);
+        }
+        break;
+      case "sort":
+        if (!it.prompt) problems.push(`${tag}: sort needs "prompt".`);
+        if (!Array.isArray(it.groups) || it.groups.length < 2 || it.groups.length > 4) problems.push(`${tag}: sort needs 2 to 4 "groups".`);
+        else if (!Array.isArray(it.rows) || it.rows.length < 3 || it.rows.some(r => !r || !r.it || !it.groups.includes(r.group))) problems.push(`${tag}: sort needs at least 3 "rows", each with "it" and a "group" from "groups".`);
+        break;
+      case "match":
+        if (!Array.isArray(it.pairs) || it.pairs.length < 3 || it.pairs.some(p => !Array.isArray(p) || p.length !== 2 || !p[0] || !p[1])) problems.push(`${tag}: match needs at least 3 "pairs" of two strings.`);
+        else if ([0, 1].some(k => new Set(it.pairs.map(p => normalize(p[k]))).size !== it.pairs.length)) problems.push(`${tag}: the left sides of "pairs" must all differ, and so must the right sides, so every item has one partner.`);
+        break;
+      case "reply":
+        if (!it.line) problems.push(`${tag}: reply needs "line" (what the other person says).`);
+        if (!arr(it.answer).length) problems.push(`${tag}: reply needs "answer".`);
+        if (it.options && !Array.isArray(it.options)) problems.push(`${tag}: reply "options" must be an array.`);
+        break;
+      case "endings":
+        if (!it.text || !/\{[^}]+\}/.test(it.text)) problems.push(`${tag}: endings needs "text" with at least one {blank}.`);
+        if (!arr(it.en).length) problems.push(`${tag}: endings needs "en".`);
+        break;
       default: problems.push(`${tag}: unknown type "${it.type}".`);
     }
   });
@@ -4328,7 +4735,9 @@ function itemHasProduction(it) {
   if (it.type === "vocab" || it.type === "number" || it.type === "prep" || it.type === "transform" || it.type === "clock") return true;
   if (it.type === "verb" || it.type === "vtense") return true;
   if (it.type === "sentence") return !!(it.cloze && it.cloze.text);
-  return false;
+  if (it.type === "reply" || it.type === "endings") return true;
+  if (it.type === "spot") return spotNeedsFix(it);
+  return false; // sort and match are recognition only
 }
 function streak() {
   const goal = progress.settings.goal || 30;
@@ -4368,7 +4777,10 @@ function knownWords(english) {
     const addIt = (s) => normalize(String(s).replace(/\([^)]*\)/g, " ").replace(/(\p{L}+)\/(\p{L}{1,2})(?=[^\p{L}]|$)/gu, (m, w, e) => w + " " + w.slice(0, -e.length) + e)).split(" ").forEach(w => { if (w) { it.add(w); it.add(deaccent(w)); } }); // notes in brackets left out; andato/a → andato andata
     for (const x of Object.values(content.items)) {
       if (x.type !== "grammar_mc") { // multiple-choice options are deliberately wrong, so only answers count
-        [x.it, x.answer, x.alt, x.plural, x.cloze && x.cloze.text].forEach(v => arr(v).forEach(addIt));
+        const own = x.type === "spot" ? [spotAnswer(x), x.fix] // a spot sentence shows a mistake on purpose: only its corrected version counts
+          : x.type === "endings" ? [endingsFull(x)]
+          : [x.it, x.answer, x.alt, x.plural, x.cloze && x.cloze.text, x.line, arr(x.rows).map(r => r.say || r.it), arr(x.pairs).map(p => x.right === "en" ? p[0] : p)];
+        own.flat(2).forEach(v => arr(v).forEach(addIt));
         if (x.forms) (Array.isArray(x.forms) ? [x.forms] : Object.values(x.forms)).forEach(fs => arr(fs).forEach(addIt));
       }
       arr(x.en).forEach(e => enForms(String(e)).forEach(f => f.split(" ").forEach(w => { if (w) en.add(w); })));
@@ -4501,10 +4913,10 @@ function checkAnswer(typed, accepted, opts) {
   const t = opts.numWords ? numWords(norm(typed)) : norm(typed);
   if (!t) return { ok: false };
   const tForms = opts.english && t.split(" ").length >= 3 ? [t, foldPhrase(t), foldPhrase(t.replace(/\bher\b/g, "one's"))] : [t];
-  if (opts.pronoun) { // translations: a subject pronoun the verb already shows may be added or left out
+  if (opts.pronoun || opts.pronounAny) { // translations and replies: a subject pronoun the verb already shows may be added or left out
     list.slice().forEach((a, k) => { const m = a.match(/^(io|tu|lui|lei|noi|voi|loro) (.+)$/); if (m && !list.includes(m[2]) && pronounFits(m[1], m[2], null)) { list.push(m[2]); src.push(src[k]); } });
     const m = t.match(/^(io|tu|lui|lei|noi|voi|loro) (.+)$/);
-    if (m && pronounFits(m[1], m[2], opts.pronoun)) tForms.push(m[2]);
+    if (m && pronounFits(m[1], m[2], opts.pronounAny ? null : opts.pronoun)) tForms.push(m[2]);
   }
   if (tForms.some(f => list.includes(f))) return { ok: true };
   const lenient = progress.settings.accents !== "strict";
@@ -4559,6 +4971,10 @@ function itemLabel(it) {
   if (it.type === "prep") return it.it + " + article";
   if (it.type === "transform") return it.it + " → " + arr(it.answer)[0];
   if (it.type === "clock") return it.value + " · " + arr(it.it)[0];
+  if (it.type === "sort" || it.type === "match") return it.prompt || "Matching pairs";
+  if (it.type === "spot") return spotAnswer(it);
+  if (it.type === "reply") return it.line + " → " + arr(it.answer)[0];
+  if (it.type === "endings") return endingsFull(it);
   return arr(it.it)[0];
 }
 /* The digits a clock item accepts. A 24-hour reading (le diciannove) or one with mezzogiorno / mezzanotte has one answer;
@@ -4572,7 +4988,7 @@ function clockDigits(item) {
   const [a, b] = h < alt ? [fmt(h)[0], fmt(alt)[0]] : [fmt(alt)[0], fmt(h)[0]];
   return { accepted: fmt(h).concat(fmt(alt)), shown: a + " or " + b };
 }
-function makeExercise(item, r, force) {
+function makeExercise(item, r, force, opt) { // opt.noListen: never a listening exercise (the learner can't listen now)
   const box = r.box;
   const introduce = box === 0 && force !== "production";
   const preferProd = force === "production" || (!introduce && (box >= 2 || Math.random() < 0.8));
@@ -4602,7 +5018,9 @@ function makeExercise(item, r, force) {
       if (!preferProd) {
         return Math.random() < 0.6 ? mcMeaning(ex, item, Math.random() < 0.5) : flipCard(ex, item);
       }
-      if (isNoun && Math.random() < 0.45) return articleDrill(ex, item, box);
+      const rn = Math.random();
+      if (isNoun && rn < 0.35) return articleDrill(ex, item, box);
+      if (isNoun && rn < 0.6 && item.plural && item.plural !== "—" && item.artPl) return pluralDrill(ex, item);
       if (item.pos === "adjective" && Array.isArray(item.forms) && Math.random() < 0.55) { const a = agreementDrill(ex, item); if (a) return a; }
       Object.assign(ex, { type: "Typed recall", typeKey: "recall", kind: "production", mode: "typed", typos: true,
         promptHtml: `<span class="en">${esc(en)}</span>` + (isNoun ? `<div class="hint">type the noun with its definite article</div>` : ""),
@@ -4643,6 +5061,7 @@ function makeExercise(item, r, force) {
       else if (box <= 1) choice = canBank && (!hasCloze || rnd < 0.4) ? "bank" : hasCloze ? "cloze" : "translate";
       else if (box === 2) choice = hasCloze && rnd < 0.5 ? "cloze" : canBank && rnd < 0.75 ? "bank" : "translate";
       else choice = hasCloze && rnd < 0.45 ? "cloze" : rnd < 0.85 ? "translate" : canBank ? "bank" : "translate";
+      if (words.length <= 9 && Math.random() < 0.2 && canListen() && !(opt && opt.noListen) && !(session && session.noListen)) return listenDrill(ex, item);
       if (choice === "bank") return wordBank(ex, item, words);
       if (choice === "translate") {
         Object.assign(ex, { type: "Translate", typeKey: "translate", kind: "production", mode: "typed", typos: true,
@@ -4712,6 +5131,54 @@ function makeExercise(item, r, force) {
         promptHtml: esc(item.it) + `<div class="hint">write in digits</div>`, accepted: [String(item.value)], shownAnswer: String(item.value) });
       return ex;
     }
+    case "spot": { // tap the wrong word (or No mistake); from box 2, and in the follow-up, then type it right
+      const toks = spotTokens(item.it), at = item.wrong == null ? -1 : toks.findIndex(t => t.n === normalize(item.wrong));
+      const fix = spotNeedsFix(item) && (force === "production" || (!introduce && box >= 2));
+      const right = spotAnswer(item), en = arr(item.en)[0];
+      const nFix = at < 0 ? 0 : spotTokens(arr(item.fix)[0]).length; // a fix can be two words (C'è → Ci sono)
+      const marked = at < 0 ? esc(right) : spotTokens(right).map((t, i) => i >= at && i < at + nFix ? `<b>${esc(t.w)}</b>` : esc(t.w)).join(" ");
+      Object.assign(ex, { type: "Spot the mistake", typeKey: "spot", kind: fix ? "production" : "recognition", mode: "spot", tokens: toks, at, fix, showWhy: introduce,
+        promptHtml: (en ? `<span class="en">${esc(en)}</span>` : "") + `<div class="hint">tap the wrong word${fix ? ", then type it correctly" : ""}, or choose No mistake</div>`,
+        accepted: arr(item.fix), shownAnswer: at < 0 ? "No mistake" : right, missedText: right, sayAnswer: right, okLine: at < 0 ? "" : marked,
+        answerLine: at < 0 ? `No mistake: <b>${esc(right)}</b> is right as it stands.` : `Answer: ${marked}` });
+      return ex;
+    }
+    case "sort": {
+      const rows = item.rows;
+      Object.assign(ex, { type: "Sort the words", typeKey: "sort", kind: "recognition", mode: "sort", showWhy: introduce, order: shuffle(rows.map((r, i) => i)),
+        promptHtml: `<span class="en">${esc(item.prompt)}</span>`, shownAnswer: rows.map(r => `${r.it}: ${r.group}`).join(", "),
+        missedText: rows.map(r => `${r.say || r.it} (${r.group})`).join(", "), sayAnswer: rows.map(r => r.say || r.it).join("\n"),
+        answerLine: "" }); // the rows themselves show the right group of each word
+      return ex;
+    }
+    case "match": {
+      const pairs = item.pairs, enRight = item.right === "en";
+      Object.assign(ex, { type: "Match the pairs", typeKey: "match", kind: "recognition", mode: "match", showWhy: introduce, enRight,
+        left: shuffle(pairs.map((p, i) => i)), right: shuffle(pairs.map((p, i) => i)),
+        promptHtml: `<span class="en">${esc(item.prompt || "Match the pairs")}</span>`, shownAnswer: pairs.map(p => p.join(" = ")).join(", "),
+        missedText: pairs.map(p => enRight ? `${p[0]} (${p[1]})` : p.join(" / ")).join(", "), sayAnswer: pairs.map(p => enRight ? p[0] : p.join(" / ")).join("\n"),
+        answerLine: pairs.map(p => `${esc(p[0])} → <b>${esc(p[1])}</b>`).join("<br>") });
+      return ex;
+    }
+    case "reply": {
+      const ans = arr(item.answer), opts = arr(item.options).filter(o => !ans.some(a => normalize(a) === normalize(o)));
+      const promptHtml = `<div class="rline">${item.who ? `<span class="who">${esc(item.who)}</span>` : ""}${esc(item.line)}</div>` + (item.cue ? `<div class="hint">${esc(item.cue)}</div>` : "");
+      if (opts.length >= 2 && (introduce || (box <= 1 && force !== "production"))) {
+        Object.assign(ex, { type: "Choose the reply", typeKey: "reply", kind: "recognition", mode: "options", showWhy: introduce, say: item.line, promptHtml,
+          options: shuffle([ans[0]].concat(opts.slice(0, 3))), correct: ans[0], shownAnswer: ans[0] });
+        return ex;
+      }
+      Object.assign(ex, { type: "Write the reply", typeKey: "reply", kind: "production", mode: "typed", typos: true, showWhy: introduce, say: item.line,
+        promptHtml: promptHtml + `<div class="hint">write your reply in Italian</div>`, accepted: ans, shownAnswer: ans[0] });
+      return ex;
+    }
+    case "endings": {
+      const cz = parseCloze(item.text), full = endingsFull(item);
+      Object.assign(ex, { type: "Complete the endings", typeKey: "endings", kind: "production", mode: "fields", showWhy: introduce, cz,
+        promptHtml: cz.parts.map((p, i) => esc(p) + (i < cz.blanks.length ? `<span class="blank">&nbsp;</span>` : "")).join("") + `<div class="hint sans">${esc(arr(item.en)[0])}</div>`,
+        accepted: cz.blanks, shownAnswer: full, answerInContext: full, sayAnswer: full });
+      return ex;
+    }
     case "grammar_mc": {
       Object.assign(ex, { type: "Grammar", typeKey: "grammar", kind: "recognition", mode: "options",
         promptHtml: `<span class="en">${esc(item.prompt)}</span>`,
@@ -4757,6 +5224,33 @@ function parseCloze(text) {
   String(text).replace(/\{([^}]+)\}/g, (m, inner, off) => { parts.push(text.slice(last, off)); blanks.push(inner.split("|").map(s => s.trim())); last = off + m.length; return m; });
   parts.push(text.slice(last));
   return { parts, blanks };
+}
+/* ---------- the exercise types added in v8.6 (see docs/exercise-types.md) ---------- */
+// spot: the sentence's words as tappable chips; w is the word as shown (with its punctuation), n its normalised form
+function spotTokens(s) { return String(s || "").split(/\s+/).filter(Boolean).map(w => ({ w, n: normalize(w) })); }
+// typing the fix is asked for only when it differs by more than an accent: lenient accents would pass the wrong word typed back (e for è)
+function spotNeedsFix(item) { return item.wrong != null && arr(item.fix).some(f => deaccent(normalize(f)) !== deaccent(normalize(item.wrong))); }
+function spotAnswer(item) { // the sentence with its mistake put right; a fix ending in an apostrophe joins the next word (un' + amica)
+  if (item.wrong == null) return String(item.it);
+  const fix = String(arr(item.fix)[0] || item.wrong), toks = spotTokens(item.it), at = toks.findIndex(t => t.n === normalize(item.wrong));
+  return toks.map((t, i) => i === at ? t.w.replace(/^([^\p{L}\p{N}']*)(.*?)([^\p{L}\p{N}']*)$/u, (m, a, b, c) => a + fix + c) : t.w)
+    .reduce((s, w, i) => s + (i === 0 ? "" : i === at + 1 && /'$/.test(fix) ? "" : " ") + w, "");
+}
+// endings: the sentence with each blank filled with its first answer
+function endingsFull(item) { const cz = parseCloze(item.text || ""); return cz.parts.map((p, i) => p + (i < cz.blanks.length ? cz.blanks[i][0] : "")).join(""); }
+// listen: only with an Italian voice and Read aloud on; never a prompt otherwise, since the sentence isn't shown
+function canListen() { return !!TTS && !!sayVoice && audioPref() !== "off"; }
+function listenDrill(ex, item) {
+  const it = arr(item.it)[0];
+  return Object.assign(ex, { type: "Listen and type", typeKey: "listen", kind: "production", mode: "typed", typos: true, listen: it,
+    promptHtml: `<div class="listen"><button type="button" class="say solo big" data-say="${esc(it)}" aria-label="Play the sentence"></button><button type="button" class="slowbtn" data-say="${esc(it)}" data-rate="slow">Slow</button></div><div class="hint">type the Italian you hear</div>`,
+    accepted: [it], shownAnswer: it });
+}
+// plural: a noun with its article, made plural (or singular)
+function pluralDrill(ex, item) {
+  const sing = joinArt(item.art, arr(item.it)[0]), pl = joinArt(item.artPl, item.plural), toPl = Math.random() < 0.7;
+  return Object.assign(ex, { type: toPl ? "Make it plural" : "Make it singular", typeKey: "plural", kind: "production", mode: "typed", typos: false, say: toPl ? sing : pl, toPl,
+    promptHtml: `${esc(toPl ? sing : pl)}<div class="hint">${toPl ? "the plural, with its article" : "the singular, with its article"}</div>`, accepted: [toPl ? pl : sing], shownAnswer: toPl ? pl : sing });
 }
 function joinArt(art, w) { return art.endsWith("'") ? art + w : art + " " + w; }
 function flipCard(ex, item) {
@@ -5222,6 +5716,53 @@ function explainFor(ex, fb) {
       if (it.note) why.push(esc(it.note));
       break;
     }
+    case "spot": {
+      const noteFor = (w) => { const n = it.notes || {}; const k = Object.keys(n).find(x => normalize(x) === normalize(w)); return k ? n[k] : ""; };
+      if (!fb.ok && ex.picked === "none" && it.wrong != null) why.push(`<b>You chose No mistake:</b> there is one, ${esc(it.wrong)}, which should be ${esc(arr(it.fix)[0])}.`);
+      else if (!fb.ok && ex.picked >= 0 && ex.picked !== ex.at) { const w = ex.tokens[ex.picked].n; why.push(`<b>You tapped ${esc(w)}:</b> ${esc(noteFor(w) || "that word is right as it stands.")}`); }
+      else if (!fb.ok && ex.picked === ex.at && fb.given) why.push(`<b>You typed ${esc(fb.given)}:</b> the right word is ${esc(arr(it.fix)[0])}.`);
+      if (it.explanation) why.push(esc(it.explanation));
+      if (arr(it.fix).length > 1) out.facts = "also accepted: " + esc(arr(it.fix).slice(1).join(" · "));
+      break;
+    }
+    case "sort": {
+      const sel = ex.lastSel || {};
+      if (!fb.ok) ex.order.forEach(i => { const r = it.rows[i], g = sel[i] != null ? it.groups[sel[i]] : null; if (g !== r.group) why.push(`<b>${esc(r.it)}: ${esc(r.group)}</b>${g ? `, not ${esc(g)}` : ""}.${r.note ? " " + esc(r.note) : ""}`); });
+      else it.rows.filter(r => r.note && progress.settings.explain === "always").forEach(r => why.push(`<b>${esc(r.it)}:</b> ${esc(r.note)}`));
+      if (it.explanation) why.push(esc(it.explanation));
+      break;
+    }
+    case "match": {
+      const notes = it.notes || {};
+      for (const [l, r] of ex.lastSlips || []) { const L = it.pairs[l], R = it.pairs[r]; why.push(`<b>You matched ${esc(L[0])} with ${esc(R[1])}:</b> ${esc(L[0])} goes with ${esc(L[1])}, and ${esc(R[1])} with ${esc(R[0])}.${notes[L[0]] ? " " + esc(notes[L[0]]) : ""}`); }
+      if (it.explanation) why.push(esc(it.explanation));
+      break;
+    }
+    case "reply": {
+      if (!fb.ok && ex.mode === "options" && fb.given && it.notes && it.notes[fb.given]) why.push(`<b>You chose ${esc(fb.given)}:</b> ${esc(it.notes[fb.given])}`);
+      if (it.explanation) why.push(esc(it.explanation));
+      if (arr(it.answer).length > 1) out.facts = "also right: " + esc(arr(it.answer).slice(1).join(" · "));
+      break;
+    }
+    case "endings": {
+      if (it.explanation) why.push(esc(it.explanation));
+      if (it.note) why.push(esc(it.note));
+      break;
+    }
+    case "listen": {
+      why.push(`It means: ${esc(arr(it.en)[0])}`);
+      if (it.explanation) why.push(esc(it.explanation));
+      break;
+    }
+    case "plural": {
+      const s = joinArt(it.art, arr(it.it)[0]), p = joinArt(it.artPl, it.plural);
+      why.push(`${esc(ex.toPl ? s : p)} → ${esc(ex.toPl ? p : s)}.` + (normalize(arr(it.it)[0]) === normalize(it.plural) ? " The noun itself doesn't change in the plural; only the article does." : ""));
+      if (ex.toPl && it.gender === "m" && it.artPl === "le") why.push(`${esc(arr(it.it)[0])} is masculine in the singular, but its plural is feminine, so it takes le.`);
+      else why.push(articleWhy(ex.toPl ? it.artPl : it.art, it));
+      if (it.note) why.push(esc(it.note));
+      out.facts = esc(nounForms(it));
+      break;
+    }
     default: { // typed recall, flip cards, intro cards
       if (it.note) why.push(esc(it.note));
       if (it.type === "vocab") out.facts = vocabFacts(it);
@@ -5644,13 +6185,13 @@ function startSession(kind, unitId) {
     s.hadNew = newIds(unitId).length > 0;
     if (progress.currentUnit !== unitId) { progress.currentUnit = unitId; saveProgress(); }
   }
-  session = s; S.screen = "session"; S.feedback = null; S.leaveAsk = false; S.revealed = false; S.picked = null; S.bankPicked = [];
+  session = s; S.screen = "session"; S.feedback = null; S.leaveAsk = false; S.revealed = false; S.picked = null; S.bankPicked = []; resetExState();
   render();
 }
 function current() { return session && session.queue[session.pos]; }
 function answerTyped(text) {
   const q = current(), ex = q.ex;
-  const res = checkAnswer(text, ex.accepted, { typos: !!ex.typos, english: !!ex.english, numWords: !!ex.numWords, itemId: ex.item.id, pronoun: ex.typeKey === "translate" ? arr(ex.item.en).join(" | ") : null });
+  const res = checkAnswer(text, ex.accepted, { typos: !!ex.typos, english: !!ex.english, numWords: !!ex.numWords, itemId: ex.item.id, pronoun: ex.typeKey === "translate" ? arr(ex.item.en).join(" | ") : null, pronounAny: ex.typeKey === "reply" });
   if (!res.ok && ex.alts && ex.alts.length && !S.retry) {
     const alt = ex.alts.find(a => checkAnswer(text, a.forms, { typos: false }).ok);
     if (alt) {
@@ -5669,6 +6210,7 @@ function answerOption(opt) {
 }
 function missedItalian(ex) { // the Italian a missed item is listed under in the session summary
   const item = ex.item;
+  if (ex.missedText) return ex.missedText;
   if (ex.answerInContext) return ex.answerInContext;
   const ans = String(ex.shownAnswer || ex.correct || "");
   const english = ex.english || ex.mode === "flip" || (ex.typeKey === "meaning" && arr(item.en).includes(ex.correct));
@@ -5680,7 +6222,7 @@ function sayAnswerOf(ex, fb) { // the Italian the answer panel's speaker reads; 
   if (ex.typeKey === "grammar") return "";
   if (ex.sayAnswer != null) return ex.sayAnswer;
   if (ex.mode === "table") return conjSpeech(ex.item.forms, ex.item.tense === "imperativo" ? null : (p) => vgPerson(ex.item.tense, p));
-  if (ex.typeKey === "translate" && fb && !fb.ok && fb.closest) return fb.closest; // the version the panel compares with
+  if ((ex.typeKey === "translate" || ex.typeKey === "reply") && fb && !fb.ok && fb.closest) return fb.closest; // the version the panel compares with
   return missedItalian(ex);
 }
 function finishAnswer(ok, note, given, closest) {
@@ -5722,7 +6264,7 @@ function acceptAnswer() {
 function continueSession() {
   stopSaying();
   session.pos++; session.done++;
-  S.feedback = null; S.revealed = false; S.picked = null; S.bankPicked = []; S.retry = null; S.flagOpen = false; S.focusId = null;
+  S.feedback = null; S.revealed = false; S.picked = null; S.bankPicked = []; S.retry = null; S.flagOpen = false; S.focusId = null; resetExState();
   if (session.pos >= session.queue.length) {
     session.finished = true;
     session.xp += 5; today().xp = (today().xp || 0) + 5;
@@ -5849,24 +6391,24 @@ function sayAllBtn(lines) { // one button that reads a whole dialogue, line by l
 }
 // a verb table read one person at a time ("io parlo", "tu parli"…); label(p) names the person, or null to read the forms bare (commands); a missing person is skipped
 const conjSpeech = (forms, label) => arr(forms).map((f, p) => !f || f === "—" || f === "-" ? "" : label ? label(p) + " " + f : f).filter(Boolean).join("\n");
-function markSaying() { app.querySelectorAll("[data-say]").forEach(b => b.classList.toggle("on", !!sayNow && b.dataset.say === sayNow.key)); }
+function markSaying() { app.querySelectorAll("[data-say]").forEach(b => b.classList.toggle("on", !!sayNow && b.dataset.say === sayNow.key && (b.dataset.rate || "") === sayNow.rate)); }
 function stopSaying() {
   const busy = !!sayNow || !!(TTS && (TTS.speaking || TTS.pending));
   sayNow = null;
   if (busy) { try { TTS.cancel(); } catch (e) { } markSaying(); }
   return busy;
 }
-function speak(raw) { // a second tap on the speaker that is playing stops it
+function speak(raw, rate) { // a second tap on the speaker that is playing stops it; rate "slow" overrides the setting (Listen and type)
   if (!TTS) return;
-  const again = !!sayNow && sayNow.key === raw, busy = stopSaying(), parts = speakable(raw);
+  const again = !!sayNow && sayNow.key === raw && sayNow.rate === (rate || ""), busy = stopSaying(), parts = speakable(raw);
   if (again || !parts.length) return;
-  const me = sayNow = { key: raw, us: [] }; // the utterances are kept here: Chrome can drop one that nothing refers to before it ends
+  const me = sayNow = { key: raw, rate: rate || "", us: [] }; // the utterances are kept here: Chrome can drop one that nothing refers to before it ends
   const done = () => { if (sayNow === me) { sayNow = null; markSaying(); } };
   for (const t of parts) {
     const u = new SpeechSynthesisUtterance(t);
     u.lang = sayVoice ? String(sayVoice.lang).replace("_", "-") : "it-IT";
     if (sayVoice) u.voice = sayVoice;
-    u.rate = SAY_RATE[audioPref()] || SAY_RATE.normal;
+    u.rate = SAY_RATE[rate] || SAY_RATE[audioPref()] || SAY_RATE.normal;
     u.onerror = (e) => { done(); if (e && /^(language|voice)-unavailable$/.test(e.error || "")) { sayListed = true; sayVoice = null; applySay(); } };
     me.us.push(u);
   }
@@ -5879,7 +6421,7 @@ if (TTS) {
   // one listener for every speaker; on mousedown the answer field keeps the focus (and the keyboard stays up)
   const speakerOf = (e) => { const b = e.target && e.target.closest && e.target.closest("[data-say], [data-conj]"); return b && app.contains(b) ? b : null; };
   app.addEventListener("mousedown", (e) => { if (speakerOf(e)) e.preventDefault(); });
-  app.addEventListener("click", (e) => { const b = speakerOf(e); if (!b) return; e.preventDefault(); speak(b.dataset.say || (b.dataset.say = conjRead(b))); });
+  app.addEventListener("click", (e) => { const b = speakerOf(e); if (!b) return; e.preventDefault(); speak(b.dataset.say || (b.dataset.say = conjRead(b)), b.dataset.rate); });
   pickVoice();
   const onVoices = () => { pickVoice(); applySay(); if (content && S.screen === "you") render(); };
   try { TTS.addEventListener("voiceschanged", onVoices); } catch (e) { TTS.onvoiceschanged = onVoices; }
@@ -6050,8 +6592,44 @@ function renderSession() {
   const tick = (cls) => `<span class="${cls}">${icon("tick", 18, 2.6)}<span class="vh">right</span></span>`, cross = (cls) => `<span class="${cls}">${icon("cross", 18, 2.6)}<span class="vh">wrong</span></span>`;
   const sayP = sayBtn(ex.say, "Listen", "solo"); // only Italian that the prompt already shows
   let body = `<div class="sbar"><button type="button" class="iconbtn" data-go="quit" aria-label="Quit">${icon("close", 22, 2)}</button><div class="sbar-mid">${bar(100 * done / total, "bar10")}<span class="sbar-type">${esc(ex.type)}</span></div><span class="scount">${done + 1}/${total}${q.repeat ? " · repeat" : ""}</span></div>
-  <div class="sx"><div class="card prompt-card${sayP ? " sayrow" : ""}"><div class="prompt">${ex.promptHtml}</div>${sayP}</div>`;
-  if (ex.mode === "vintro") {
+  <div class="sx"><div class="card prompt-card${sayP ? " sayrow" : ""}"><div class="prompt${ex.mode === "fields" ? " fieldsp" : ""}">${ex.mode === "fields" ? fieldsPrompt(ex, fb) : ex.promptHtml}</div>${sayP}</div>`;
+  const giveupRow = (check) => `<div class="btnrow"><button type="button" data-act="giveup">Don't know</button>${check || ""}</div>`;
+  if (ex.mode === "spot") {
+    const at = ex.at, pk = fb ? ex.picked : S.spotAt, it = ex.item;
+    body += `<div class="spotline" role="group" aria-label="The sentence: tap the wrong word">` + ex.tokens.map((t, i) => {
+      const cls = fb ? (i === at ? " err" : i === pk ? " miss" : "") : i === S.spotAt ? " at" : "";
+      const chip = `<button type="button" class="wchip${cls}" data-spot="${i}" ${fb || S.spotAt != null ? "disabled" : ""}>${fb && (i === at || i === pk) ? cross("smark") : ""}${esc(t.w)}${fb && i === pk && i !== at ? `<span class="vh">(you tapped this)</span>` : ""}</button>`;
+      return chip + (fb && i === at ? `<span class="wchip fixw">${tick("smark")}${esc(arr(it.fix)[0])}</span>` : "");
+    }).join("") + `</div>`;
+    if (!fb && S.spotAt != null) {
+      body += `<label class="field"><span class="flabel">Replace <b>${esc(ex.tokens[S.spotAt].n)}</b> with:</span><input type="text" id="answer" placeholder="Your answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" lang="it"></label>` + accentBar();
+      body += giveupRow(`<button type="button" class="primary" data-act="check">Check</button>`);
+    } else if (!fb || at < 0 || ex.picked === "none") { // after answering, No mistake stays only when it was the answer or the choice
+      const none = ex.picked === "none", cls = fb ? (at < 0 ? " right" : none ? " wrong" : "") : "";
+      body += `<div class="options"><button type="button" class="opt${cls}" data-act="nomistake" ${fb ? "disabled" : ""}><span class="otext">No mistake</span>${fb && at < 0 ? tick("omark") : fb && none ? cross("omark") : ""}</button></div>`;
+      if (!fb) body += giveupRow();
+    }
+  } else if (ex.mode === "sort") {
+    const sel = fb ? (ex.lastSel || {}) : (S.sortSel || {}), it = ex.item;
+    body += `<div class="sortrows">` + ex.order.map(ri => {
+      const r = it.rows[ri], g = sel[ri];
+      return `<div class="sortrow"><span class="sw">${esc(r.it)}</span><div class="sortseg" role="group" aria-label="${esc(r.it)}">` + it.groups.map((gl, gi) => {
+        const cls = fb ? (gl === r.group ? "right" : g === gi ? "wrong" : "") : "";
+        return `<button type="button" data-sort="${ri}:${gi}" aria-pressed="${g === gi}"${cls ? ` class="${cls}"` : ""} ${fb ? "disabled" : ""}>${fb && gl === r.group ? tick("smark") : fb && g === gi ? cross("smark") : ""}${esc(gl)}</button>`;
+      }).join("") + `</div></div>`;
+    }).join("") + `</div>`;
+    if (!fb) body += giveupRow(`<button type="button" class="primary" data-act="checkSort" ${Object.keys(sel).length === it.rows.length ? "" : "disabled"}>Check</button>`);
+  } else if (ex.mode === "match") {
+    const doneP = fb ? ex.left : (S.mDone || []), bad = !fb && S.mBad || [], it = ex.item;
+    const cell = (side, pi) => {
+      const k = doneP.indexOf(pi), isDone = k >= 0, sel = !fb && S.mSel === side + pi, isBad = bad[side === "L" ? 0 : 1] === pi;
+      return `<button type="button" class="mchip${isDone ? " done" : ""}${sel ? " sel" : ""}${isBad ? " bad" : ""}${side === "R" && ex.enRight ? " en" : ""}" data-match="${side}${pi}" aria-pressed="${sel}" ${isDone || fb ? "disabled" : ""}>${isDone ? `<span class="mn" aria-label="pair ${k + 1}">${k + 1}</span>` : isBad ? cross("smark") : ""}<span>${esc(it.pairs[pi][side === "L" ? 0 : 1])}</span></button>`;
+    };
+    body += `<div class="matchgrid"><div class="mcol">${ex.left.map(pi => cell("L", pi)).join("")}</div><div class="mcol">${ex.right.map(pi => cell("R", pi)).join("")}</div></div>`;
+    if (!fb) body += giveupRow();
+  } else if (ex.mode === "fields") {
+    if (!fb) body += accentBar() + giveupRow(`<button type="button" class="primary" data-act="checkFields">Check</button>`);
+  } else if (ex.mode === "vintro") {
     body += `<div class="card vintro">${ex.introHtml}</div><button type="button" class="primary wide" data-act="introDone">Got it, continue</button>`;
   } else if (ex.mode === "table") {
     const cells = fb && ex.lastCells;
@@ -6083,18 +6661,20 @@ function renderSession() {
     if (S.retry && !fb) body += `<div class="note" role="status">${esc(S.retry)}</div>`;
     body += `<label class="field"><span class="vh">Your answer</span><input type="text" id="answer"${fb ? ` class="${fb.ok ? "ok" : "bad"}"` : ` placeholder="Your answer"`} autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" lang="it" ${fb ? "disabled" : ""} value="${fb ? esc(fb.given) : ""}"></label>` + (ex.english ? "" : accentBar());
     if (!fb) body += `<div class="btnrow"><button type="button" data-act="giveup">Don't know</button><button type="button" class="primary" data-act="check">Check</button></div>`;
+    if (!fb && ex.listen) body += `<div class="btnrow end"><button type="button" class="quiet" data-act="noListen">Can't listen now</button></div>`;
   }
   body += `</div>`;
   if (fb) {
-    const showWhy = progress.settings.explain === "always" || !fb.ok || ex.mode === "flip";
+    const showWhy = progress.settings.explain === "always" || !fb.ok || ex.mode === "flip" || ex.showWhy; // a new item's first exercise always explains
     const info = explainFor(ex, fb);
     const answer = ex.shownAnswer || ex.correct || "";
     let title = "Not quite", line = "", extra = "";
-    if (fb.ok) { title = "Correct"; if (fb.note) line = esc(fb.note); }
+    if (fb.ok) { title = "Correct"; if (fb.note) line = esc(fb.note); else if (ex.okLine) line = ex.okLine; }
+    else if (ex.answerLine != null) line = ex.answerLine;
     else if (ex.mode === "table") { const w = ex.cells.filter(p => !(ex.lastCells && ex.lastCells[p] && ex.lastCells[p].ok)).length; line = `${w} of ${ex.cells.length} wrong. The right forms are under your answers.`; }
     else if (ex.mode === "typed" && fb.given) {
       // translations and English cards have several right answers: compare with the one nearest to what was typed
-      const multi = (ex.typeKey === "translate" || ex.english) && fb.closest;
+      const multi = (ex.typeKey === "translate" || ex.typeKey === "reply" || ex.english) && fb.closest;
       const near = multi ? fb.closest : answer;
       line = "Answer: <b>" + diffHtml(fb.given, near) + "</b>";
       if (multi && normalize(near) !== normalize(answer)) extra = `<div class="extra dim">${ex.english ? "All answers" : "Also right"}: ${esc(ex.english ? answer : arr(ex.accepted).filter(a => normalize(a) !== normalize(near)).slice(0, 2).join(" / "))}</div>`;
@@ -6130,6 +6710,53 @@ function saveFlag() {
   progress.flags[id] = { id: ex.item.id, unit: ex.item.unit, exercise: ex.type, prompt: tmp.textContent.replace(/\s+/g, " ").trim(), given: fb.given || "", expected: ex.shownAnswer || ex.correct || "", note: noteEl ? noteEl.value.trim() : "", createdAt: t, updatedAt: t, version: APP_VERSION };
   S.flagOpen = false; saveProgress(); render();
 }
+// endings: the sentence with an input in each blank; a word with a blank never breaks across lines
+function fieldsPrompt(ex, fb) {
+  const cells = fb ? (ex.lastCells || {}) : null, n = ex.cz.blanks.length;
+  const input = (i) => {
+    const c = cells && cells[i], w = Math.max(1, ...ex.cz.blanks[i].map(b => b.length));
+    return `<input type="text" class="fld${fb ? (c && c.ok ? " ok" : " bad") : ""}" id="fld${i}" data-fld="${i}" aria-label="Blank ${i + 1} of ${n}" style="width:calc(${w}ch + 26px)" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" lang="it" enterkeyhint="${i === n - 1 ? "done" : "next"}" ${fb ? "disabled" : ""} value="${c ? esc(c.given) : ""}">`
+      + (fb && !(c && c.ok) ? `<span class="fldfix"><span class="vh">the right answer: </span>${esc(ex.cz.blanks[i][0])}</span>` : "");
+  };
+  let s = ""; ex.cz.parts.forEach((p, i) => { s += p + (i < n ? "\u0000" + i + "\u0000" : ""); });
+  return `<div class="fsent">` + s.split(/(\s+)/).map(w => w.includes("\u0000") ? `<span class="nw">${w.split(/\u0000(\d+)\u0000/).map((x, k) => k % 2 ? input(Number(x)) : esc(x)).join("")}</span>` : esc(w)).join("")
+    + `</div><div class="hint">${esc(arr(ex.item.en)[0])}</div>`;
+}
+function checkFields() {
+  const q = current(), ex = q && q.ex; if (!ex || ex.mode !== "fields" || S.feedback) return;
+  const els = ex.cz.blanks.map((b, i) => document.getElementById("fld" + i));
+  const empty = els.find(el => el && !el.value.trim()); if (empty) { empty.focus(); return; }
+  const cells = {}, notes = [];
+  ex.cz.blanks.forEach((b, i) => { const v = els[i] ? els[i].value.trim() : "", r = checkAnswer(v, b, { typos: false }); cells[i] = { given: v, ok: r.ok }; if (r.ok && r.note) notes.push(r.note); });
+  ex.lastCells = cells;
+  finishAnswer(Object.values(cells).every(c => c.ok), notes.join(" "), ex.cz.parts.map((p, i) => p + (i < ex.cz.blanks.length ? cells[i].given : "")).join(""));
+}
+function spotTap(i) {
+  const q = current(), ex = q && q.ex; if (!ex || S.feedback || S.spotAt != null) return;
+  ex.picked = i;
+  if (i === ex.at && ex.fix) { S.spotAt = i; render(); return; } // the right word: now type it correctly
+  finishAnswer(i === ex.at, "", ex.tokens[i].w);
+}
+function matchTap(id) {
+  const q = current(), ex = q && q.ex; if (!ex || S.feedback) return;
+  const side = id[0], pi = Number(id.slice(1));
+  S.mBad = null;
+  if (!S.mSel || S.mSel[0] === side) { S.mSel = S.mSel === id ? null : id; render(); return; }
+  const other = Number(S.mSel.slice(1)), li = side === "L" ? pi : other, ri = side === "R" ? pi : other;
+  S.mSel = null;
+  if (li === ri) {
+    S.mDone = (S.mDone || []).concat(li);
+    if (S.mDone.length === ex.item.pairs.length) { ex.lastSlips = S.mSlips || []; finishAnswer(!ex.lastSlips.length, "", ex.lastSlips.map(([l, r]) => ex.item.pairs[l][0] + " = " + ex.item.pairs[r][1]).join(", ")); return; }
+  } else { S.mSlips = (S.mSlips || []).concat([[li, ri]]); S.mBad = [li, ri]; }
+  render();
+}
+function resetExState() { S.spotAt = null; S.sortSel = {}; S.mSel = null; S.mDone = []; S.mSlips = []; S.mBad = null; }
+function cantListen() { // swap every listening exercise left in this session for another exercise on the same item, at no cost
+  if (!session) return;
+  session.noListen = true;
+  for (let i = session.pos; i < session.queue.length; i++) { const q = session.queue[i]; if (q.ex && q.ex.listen) q.ex = makeExercise(q.ex.item, rec(q.ex.item.id), q.followup ? "production" : q.ex.repeatForce, { noListen: true }) || q.ex; }
+  S.retry = null; render();
+}
 function accentBar() { return `<div class="accentbar">` + ["à", "è", "é", "ì", "ò", "ù"].map(c => `<button type="button" class="key" data-ch="${c}" tabindex="-1" aria-label="Type ${c}">${c}</button>`).join("") + `</div>`; }
 function renderSummary() {
   const s = session;
@@ -6138,7 +6765,7 @@ function renderSummary() {
   return `<header class="hdr"><h1 class="title">Session complete</h1></header>
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
-  ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}${m.item.type === "grammar_mc" ? "" : sayBtn(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" ? `<div class="small muted">${esc(m.item.prompt)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
+  ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}${m.item.type === "grammar_mc" ? "" : sayBtn(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" || m.item.type === "sort" || m.item.type === "match" ? `<div class="small muted">${esc(m.item.prompt || "")}</div>` : m.item.type === "reply" ? `<div class="small muted">${esc(m.item.line)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
   <button type="button" class="primary wide" data-go="home">Back to Today</button>`;
 }
 function boxTag(id) { const r = rec(id); return r.box === 0 ? "" : ` <span class="box">box ${r.box}${r.box >= 5 ? " ✓" : ""}</span>`; }
@@ -6248,9 +6875,9 @@ function renderReference() {
   if (L) h += `<div class="refbar"><div class="seg" role="tablist" aria-label="Unit">` + [["lesson", "Lesson"], ["glossary", "Glossary"]].map(([k, l]) => `<button type="button" role="tab" aria-selected="${tab === k}" data-reftab="${k}">${l}</button>`).join("") + `</div>${tab === "lesson" ? lessonChips(u, L) : ""}</div>`;
   if (tab === "lesson") return h + lessonHtml(u, L);
   const f = normalize(S.refFilter || "");
-  const match = (i) => !f || [arr(i.it).join(" "), arr(i.en).join(" "), i.prompt || "", i.answer || "", i.value != null ? String(i.value) : ""].some(x => normalize(x).includes(f));
+  const match = (i) => !f || itemFields(i).some(x => normalize(x).includes(f));
   const items = (content.byUnit[u.id] || []).filter(match);
-  const verbs = items.filter(i => i.type === "verb"), nouns = items.filter(i => i.type === "vocab" && i.pos === "noun" && i.art), other = items.filter(i => i.type === "vocab" && !(i.pos === "noun" && i.art)), sents = items.filter(i => i.type === "sentence"), gram = items.filter(i => i.type === "grammar_mc"), nums = items.filter(i => i.type === "number"), preps = items.filter(i => i.type === "prep"), trans = items.filter(i => i.type === "transform"), clocks = items.filter(i => i.type === "clock");
+  const verbs = items.filter(i => i.type === "verb"), nouns = items.filter(i => i.type === "vocab" && i.pos === "noun" && i.art), other = items.filter(i => i.type === "vocab" && !(i.pos === "noun" && i.art)), sents = items.filter(i => i.type === "sentence"), gram = items.filter(i => i.type === "grammar_mc"), nums = items.filter(i => i.type === "number"), preps = items.filter(i => i.type === "prep"), trans = items.filter(i => i.type === "transform"), clocks = items.filter(i => i.type === "clock"), practice = items.filter(i => PRACTICE_TYPES.includes(i.type)).sort((a, b) => PRACTICE_TYPES.indexOf(a.type) - PRACTICE_TYPES.indexOf(b.type));
   const table = (title, rows, head) => groupHtml(title, `<div class="card gcard"><div class="tablewrap"><table class="gloss">${head || ""}${rows}</table></div></div>`);
   const list = (title, html) => groupHtml(title, `<div class="card gcard">${html}</div>`);
   h += `<label class="vh" for="refFilter">Filter this unit</label><input type="text" id="refFilter" placeholder="Filter…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`;
@@ -6263,6 +6890,7 @@ function renderReference() {
   if (nums.length) h += table("Numbers", nums.map(n => `<tr><td style="width:1%;white-space:nowrap">${n.value}</td><td class="it">${esc(n.it)}${sayBtn(n.it)}${boxTag(n.id)}${arr(n.alt).length ? `<div class="small muted">also ${esc(arr(n.alt).join(", "))}</div>` : ""}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""));
   if (other.length) h += table(nouns.length || verbs.length ? "Other words" : "Words", other.map(n => `<tr><td class="it">${esc(arr(n.it)[0])}${sayBtn(arr(n.it)[0])}${Array.isArray(n.forms) ? `<div class="gf">${esc(formsText(n.forms))}</div>` : ""}<div class="pos">${esc(posLabel(n.pos, n.gender))}</div></td><td>${esc(enList(n).join(", "))}${boxTag(n.id)}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""));
   if (sents.length) h += table("Sentences", sents.map(x => `<tr><td class="it">${esc(arr(x.it)[0])}${sayBtn(arr(x.it)[0])}</td><td>${esc(arr(x.en)[0])}${boxTag(x.id)}${x.explanation ? `<div class="small muted">${esc(x.explanation)}</div>` : ""}</td></tr>`).join(""));
+  if (practice.length) h += list("Practice sets", practice.map(x => `<div class="gitem">${rowHtml(x)}</div>`).join(""));
   if (gram.length) h += list("Grammar points", gram.map(g => `<div class="gitem">${esc(g.prompt)}${boxTag(g.id)}<div class="it">${esc(g.answer)}</div>${g.explanation ? `<div class="small muted">${esc(g.explanation)}</div>` : ""}</div>`).join(""));
   if (!items.length) h += `<p class="muted">No items match.</p>`;
   return h + `<button type="button" class="primary wide" data-unit="${esc(u.id)}">Practise this unit</button>`;
@@ -6278,13 +6906,25 @@ function rowHtml(i) {
   if (i.type === "clock") return `<div>${esc(i.value)} <span class="itx">${esc(arr(i.it)[0])}</span>${sayBtn(arr(i.it)[0])} ${boxTag(i.id)}</div>` + (arr(i.it).length > 1 ? `<div class="small muted">also: ${esc(arr(i.it).slice(1).join(" · "))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "transform") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="small muted">→ ${esc(i.task)}</span> ${boxTag(i.id)}</div><div class="itx">${esc(arr(i.answer)[0])}${sayBtn(arr(i.answer)[0])}</div>` + (i.explanation ? `<div class="small muted">${esc(i.explanation)}</div>` : "");
   if (i.type === "prep") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))}</span> ${boxTag(i.id)}</div>` + prepTableHtml(i.it) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  const why = (t) => t ? `<div class="small muted">${esc(t)}</div>` : "", kind = (t) => `<span class="small muted">${t}</span>`;
+  if (i.type === "spot") return `<div>${kind(i.wrong == null ? "Spot the mistake · no mistake" : "Spot the mistake")} ${boxTag(i.id)}</div>` + (i.wrong == null ? "" : `<div class="small"><span aria-hidden="true">✕</span><span class="vh">Not:</span> ${esc(i.it)}</div>`) + `<div><span class="itx">${esc(spotAnswer(i))}</span>${sayBtn(spotAnswer(i))}</div>` + (i.en ? `<div>${esc(arr(i.en)[0])}</div>` : "") + why(i.explanation);
+  if (i.type === "reply") return `<div>${kind("Reply")} ${boxTag(i.id)}</div><div>${i.who ? esc(i.who) + ": " : ""}<span class="itx">${esc(i.line)}</span>${sayBtn(i.line)}</div>` + (i.cue ? `<div class="small muted">${esc(i.cue)}</div>` : "") + `<div><span aria-hidden="true">→</span> <span class="itx">${esc(arr(i.answer)[0])}</span>${sayBtn(arr(i.answer)[0])}</div>` + (arr(i.answer).length > 1 ? `<div class="small muted">also: ${esc(arr(i.answer).slice(1).join(" · "))}</div>` : "") + why(i.explanation);
+  if (i.type === "endings") return `<div>${kind("Endings")} ${boxTag(i.id)}</div><div><span class="itx">${esc(endingsFull(i))}</span>${sayBtn(endingsFull(i))}</div><div>${esc(arr(i.en)[0])}</div>` + why(i.explanation);
+  if (i.type === "sort") return `<div>${kind("Sort")} ${esc(i.prompt)} ${boxTag(i.id)}</div>` + i.rows.map(r => `<div><span class="itx">${esc(r.it)}</span>${sayBtn(r.say || r.it)} <span class="muted">→ ${esc(r.group)}</span>${r.note ? `<div class="small muted">${esc(r.note)}</div>` : ""}</div>`).join("") + why(i.explanation);
+  if (i.type === "match") return `<div>${kind("Match")} ${esc(i.prompt || "")} ${boxTag(i.id)}</div>` + i.pairs.map(p => `<div><span class="itx">${esc(p[0])}</span>${sayBtn(p[0])} <span class="muted">=</span> ${i.right === "en" ? esc(p[1]) : `<span class="itx">${esc(p[1])}</span>${sayBtn(p[1])}`}</div>`).join("") + why(i.explanation);
   return "";
+}
+const PRACTICE_TYPES = ["spot", "endings", "reply", "sort", "match"]; // the v8.6 types, listed together in a unit's glossary
+function itemFields(i) { // the text of an item that Look up and the glossary filter search
+  return [i.type === "spot" ? spotAnswer(i) : arr(i.it).join(" "), arr(i.en).join(" "), i.prompt || "", arr(i.answer).join(" "), i.task || "", i.value != null ? String(i.value) : "", i.plural || "",
+    Array.isArray(i.forms) ? i.forms.join(" ") : (i.forms ? Object.values(i.forms).flat().join(" ") : ""),
+    i.line || "", i.cue || "", i.text ? endingsFull(i) : "", arr(i.fix).join(" "), arr(i.rows).map(r => r.it + " " + (r.say || "")).join(" "), arr(i.pairs).flat().join(" ")];
 }
 function renderLookup() {
   const f = normalize(S.lookup || "");
   let hits = [];
   if (f.length >= 2) {
-    const fields = (i) => [arr(i.it).join(" "), arr(i.en).join(" "), i.prompt || "", arr(i.answer).join(" "), i.task || "", i.value != null ? String(i.value) : "", i.plural || "", Array.isArray(i.forms) ? i.forms.join(" ") : (i.forms ? Object.values(i.forms).flat().join(" ") : "")];
+    const fields = itemFields;
     const score = (i) => { const fs = fields(i).map(normalize); if (fs.some(x => x === f)) return 0; if (fs.some(x => x.split(" ").includes(f))) return 1; if (fs.some(x => x.startsWith(f))) return 2; return fs.some(x => x.includes(f)) ? 3 : 9; };
     hits = Object.values(content.items).map(i => [score(i), i]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || (isFlashUnit(a[1].unit) ? 1 : 0) - (isFlashUnit(b[1].unit) ? 1 : 0)).slice(0, 40).map(x => x[1]);
   }
@@ -6309,7 +6949,7 @@ function renderStats() {
   const days = Object.keys(progress.days).sort().slice(-14).reverse();
   const acc = (n) => { const a = accuracy(n); return a[1] ? pctOf(a) + " (" + a[0] + "/" + a[1] + ")" : "–"; };
   const byType = (() => { const cut = dayKey(t - 29 * 864e5), m = {}; for (const [d, v] of Object.entries(progress.days)) if (d >= cut && v.t) for (const [k, x] of Object.entries(v.t)) if (k !== "all") { m[k] = m[k] || [0, 0]; m[k][0] += x[0]; m[k][1] += x[1]; } return Object.entries(m).filter(e => e[1][1] > 0).sort((a, b) => (a[1][0] / a[1][1]) - (b[1][0] / b[1][1])); })();
-  const typeName = { flashcard: "Flashcards", recall: "Typed recall", article: "Article drill", conjugation: "Conjugation", cloze: "Fill in the blank", grammar: "Grammar questions", meaning: "Meaning (multiple choice)", flip: "Flip cards", intro: "New-item cards", agreement: "Adjective agreement", number: "Numbers", bank: "Word order", translate: "Translation", preparticle: "Preposition + article", transform: "Transformations", clock: "Telling the time", vtable: "Verbs: full tables", vspot: "Verbs: single forms", vtenseid: "Verbs: which tense?", vperson: "Verbs: which person?", vaux: "Verbs: essere or avere?", vpick: "Verbs: pick the form", vmeaning: "Verbs: from English", vswitch: "Verbs: change the tense", vinf: "Verbs: which verb?" };
+  const typeName = { flashcard: "Flashcards", recall: "Typed recall", article: "Article drill", conjugation: "Conjugation", cloze: "Fill in the blank", grammar: "Grammar questions", meaning: "Meaning (multiple choice)", flip: "Flip cards", intro: "New-item cards", agreement: "Adjective agreement", number: "Numbers", bank: "Word order", translate: "Translation", preparticle: "Preposition + article", transform: "Transformations", clock: "Telling the time", vtable: "Verbs: full tables", vspot: "Verbs: single forms", vtenseid: "Verbs: which tense?", vperson: "Verbs: which person?", vaux: "Verbs: essere or avere?", vpick: "Verbs: pick the form", vmeaning: "Verbs: from English", vswitch: "Verbs: change the tense", vinf: "Verbs: which verb?", spot: "Spot the mistake", sort: "Sort the words", match: "Match the pairs", reply: "Replies", endings: "Complete the endings", listen: "Listen and type", plural: "Plurals" };
   const table = (title, rows, after) => groupHtml(title, `<div class="card gcard"><div class="tablewrap"><table>${rows}</table></div></div>` + (after || ""));
   const stat = (k, v) => `<div class="stat"><span>${k}</span><span>${v}</span></div>`;
   return screenHead("Stats", { back: "you", backLabel: "You" }) + `
@@ -6390,6 +7030,9 @@ function wire() {
   app.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => answerOption(b.dataset.opt));
   app.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { S.bankPicked = (S.bankPicked || []).concat(Number(b.dataset.pick)); render(); });
   app.querySelectorAll("[data-unpick]").forEach(b => b.onclick = () => { const i = Number(b.dataset.unpick); S.bankPicked = (S.bankPicked || []).filter(x => x !== i); render(); });
+  app.querySelectorAll("[data-spot]").forEach(b => b.onclick = () => spotTap(Number(b.dataset.spot)));
+  app.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { const [r, g] = b.dataset.sort.split(":").map(Number); S.sortSel = Object.assign({}, S.sortSel, { [r]: g }); render(); });
+  app.querySelectorAll("[data-match]").forEach(b => b.onclick = () => matchTap(b.dataset.match));
   app.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => insertChar(b.dataset.ch));
   app.querySelectorAll("[data-set]").forEach(sel => sel.onchange = () => {
     let v = sel.value; if (v === "true") v = true; else if (v === "false") v = false; else if (/^\d+$/.test(v)) v = Number(v);
@@ -6422,6 +7065,9 @@ function wire() {
   const cellInputs = app.querySelectorAll("[data-cell]");
   cellInputs.forEach(c => c.onfocus = () => { S.focusId = c.id; });
   if (cellInputs.length && !S.feedback && !S.leaveAsk) cellInputs[0].focus();
+  const fldInputs = app.querySelectorAll("[data-fld]");
+  fldInputs.forEach(c => c.onfocus = () => { S.focusId = c.id; });
+  if (fldInputs.length && !S.feedback && !S.leaveAsk) fldInputs[0].focus();
   if (S.feedback && !S.leaveAsk) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
   const lb = document.getElementById("lookupBox");
   if (lb) { lb.oninput = () => { const pos = lb.selectionStart; S.lookup = lb.value; render(); const n = document.getElementById("lookupBox"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }; if (!S.lookup) lb.focus(); }
@@ -6447,7 +7093,19 @@ function action(a) {
     case "missed": finishAnswer(false, "", ""); break;
     case "check": { const inp = document.getElementById("answer"); if (inp && inp.value.trim()) answerTyped(inp.value); else if (inp) inp.focus(); break; }
     case "continue": if (Date.now() - (S.answeredAt || 0) > 350) continueSession(); break;
-    case "giveup": finishAnswer(false, "", (q && q.ex.mode === "bank" && S.bankPicked && S.bankPicked.length) ? S.bankPicked.map(i => q.ex.tokens[i].w).join(" ") : ""); break;
+    case "giveup":
+      if (q && q.ex.mode === "sort") q.ex.lastSel = Object.assign({}, S.sortSel);
+      if (q && q.ex.mode === "match") q.ex.lastSlips = S.mSlips || [];
+      if (q && q.ex.mode === "fields") q.ex.lastCells = {};
+      finishAnswer(false, "", (q && q.ex.mode === "bank" && S.bankPicked && S.bankPicked.length) ? S.bankPicked.map(i => q.ex.tokens[i].w).join(" ") : ""); break;
+    case "nomistake": if (q && q.ex.mode === "spot" && !S.feedback) { q.ex.picked = "none"; finishAnswer(q.ex.at < 0, "", "No mistake"); } break;
+    case "checkSort": {
+      const ex = q.ex, sel = S.sortSel || {}; if (Object.keys(sel).length < ex.item.rows.length) break;
+      ex.lastSel = Object.assign({}, sel);
+      finishAnswer(ex.item.rows.every((r, i) => ex.item.groups[sel[i]] === r.group), "", ex.item.rows.map((r, i) => `${r.it}: ${ex.item.groups[sel[i]]}`).join(", ")); break;
+    }
+    case "checkFields": checkFields(); break;
+    case "noListen": cantListen(); break;
     case "checkBank": {
       const picked = S.bankPicked || []; if (!picked.length) break;
       const seq = picked.map(i => q.ex.tokens[i].n).join(" ");
@@ -6504,7 +7162,13 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
     if (tag === "BUTTON" || tag === "TEXTAREA") return;
     if (S.feedback) { e.preventDefault(); continueSession(); return; }
-    if (q.ex.mode === "typed" && tag === "INPUT") { e.preventDefault(); action("check"); return; }
+    if ((q.ex.mode === "typed" || q.ex.mode === "spot") && tag === "INPUT") { e.preventDefault(); action("check"); return; }
+    if (q.ex.mode === "fields" && tag === "INPUT") {
+      e.preventDefault();
+      const all = [...app.querySelectorAll("[data-fld]")], i = all.indexOf(e.target);
+      if (i >= 0 && i < all.length - 1) all[i + 1].focus(); else action("checkFields");
+      return;
+    }
     if (q.ex.mode === "flip" && !S.revealed) { e.preventDefault(); action("reveal"); return; }
     if (q.ex.mode === "vintro") { e.preventDefault(); action("introDone"); return; }
     if (q.ex.mode === "table" && tag === "INPUT") {
@@ -6801,7 +7465,7 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "8.5";
+const APP_VERSION = "8.6";
 applyTheme(themePref());
 loadLocal();
 buildContent();

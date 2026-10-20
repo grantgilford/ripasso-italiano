@@ -66,6 +66,8 @@ Within any session, a missed exercise is repeated at the end of the session unti
 | 9 | Match pairs | Recognition | vocab | 5 IT/EN pairs, tap to match | v2 |
 | 10 | Typed translation | Production | sentence | EN sentence → type full IT sentence | v2 |
 
+The app has since grown well beyond these ten (the Verbs section's drills, numbers, clock times, transforms and, from v8.6, Spot the mistake, Complete the endings, Reply, Sort the words, Match the pairs, Listen and type and Make it plural). The current, complete list is kept in `docs/exercise-types.md`.
+
 **Distractors** for multiple choice come from the same unit and the same part of speech. For grammar forms, they come from other forms of the same set (other persons of the same verb, other articles). If a unit is too small, the app fills from earlier units.
 
 **Choosing exercises for an item:** a new item is introduced with a recognition exercise (1, 2, or 9). After that, the app prefers production exercises. An item can't go past box 2 (section 8) without a correct production answer.

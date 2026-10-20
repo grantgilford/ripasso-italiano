@@ -151,6 +151,69 @@ for (const it of allItems) {
     if (!it.explanation) problem("Missing explanations", `${where}: transform has no explanation`);
     if (arr(it.answer).some(a => normalize(a) === normalize(it.it))) problem("Transforms whose answer is the sentence unchanged", `${where}: “${it.it}”`);
   }
+  // the exercise types added in v8.6 (docs/exercise-types.md)
+  if (["spot", "sort", "match", "reply", "endings"].includes(it.type)) {
+    count("v8.6 practice items");
+    if (!it.explanation) problem("Missing explanations", `${where}: ${it.type} has no explanation`);
+    const texts = it.type === "spot" ? [it.it, ...arr(it.en), ...arr(it.fix)] : it.type === "reply" ? [it.line, ...arr(it.answer), ...arr(it.options)] : it.type === "endings" ? [it.text, ...arr(it.en)] : [];
+    for (const s of texts) if (/"/.test(s)) problem("Straight quotation marks in sentences", `${where}: ${s}`);
+  }
+  if (it.type === "spot") {
+    const toks = String(it.it || "").split(/\s+/).filter(Boolean).map(normalize);
+    if (!arr(it.en).length) problem("Spot the mistake without English", `${where}: the English meaning is what tells the learner what the sentence should say`);
+    if (it.wrong != null) {
+      if (toks.filter(t => t === normalize(it.wrong)).length !== 1) problem("Spot the mistake: the wrong word isn't in the sentence once", `${where}: “${it.wrong}” in “${it.it}”`);
+      if (!arr(it.fix).length) problem("Spot the mistake: no fix", where);
+      for (const f of arr(it.fix)) if (f === it.wrong) problem("Spot the mistake: a fix that is the wrong word", `${where}: “${f}”`);
+    }
+    for (const k of Object.keys(it.notes || {})) {
+      if (!toks.includes(normalize(k))) look("Notes for words not in the sentence", `${where}: note for “${k}”`);
+      if (it.wrong != null && normalize(k) === normalize(it.wrong)) look("Notes for words not in the sentence", `${where}: a note for the wrong word itself is never shown (the explanation covers it)`);
+    }
+  }
+  if (it.type === "reply") {
+    const acc = new Set(arr(it.answer).map(normalize)), notes = it.notes || {};
+    if (arr(it.options).length === 1) look("Replies with a single wrong option", `${where}: the multiple choice needs at least two, so it is never shown`);
+    for (const o of arr(it.options)) {
+      count("wrong options checked");
+      if (acc.has(normalize(o))) problem("Wrong options that are accepted answers", `${where}: reply option “${o}” is an accepted answer (the app silently drops it)`);
+      checkNote(where, o, notes[o]);
+    }
+    for (const k of Object.keys(notes)) if (!arr(it.options).includes(k)) look("Notes for options that no longer exist", `${where}: reply note for “${k}”`);
+  }
+  if (it.type === "sort") {
+    const seen = new Set();
+    for (const r of arr(it.rows)) {
+      count("sort rows checked");
+      if (!r.note || r.note.trim().split(/\s+/).length < SHORT_WORDS) problem("Sort rows without a reason", `${where}: “${r.it}” needs a note saying why it belongs to ${r.group}`);
+      if (seen.has(normalize(r.it))) problem("Repeated options", `${where}: “${r.it}” appears twice`);
+      seen.add(normalize(r.it));
+    }
+    if (new Set(arr(it.groups)).size !== arr(it.groups).length) problem("Repeated options", `${where}: a group appears twice`);
+    if (arr(it.groups).some(g => String(g).length > 14)) look("Sort groups that may not fit a phone", `${where}: keep group labels short (they share one row)`);
+  }
+  if (it.type === "match") {
+    count("match pairs checked", arr(it.pairs).length);
+    if (arr(it.pairs).length > 6) look("Match grids that may not fit a phone", `${where}: ${arr(it.pairs).length} pairs (4 or 5 fit best)`);
+    if (arr(it.pairs).some(p => p.some(x => String(x).length > 28))) look("Match grids that may not fit a phone", `${where}: a side over 28 characters wraps onto several lines`);
+  }
+  if (it.type === "endings") {
+    const pc = app.parseCloze(it.text || "");
+    if (pc.blanks.some(b => b.some(x => !x))) problem("Endings with an empty blank", `${where}: “${it.text}”`);
+    if (pc.blanks.length > 4) look("Endings with many blanks", `${where}: ${pc.blanks.length} blanks`);
+  }
+}
+
+// The same English sentence in two units gets the same accepted Italian, so an answer is never right in one unit and wrong in the other.
+// (A leading subject pronoun is ignored: translations accept one added or left out wherever the verb fits.)
+{
+  const byEn = {};
+  for (const it of allItems) if (it.type === "sentence") for (const e of arr(it.en)) (byEn[normalize(e)] = byEn[normalize(e)] || []).push(it);
+  for (const [en, list] of Object.entries(byEn)) {
+    if (new Set(list.map(i => i.unit)).size < 2) continue;
+    const acc = list.map(i => JSON.stringify([...new Set(app.translationsOf(i).map(s => normalize(s.replace(/\u0001/g, "")).replace(/^(io|tu|lui|lei|noi|voi|loro) /, "")))].sort()));
+    if (new Set(acc).size > 1) look("Same English sentence, different accepted Italian", `“${en}”: ${list.map(i => `${i.id} (${arr(i.it).join(" / ")})`).join("; ")}`);
+  }
 }
 
 /* ---------- 5. vocabulary data ---------- */
@@ -263,9 +326,12 @@ function british(where, s) {
 for (const it of allItems) {
   const where = `${it.id} (${it.unit})`;
   if (arr(it.en).length) british(where + " first gloss", arr(it.en)[0]);
-  for (const k of ["explanation", "note", "prompt", "task"]) if (it[k]) british(where, it[k]);
+  for (const k of ["explanation", "note", "prompt", "task", "cue"]) if (it[k]) british(where, it[k]);
   for (const v of Object.values(it.distractorNotes || {})) british(where, v);
   for (const v of Object.values((it.cloze && it.cloze.notes) || {})) british(where, v);
+  if (["spot", "reply"].includes(it.type)) for (const v of Object.values(it.notes || {})) british(where, v);
+  for (const r of arr(it.rows)) british(where, r.note || "");
+  if (it.type === "match" && it.right === "en") for (const p of arr(it.pairs)) british(where, p[1]);
 }
 for (const u of Object.values(units)) arr(u.notes).forEach(n => british(`${u.id} notes`, n));
 for (const uid of Object.keys(units)) { const L = lessonOf(uid); if (L) for (const [sec, t] of lessonTexts(L)) british(`${uid} lesson §${sec}`, t.replace(/\*[^*]+\*/g, "")); }
