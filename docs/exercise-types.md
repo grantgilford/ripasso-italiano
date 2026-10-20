@@ -56,7 +56,7 @@ A wrong answer puts the item back at the end of the session. Every wrong answer 
 
 ## Where the new types could go next
 
-Each new type is ordinary content, so any unit can use it. Ideas, unit by unit:
+Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all five, and so does the possessives unit (u19, v8.8), which shows how well they suit a single grammar point: sort for article or no article, *mio / mia / miei / mie* and *tuo / Suo / vostro*; match for *my book* ↔ *il mio libro*; spot for *lo mio zaino*; endings for *i mie{i} fratelli*; reply for *Di chi è?* Ideas for the other units:
 
 | Type | Fits |
 |---|---|
@@ -88,4 +88,4 @@ Every new item type touches the same places. In `index.html`:
 7. The glossary (`PRACTICE_TYPES`, `rowHtml`), Look up and the glossary filter (`itemFields`), the summary line, `itemLabel`, the Stats names (`typeName`) and `knownWords` (what the typo rule treats as real words; leave out text that is wrong on purpose).
 8. CSS beside the other session styles: 44 px targets, the ok / bad tokens, never colour alone (a ✓ or ✕ goes with each colour).
 
-Then the tools: a section for it in `tools/check-content.js` (explanations, a note for every wrong option, anything else that can be wrong in the data), a block in `newTypes` in `tools/test-ui.js` (answered right and wrong by tapping, in light and dark at 360 px and at 120% text) plus its fields in the read-aloud `dataWords`, and a branch in `runSession` in `tools/test-progress.js` so practice sessions answer it as a learner would. Finally the item format in the content guide, the look in the design system, and a row in the table above.
+Then the tools: a section for it in `tools/check-content.js` (explanations, a note for every wrong option, anything else that can be wrong in the data), a block in `newTypes` in `tools/test-ui.js` (answered right and wrong by tapping, in light and dark at 360 px and at 120% text) plus its fields in the read-aloud `dataWords`, a branch in `runSession` in `tools/test-progress.js` so practice sessions answer it as a learner would, and one in `tools/test-items.js` if it has a new `mode`, so every item of the type is answered right through the screen. Finally the item format in the content guide, the look in the design system, and a row in the table above.

@@ -7,7 +7,8 @@
   items.json is a JSON array of items in the content guide's format (or an
   object with an "items" array). Each item is written as one line, in the
   same style as the rest of BUILTIN, straight after the last item of its unit,
-  in the order given. Refused, with nothing written, if:
+  in the order given (a new unit's first items go after the items of the unit
+  listed before it). Refused, with nothing written, if:
     - an id already exists anywhere in the app, or appears twice in the file;
     - an item's unit is not one of the built-in grammar units;
     - the app's own pack check (validatePack) reports a problem.
@@ -63,9 +64,14 @@ const byUnit = {};
 for (const it of items) (byUnit[it.unit] = byUnit[it.unit] || []).push(it);
 const added = [];
 for (const [unit, list] of Object.entries(byUnit)) {
-  let last = -1;
-  for (let i = start; i < end; i++) { const m = lines[i].match(ITEM); if (m && m[1] === unit) last = i; }
-  if (last < 0) { console.error(`Nothing written: unit ${unit} has no items in BUILTIN to add after.`); process.exit(1); }
+  const lastOf = u => { let at = -1; for (let i = start; i < end; i++) { const m = lines[i].match(ITEM); if (m && m[1] === u) at = i; } return at; };
+  let last = lastOf(unit);
+  if (last < 0) { // a new unit's first items go after the unit before it in the list (by order) that has items
+    const order = u => app.BUILTIN.units.find(x => x.id === u).order || 0;
+    const before = app.BUILTIN.units.filter(u => order(u.id) < order(unit) && lastOf(u.id) >= 0).sort((a, b) => order(b.id) - order(a.id))[0];
+    last = before ? lastOf(before.id) : -1;
+  }
+  if (last < 0) { console.error(`Nothing written: found no place in BUILTIN to add unit ${unit}'s items after.`); process.exit(1); }
   const isLastOfArray = !lines.slice(last + 1, end).some(l => ITEM.test(l));
   if (!lines[last].trimEnd().endsWith(",")) lines[last] = lines[last].trimEnd() + ",";
   const out = list.map((it, k) => "    " + JSON.stringify(it) + (isLastOfArray && k === list.length - 1 ? "" : ","));
