@@ -29,7 +29,8 @@ if (!args[0]) { console.error("Usage: node tools/check-new-words.js words.txt [p
 const html = fs.readFileSync(args[1] || path.join(__dirname, "..", "index.html"), "utf8");
 
 /* load the content, as tools/check-content.js does */
-const code = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1])[0] || "";
+// the app's script is the inline one with the boot section (a small snippet in <head> comes first)
+const code = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes("/* ---------- boot ---------- */")) || "";
 const boot = code.indexOf("/* ---------- boot ---------- */");
 if (boot < 0) { console.error("Could not find the boot section in the script; the loader needs updating."); process.exit(1); }
 const noop = () => {};
