@@ -39,7 +39,14 @@
        speaker keeps the answer field focused; a second tap or leaving the
        screen stops it; Off · Normal · Slow is kept per device and leaves
        progress untouched; and with no Italian voice, or no speech at all, the
-       speakers are hidden or never drawn and You says why.
+       speakers are hidden or never drawn and You says why;
+    9. the exercise types added in v8.6 (docs/exercise-types.md) work by tapping
+       and typing in light and dark at 360 px and at 120% text: Spot the
+       mistake (a right word tapped, the wrong word tapped and typed right, No
+       mistake), Sort the words, Match the pairs, Choose / Write the reply,
+       Complete the endings (Enter moves between blanks), Listen and type (Play,
+       Slow, and Can't listen now, which costs nothing) and Make it plural, each
+       with the 44 px and no-sideways-scroll rules and the right answer panel.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -224,6 +231,118 @@ async function tour(page, label, opts = {}) {
   check(L("leaving a session returns to Today with the tab bar"), (await screen(page)) === "home" && await page.$(".tabbar"));
 }
 
+/* ---------- the exercise types added in v8.6 ---------- */
+// Each one is put in front of the learner as a one-item session and answered right and wrong by tapping
+// and typing, in light and dark at 360 px and with text at 120% (325 px wide), with a stand-in Italian voice.
+async function newTypes(browser, origin) {
+  for (const [width, height, scheme, label] of [[360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `New types, ${label}: ${t}`;
+    const { page, context } = await openApp(browser, origin, { width, height, scheme, init: fakeSpeech(VOICES) });
+    const one = (id, box = 0, how = null) => page.evaluate(([id, box, how]) => { // how: "listen" or "plural" builds that drill directly
+      const item = content.items[id], r = { box, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 0 };
+      const ex = how === "listen" ? listenDrill({ item, note: "" }, item) : how === "plural" ? pluralDrill({ item, note: "" }, item) : makeExercise(item, r);
+      session = { kind: "unit", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+      S.screen = "session"; S.feedback = null; S.retry = null; resetExState(); render(); window.scrollTo(0, 0);
+      return { mode: ex.mode, at: ex.at, fix: ex.fix, accepted: ex.accepted, order: ex.order, n: item.pairs ? item.pairs.length : 0, rows: item.rows ? item.rows.map(r => item.groups.indexOf(r.group)) : [] };
+    }, [id, box, how]);
+    const panel = async () => { await page.waitForTimeout(450); return page.evaluate(() => { const fb = document.querySelector(".fb"), c = document.querySelector('.fb [data-act="continue"]'); if (!fb || !c) return null; const r = c.getBoundingClientRect(); return { title: fb.querySelector(".fb-title").textContent, onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 0.5, text: fb.textContent.replace(/\s+/g, " ") }; }); };
+    const ok = (p, title) => !!p && p.title === title && p.onScreen;
+
+    // Spot the mistake: a correct word tapped, then the wrong word tapped and typed right, and No mistake
+    let ex = await one("sp-u01-z01", 2);
+    await layout(page, L("Spot the mistake"));
+    await tap(page, '[data-spot="0"]');
+    let p = await panel();
+    check(L("Spot the mistake: tapping a word that is right gives Not quite, and says it was right"), ok(p, "Not quite") && /You tapped anna/i.test(p.text), JSON.stringify(p));
+    ex = await one("sp-u01-z01", 2);
+    await tap(page, `[data-spot="${ex.at}"]`);
+    check(L("Spot the mistake: tapping the wrong word asks for the right one"), await page.$("#answer") && /Replace\s+stanco\s+with/.test(await page.textContent(".field")));
+    await layout(page, L("Spot the mistake, typing the fix"));
+    await page.fill("#answer", "stanca"); await page.press("#answer", "Enter");
+    p = await panel();
+    check(L("Spot the mistake: typing it right, with Enter, gives Correct and the corrected sentence"), ok(p, "Correct") && /Anna è stanca/.test(p.text), JSON.stringify(p));
+    await one("sp-u01-z13", 0); await tap(page, '[data-act="nomistake"]'); p = await panel();
+    check(L("Spot the mistake: No mistake on a right sentence gives Correct"), ok(p, "Correct"), JSON.stringify(p));
+    await one("sp-u01-z06", 0); await tap(page, '[data-act="nomistake"]'); p = await panel();
+    check(L("Spot the mistake: No mistake on a wrong sentence gives Not quite, naming the mistake"), ok(p, "Not quite") && /You chose No mistake/.test(p.text), JSON.stringify(p));
+
+    // Sort the words
+    ex = await one("so-u02-z01");
+    await layout(page, L("Sort the words"));
+    check(L("Sort the words: Check waits until every word has a group"), await page.$eval('[data-act="checkSort"]', b => b.disabled));
+    for (const ri of ex.order) await tap(page, `[data-sort="${ri}:${ex.rows[ri]}"]`);
+    await tap(page, '[data-act="checkSort"]'); p = await panel();
+    check(L("Sort the words: all right gives Correct"), ok(p, "Correct"), JSON.stringify(p));
+    ex = await one("so-u02-z01");
+    for (const ri of ex.order) await tap(page, `[data-sort="${ri}:${ri === ex.order[0] ? (ex.rows[ri] + 1) % 4 : ex.rows[ri]}"]`);
+    await tap(page, '[data-act="checkSort"]'); p = await panel();
+    check(L("Sort the words: one wrong gives Not quite, with every row's right group marked and the reason"), ok(p, "Not quite") && (await page.$$(".sortseg .right")).length === ex.order.length && (await page.$$(".sortseg .wrong")).length === 1 && /, not /.test(p.text), JSON.stringify(p));
+
+    // Match the pairs
+    ex = await one("ma-u01-z01");
+    await layout(page, L("Match the pairs"));
+    await tap(page, '[data-match="L0"]'); await tap(page, '[data-match="R1"]');
+    check(L("Match the pairs: a wrong pair is marked, with a cross"), (await page.$$(".mchip.bad")).length === 2 && (await page.$$(".mchip.bad .smark")).length === 2);
+    for (let i = 0; i < ex.n; i++) { await tap(page, `[data-match="L${i}"]`); await tap(page, `[data-match="R${i}"]`); }
+    p = await panel();
+    check(L("Match the pairs: after a slip, finishing gives Not quite, naming the slip, with every pair numbered"), ok(p, "Not quite") && /You matched io with sei/.test(p.text) && (await page.$$(".mchip .mn")).length === 2 * ex.n, JSON.stringify(p));
+    ex = await one("ma-u01-z01");
+    for (let i = ex.n - 1; i >= 0; i--) { await tap(page, `[data-match="R${i}"]`); await tap(page, `[data-match="L${i}"]`); }
+    p = await panel();
+    check(L("Match the pairs: matching all, from either side, gives Correct"), ok(p, "Correct"), JSON.stringify(p));
+
+    // Replies: choose at first, written later (a subject pronoun may be added)
+    ex = await one("re-u01-z01", 0);
+    check(L("Reply: a new one offers the replies to choose from"), ex.mode === "options" && (await page.$$("[data-opt]")).length === 4);
+    await layout(page, L("Choose the reply"));
+    await page.click('[data-opt="Si chiama Anna."]'); p = await panel();
+    check(L("Reply: a wrong choice gives Not quite with its note"), ok(p, "Not quite") && /You chose Si chiama Anna/.test(p.text), JSON.stringify(p));
+    ex = await one("re-u01-z01", 3);
+    await page.fill("#answer", "Io mi chiamo Anna"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Reply: a written reply with the subject pronoun added gives Correct"), ex.mode === "typed" && ok(p, "Correct"), JSON.stringify(p));
+
+    // Complete the endings
+    ex = await one("en-u01-z01", 1);
+    await layout(page, L("Complete the endings"));
+    check(L("Endings: the first blank has the focus"), (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "fld0");
+    await page.keyboard.type("e"); await page.keyboard.press("Enter");
+    check(L("Endings: Enter moves to the next blank"), (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "fld1");
+    await page.keyboard.type("he"); await page.keyboard.press("Enter"); p = await panel();
+    check(L("Endings: all right gives Correct, and the panel reads the whole sentence"), ok(p, "Correct") && (await page.$eval(".fb-head [data-say]", b => b.dataset.say)) === "Le ragazze sono stanche.", JSON.stringify(p));
+    await one("en-u01-z01", 1);
+    await page.fill("#fld0", "e"); await page.fill("#fld1", "e"); await tap(page, '[data-act="checkFields"]'); p = await panel();
+    check(L("Endings: a wrong ending gives Not quite, with the right one beside it"), ok(p, "Not quite") && (await page.$$(".fldfix")).length === 1, JSON.stringify(p));
+
+    // Listen and type, and Can't listen now
+    ex = await one("s-u01-01", 3, "listen");
+    await layout(page, L("Listen and type"));
+    await page.evaluate(() => { window.__said.length = 0; });
+    await tap(page, ".listen .say"); await page.waitForTimeout(100); await tap(page, ".listen .slowbtn"); await page.waitForTimeout(400); // a new utterance starts 80 ms after the one it stops
+    const heard = await page.evaluate(() => window.__said.slice());
+    check(L("Listen and type: Play reads the sentence, Slow reads it slowly"), heard.length >= 2 && heard[0].text === "Sono stanco." && heard[heard.length - 1].rate === 0.65 && heard[0].rate !== 0.65, JSON.stringify(heard));
+    const before = await page.evaluate(() => JSON.stringify(progress.items[pid("s-u01-01")] || null));
+    await tap(page, '[data-act="noListen"]');
+    const swapped = await page.evaluate(() => ({ listen: !!current().ex.listen, id: current().ex.item.id, no: session.noListen }));
+    check(L("Listen and type: Can't listen now swaps it for another exercise on the same item, at no cost"), !swapped.listen && swapped.id === "s-u01-01" && swapped.no && before === await page.evaluate(() => JSON.stringify(progress.items[pid("s-u01-01")] || null)), JSON.stringify(swapped));
+    ex = await one("s-u01-01", 3, "listen");
+    await page.fill("#answer", "sono stanco"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Listen and type: typing what was heard gives Correct, with the meaning"), ok(p, "Correct"), JSON.stringify(p));
+
+    // Make it plural / singular
+    ex = await one("v-u02-x-dito", 3, "plural");
+    await layout(page, L("Make it plural"));
+    await page.fill("#answer", ex.accepted[0]); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Plural drill: the right form gives Correct"), ok(p, "Correct"), JSON.stringify(p));
+    ex = await one("v-u02-x-dito", 3, "plural");
+    await page.fill("#answer", "i diti"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Plural drill: a wrong form gives Not quite, with the noun's forms"), ok(p, "Not quite") && /il dito · un dito · le dita/.test(p.text), JSON.stringify(p));
+
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+  }
+  console.log("  New exercise types checked");
+}
+
 /* ---------- read aloud ---------- */
 // A stand-in for the phone's speech, run in the page before the app: it lists the given voices, plays each
 // utterance for 300 ms in turn, and records what was read (window.__said) and how often it was stopped.
@@ -324,12 +443,13 @@ async function readAloud(browser, origin) {
     const text = (h) => { const d = document.createElement("div"); d.innerHTML = String(h || "").replace(/</g, " <"); return normalize(d.textContent); };
     const words = (x) => normalize(x).replace(/'/g, "' ").split(" ").filter(Boolean); // l'amico is l' + amico
     const dataWords = (item, ex) => {
-      const own = [item, ex.noun].filter(Boolean).flatMap(i => [i.it, i.forms, i.allForms, i.plural, i.art, i.indef, i.artPl, i.answer, i.alt, i.cloze && i.cloze.text])
+      const own = [item, ex.noun].filter(Boolean).flatMap(i => [i.it, i.forms, i.allForms, i.plural, i.art, i.indef, i.artPl, i.answer, i.alt, i.cloze && i.cloze.text,
+        i.fix, i.line, i.type === "endings" ? endingsFull(i) : null, i.rows && i.rows.map(r => [r.it, r.say]), i.pairs && i.pairs.map(p => i.right === "en" ? p[0] : p)]) // the v8.6 types
         .concat(item.type === "prep" ? [PREP_TABLE[item.it]] : []); // a preposition's merged forms (della, nello…) come from the app's table
       return new Set(words(JSON.stringify(own).replace(/[{}|]/g, " ")).concat(["io", "tu", "lui", "lei", "noi", "voi", "loro", "che"]));
     };
     const keep = [progress.settings.fcDir, progress.settings.flipDir], bad = [], typesRead = new Set();
-    let n = 0, prompts = 0, panels = 0;
+    let n = 0, prompts = 0, panels = 0, listens = 0;
     for (const [fcDir, flipDir] of [["it-en", "IT→EN"], ["en-it", "EN→IT"]]) {
       progress.settings.fcDir = fcDir; progress.settings.flipDir = flipDir;
       for (const item of Object.values(content.items)) for (const box of [0, 1, 3]) for (let k = 0; k < 2; k++) {
@@ -342,6 +462,13 @@ async function readAloud(browser, origin) {
           for (const x of speakable(ex.say)) if (!text(ex.promptHtml).includes(normalize(x))) bad.push(`${where}: reads “${x}”, the prompt shows “${text(ex.promptHtml)}”`);
         }
         for (const x of speakable(ex.sayBack || "")) if (!text(ex.backHtml).includes(normalize(x))) bad.push(`${where}: the back reads “${x}”, it shows “${text(ex.backHtml)}”`);
+        if (ex.listen) { // Listen and type: the one prompt that plays Italian it doesn't show, and it must be the sentence itself
+          listens++;
+          if (ex.say) bad.push(`${where}: a listening exercise also has the ordinary prompt speaker`);
+          if (ex.listen !== arr(item.it)[0]) bad.push(`${where}: plays “${ex.listen}”, not the item's first sentence`);
+          if (text(ex.promptHtml).includes(normalize(ex.listen))) bad.push(`${where}: the sentence to type is shown`);
+          if (!/data-say=/.test(ex.promptHtml) || !/data-rate="slow"/.test(ex.promptHtml)) bad.push(`${where}: a listening exercise needs its play and slow buttons`);
+        }
         const a = sayAnswerOf(ex, { ok: true });
         if (ex.typeKey === "grammar") { if (a) bad.push(`${where}: a rule question's answer is read`); continue; }
         if (!speakable(a).length) { if (ex.mode !== "vintro") bad.push(`${where}: the answer panel has no speaker`); continue; }
@@ -351,9 +478,10 @@ async function readAloud(browser, origin) {
       }
     }
     [progress.settings.fcDir, progress.settings.flipDir] = keep;
-    return { n, prompts, panels, types: [...typesRead].sort().join(", "), bad: [...new Set(bad)] };
+    return { n, prompts, panels, listens, types: [...typesRead].sort().join(", "), bad: [...new Set(bad)] };
   });
   check(`Read aloud: of ${r.n} exercises built from every item, ${r.prompts} prompts read only the Italian they show and ${r.panels} answer panels read only the item's Italian`, !r.bad.length && r.prompts > 1000 && r.panels > 10000, r.bad.slice(0, 8).join("\n") + (r.bad.length > 8 ? `\n… ${r.bad.length} in all` : ""));
+  check(`Read aloud: ${r.listens} Listen and type exercises play the item's own sentence, without showing it`, r.listens > 100, "no listening exercises were built, though the stand-in voice is Italian");
   if (process.env.VERBOSE) console.log("         prompts with a speaker: " + r.types);
 
   // the setting: Off · Normal · Slow
@@ -576,6 +704,9 @@ async function readAloud(browser, origin) {
       await context.close();
       console.log("  Keyboard room checked");
     }
+
+    /* The exercise types added in v8.6 */
+    await newTypes(browser, origin);
 
     /* Read aloud */
     await readAloud(browser, origin);

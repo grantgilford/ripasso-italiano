@@ -148,7 +148,7 @@ async function runSession(page, start, maxSteps = 200) {
       const vis = sel => { const e = document.querySelector(sel); return !!(e && e.offsetParent !== null && !e.disabled); };
       return {
         screen: S.screen, feedback: !!S.feedback, has: Object.fromEntries(["continue", "introDone", "reveal", "gotit", "giveupTable", "giveup", "check"].map(a => [a, vis(`[data-act="${a}"]`)])),
-        opts: vis("[data-opt]"), input: vis("#answer"), bank: vis(".options.bank"),
+        opts: vis("[data-opt]"), input: vis("#answer"), bank: vis(".options.bank"), mode: ex && !S.feedback ? ex.mode : null,
         correct: ex ? String(ex.correct != null ? ex.correct : (Array.isArray(ex.accepted) ? ex.accepted[0] : ex.shownAnswer || "")).replace(/\u0001/g, "") : "",
       };
     });
@@ -158,6 +158,25 @@ async function runSession(page, start, maxSteps = 200) {
     else if (st.has.introDone) await page.click('[data-act="introDone"]');
     else if (st.has.reveal) await page.click('[data-act="reveal"]');
     else if (st.has.gotit) { await page.click(right ? '[data-act="gotit"]' : '[data-act="missed"]'); answered++; }
+    else if (st.mode && ["spot", "sort", "match", "fields"].includes(st.mode)) { // the v8.6 exercise types, answered right or wrong through the screen
+      const ex = await page.evaluate(() => { const e = current().ex; return { mode: e.mode, at: e.at, fix: e.fix, order: e.order, rows: e.item.rows && e.item.rows.map(r => e.item.groups.indexOf(r.group)), n: e.item.pairs ? e.item.pairs.length : 0, blanks: e.cz ? e.cz.blanks.map(b => b[0]) : [], spotAt: S.spotAt }; });
+      if (ex.mode === "spot") {
+        if (ex.spotAt != null) { await page.fill("#answer", right ? [].concat(await page.evaluate(() => current().ex.accepted))[0] : "zzzz"); await page.click('[data-act="check"]'); }
+        else if (!right) await page.click('[data-act="giveup"]');
+        else if (ex.at < 0) await page.click('[data-act="nomistake"]');
+        else { await page.click(`[data-spot="${ex.at}"]`); if (ex.fix) continue; } // the typing step comes next
+      } else if (ex.mode === "sort") {
+        for (const ri of ex.order) await page.click(`[data-sort="${ri}:${right ? ex.rows[ri] : (ex.rows[ri] + 1) % 2}"]`);
+        await page.click('[data-act="checkSort"]');
+      } else if (ex.mode === "match") {
+        if (!right) await page.click(`[data-match="L0"]`), await page.click(`[data-match="R${ex.n - 1}"]`);
+        for (let i = 0; i < ex.n; i++) { await page.click(`[data-match="L${i}"]`); await page.click(`[data-match="R${i}"]`); }
+      } else {
+        for (let i = 0; i < ex.blanks.length; i++) await page.fill(`#fld${i}`, right ? ex.blanks[i] : "zz");
+        await page.click('[data-act="checkFields"]');
+      }
+      answered++;
+    }
     else if (st.has.giveupTable) { // a verb table: fill it in (a failed table comes back until it is right)
       await page.evaluate(() => { const ex = current().ex; for (const p of ex.cells) { const el = document.getElementById("vt" + p); if (el) el.value = [].concat(ex.accepted[p])[0]; } });
       await page.click('[data-act="checkTable"]'); answered++;
