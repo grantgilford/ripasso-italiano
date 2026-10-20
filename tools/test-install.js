@@ -160,7 +160,8 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
     await tap(page, '#n-update [data-act="updateLater"]');
     check("Later hides it for now", !(await page.$("#n-update")));
     await tap(page, '.tab[data-go="you"]'); await tap(page, '[data-go="data"]');
-    check("Your data has an App section with the version", /Version 8\.\d/.test(await page.textContent("#sec-app")) && !!(await page.$('#sec-app [data-act="applyUpdate"]')));
+    const version = await page.evaluate("APP_VERSION"); // the running version, whatever its number
+    check("Your data has an App section with the version", (await page.textContent("#sec-app")).includes("Version " + version) && !!(await page.$('#sec-app [data-act="applyUpdate"]')));
     const progBefore = await stored(page, "itapp.progress.v1");
     await Promise.all([page.waitForNavigation({ timeout: 10000 }), page.click('#sec-app [data-act="applyUpdate"]')]);
     await page.waitForFunction(ready);
