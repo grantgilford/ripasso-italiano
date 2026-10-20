@@ -255,7 +255,7 @@ const FC_POS = new Set(["nm", "nf", "v", "adj", "adv", "pron", "prep", "conj", "
 }
 
 /* ---------- 6. unit notes and the review-unit tags ---------- */
-const REVIEW_TAGS = ["Essere & basics", "Nouns & articles", "Present tense", "Irregular verbs", "Verb tenses", "Adjectives", "Numbers", "Adverbs", "Questions", "Prepositions", "Conjunctions", "Subjunctive", "Object pronouns", "Formal & informal", "Time", "Longer sentences"];
+const REVIEW_TAGS = ["Essere & basics", "Nouns & articles", "Present tense", "Irregular verbs", "Verb tenses", "Adjectives", "Possessives", "Numbers", "Adverbs", "Questions", "Prepositions", "Conjunctions", "Subjunctive", "Object pronouns", "Formal & informal", "Time", "Longer sentences"];
 for (const u of Object.values(units)) {
   if (u.mode) continue;
   const n = arr(u.notes).length;
