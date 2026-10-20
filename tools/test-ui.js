@@ -705,6 +705,18 @@ async function readAloud(browser, origin) {
       console.log("  Keyboard room checked");
     }
 
+    /* English answers: a contraction counts as the words it stands for (the vocab packs' phrases rely on it) */
+    {
+      const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light" });
+      const pairs = [["I am tired", "I'm tired"], ["I do not know", "I don't know"], ["I cannot remember", "I can't remember"], ["it is my turn", "it's my turn"], ["I will call you back", "I'll call you back"], ["you are joking", "you're joking"]];
+      const ok = await page.evaluate(ps => ps.map(([a, b]) => !!checkAnswer(a, [b], { english: true }).ok && !!checkAnswer(b, [a], { english: true }).ok), pairs);
+      check("English answers: a contraction counts as the words it stands for (I'm = I am, don't = do not), both ways", ok.every(Boolean), JSON.stringify(pairs.filter((p, i) => !ok[i])));
+      check("English answers: …while another word is still wrong", !(await page.evaluate(() => checkAnswer("I'm hungry", ["I'm tired"], { english: true }).ok)));
+      check("English answers: no script errors", !page.errors.length, page.errors.join("\n"));
+      await context.close();
+      console.log("  English contractions checked");
+    }
+
     /* The exercise types added in v8.6 */
     await newTypes(browser, origin);
 
