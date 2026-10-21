@@ -90,8 +90,14 @@ const BUDGETS = {
   "buildSession wild": 81,
   "buildSession hard": 55,
   "buildSession mistakes": 31,
-  "pushProgress (fake db)": 225,
-  "adoptRemote (fake db)": 932,
+  // the sync figures, set at 9.4 (dirty tracking and the record-by-record merge) in the same way; the push after an echo
+  // takes well under a millisecond, so its budget leaves room for the timer's own granularity
+  "pushProgress (fake db)": 94,
+  "adoptRemote (fake db)": 166,
+  "pushProgress after an answer": 23,
+  "Snapshot: the echo of own writes": 43,
+  "pushProgress after the echo": 3,
+  "Snapshot: another device's changes": 160,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work may keep
