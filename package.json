@@ -1,0 +1,14 @@
+{
+  "name": "ripasso-italiano-tools",
+  "private": true,
+  "description": "The checks and tests for Ripasso Italiano. The app itself is index.html and needs none of this.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "check": "node tools/check-content.js",
+    "test": "node tools/check-content.js && node tools/test-progress.js && node tools/test-ui.js && node tools/test-install.js && node tools/test-perf.js",
+    "test:items": "node tools/test-items.js"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
+}

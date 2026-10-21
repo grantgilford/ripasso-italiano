@@ -22,10 +22,8 @@
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
 "use strict";
-const fs = require("fs");
 const path = require("path");
-const http = require("http");
-const { execSync } = require("child_process");
+const { loadPlaywright, serveApp } = require("./lib/browser");
 
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
@@ -35,18 +33,10 @@ const units = args.filter((a, i) => !a.startsWith("--") && !["--repeats", "--ids
 const file = path.resolve(args.find(a => a.endsWith(".html")) || path.join(__dirname, "..", "index.html"));
 if (!units.length && !extraIds.length) { console.log("Usage: node tools/test-items.js u19 [u17 …] [--ids id1,id2] [--repeats 4]"); process.exit(1); }
 
-function loadPlaywright() {
-  try { return require("playwright"); } catch (e) { }
-  try { return require(path.join(execSync("npm root -g").toString().trim(), "playwright")); } catch (e) { }
-  console.error("Playwright is not installed. Install it with: npm install -g playwright");
-  process.exit(2);
-}
 const { chromium } = loadPlaywright();
 
 (async () => {
-  const html = fs.readFileSync(file);
-  const server = http.createServer((req, res) => { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); });
-  await new Promise(r => server.listen(0, "127.0.0.1", r));
+  const server = await serveApp(file);
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   const errors = [];

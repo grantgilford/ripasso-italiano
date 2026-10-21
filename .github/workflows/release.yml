@@ -1,0 +1,38 @@
+# Marks each released version: when main changes (a pull request is merged), GitHub reads APP_VERSION
+# from index.html and, if there is no tag v<version> yet, tags that commit with it. The tags list on
+# GitHub then shows exactly which commit each version came from (v7.2, the safety net, was tagged by hand).
+name: Tag release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write # to push the tag
+
+concurrency:
+  group: tag-release
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag the version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Tag v<APP_VERSION> if it doesn't exist
+        run: |
+          version=$(sed -n 's/^const APP_VERSION = "\([^"]*\)";.*/\1/p' index.html | head -n 1)
+          if [ -z "$version" ]; then echo "::error::Couldn't find const APP_VERSION = \"…\"; in index.html"; exit 1; fi
+          tag="v$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "$tag already exists; nothing to do."
+            exit 0
+          fi
+          line=$(grep -m 1 -F -- "- **$version**" CHANGELOG.md || true)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$tag" -m "Ripasso $version" -m "${line:-See CHANGELOG.md.}" "$GITHUB_SHA"
+          git push origin "refs/tags/$tag"
+          echo "Tagged $GITHUB_SHA as $tag."

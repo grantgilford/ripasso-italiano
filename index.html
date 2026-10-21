@@ -6599,6 +6599,7 @@ const ICON = { // 24-unit stroke icons, as drawn in docs/design/mockups
   download: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14"/>',
   layers: '<path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5M4 16.5l8 4.5 8-4.5"/>',
   speaker: '<path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.7 7.7 0 0 1 0 11"/>',
+  sparkle: '<path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/>', // What's new (v9.1), in the same style
 };
 function icon(name, size = 22, stroke = 1.8) { return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[name]}</svg>`; }
 function logo(size) { return `<svg class="ico logo" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="23" fill="#0F6B4B"/><path d="M31 32 L45 68" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" fill="none"/><path d="M55 32 L69 68" stroke="#EF4B55" stroke-width="13" stroke-linecap="round" fill="none"/></svg>`; }
@@ -6614,6 +6615,12 @@ function applyTheme(v) {
   } catch (e) { }
 }
 function setTheme(v) { lsSet(LS_THEME, v); applyTheme(v); render(); }
+// What's new: after the app's version changes, Today shows the new version's CHANGES (beside APP_VERSION) until Got it is tapped,
+// in every copy. The version last seen is kept per device in its own key, never in progress, like Appearance, so it neither syncs
+// nor touches the progress formats. A device with no progress yet starts with the current version seen (see boot): nothing is new to it.
+const LS_SEEN = "itapp.seen.v1";
+const whatsNewDue = () => !S.newSeen && !!CHANGES && lsGet(LS_SEEN) !== APP_VERSION;
+function markSeen() { S.newSeen = true; lsSet(LS_SEEN, APP_VERSION); } // remembered for this visit even if the device refuses to save
 /* Read aloud: the Italian is spoken by the device's own voice (the browser's speech synthesis), only when a speaker is tapped;
    nothing is recorded or downloaded and nothing plays by itself. The setting (Off · Normal · Slow) is kept per device in its own key,
    never in progress, like Appearance, since each phone has its own voices. Where the browser can't speak (the Android WebView inside
@@ -7397,6 +7404,7 @@ function action(a) {
     case "shareProgress": case "backupNow": backupNow(); break;
     case "backupLater": setBackupInfo({ snooze: now() + 3 * 864e5 }); render(); break;
     case "welcomeDone": setBackupInfo({ welcomed: true }); render(); break;
+    case "newSeen": markSeen(); render(); break;
     case "stay": S.leaveAsk = false; render(); break;
     case "applyUpdate": applyUpdate(); break;
     case "updateLater": S.updateLater = true; render(); break;
@@ -7642,17 +7650,18 @@ function protectStorage() {
   navigator.storage.persisted().then(p => p || navigator.storage.persist()).then(p => { S.persisted = !!p; if (S.screen === "data") render(); }).catch(() => { });
 }
 
-// One card at a time on Today, the most urgent first: progress couldn't be saved, an update, the first-run welcome, a backup reminder.
+// One card at a time on Today, the most urgent first: progress couldn't be saved, an update, the first-run welcome, a backup reminder, What's new.
 function noticeHtml() {
   const card = (id, ic, title, text, buttons) => `<section class="card notice" id="${id}" aria-labelledby="${id}-t"><h2 class="label notice-h" id="${id}-t">${icon(ic, 20, 2)}<span>${title}</span></h2><p class="small muted">${text}</p><div class="btnrow">${buttons}</div></section>`;
   if (S.saveFailed) return card("n-save", "info", "Progress couldn't be saved", "This device refused to save your latest answers. Back up now so nothing is lost, then free some space on the phone.", `<button type="button" class="primary" data-act="backupNow">Back up now</button>`);
   if (S.update && !S.updateLater) return card("n-update", "review", `Ripasso ${esc(S.update.version || "")} is ready`, "A new version has been downloaded. Updating takes a second and keeps all your progress.", `<button type="button" class="primary" data-act="applyUpdate">${S.applying ? "Updating…" : "Update now"}</button><button type="button" data-act="updateLater">Later</button>`);
-  if (!HOSTED) return "";
+  const news = whatsNewDue() ? card("n-new", "sparkle", `What's new in ${esc(APP_VERSION)}`, esc(CHANGES), `<button type="button" class="primary" data-act="newSeen">Got it</button>`) : ""; // in every copy
+  if (!HOSTED) return news;
   const b = backupInfo(), practised = Object.keys(progress.items).length > 0;
   if (!practised && !b.welcomed && !b.at) return card("n-welcome", "you", "New on this device?", "If you've practised in another copy of Ripasso, such as the claude.ai one, load its backup file to bring your progress here.", `<button type="button" class="primary" data-go="data" data-to="sec-backup">Load a backup</button><button type="button" data-act="welcomeDone">Start fresh</button>`);
   const due = practised && (progress.updatedAt || 0) > (b.at || 0) && now() - (b.at || 0) > 7 * 864e5 && now() > (b.snooze || 0);
   if (due) return card("n-backup", "download", "Back up your progress", `Your progress is kept only on this phone. ${b.at ? "Your last backup was " + ago(b.at) + "." : "You haven't made a backup yet."}`, `<button type="button" class="primary" data-act="backupNow">Back up now</button><button type="button" data-act="backupLater">Later</button>`);
-  return "";
+  return news;
 }
 
 /* the offline worker and updates (sw.js) */
@@ -7728,9 +7737,11 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.0";
+const APP_VERSION = "9.1";
+const CHANGES = "After each update, a card like this one tells you what's new. Behind the scenes, GitHub now tests every change automatically before it reaches you."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
 loadLocal();
+if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new
 buildContent();
 saveProgress(false);
 render();

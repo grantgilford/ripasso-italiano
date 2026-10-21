@@ -15,8 +15,8 @@
        opens, with its progress;
     3. a new index.html on the website is downloaded and offered on Today as
        "Update now", never during a session; Later hides it; Update now
-       switches to the new version and keeps all progress; Check for updates
-       in Your data works;
+       switches to the new version and keeps all progress (and Today then
+       says What's new in it); Check for updates in Your data works;
     4. the back button steps back through the screens (Units, You, Settings,
        a unit, the summary), and in a session first asks "Leave this
        session?" (Keep practising stays, Leave goes to Today); on Today the
@@ -34,35 +34,21 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
-const { execSync } = require("child_process");
+const { loadPlaywright, serve: listen, checks } = require("./lib/browser");
 
 const HEADED = process.argv.includes("--headed");
 const ROOT = path.join(__dirname, "..");
 const BASE = "/ripasso-italiano/";
 
-function loadPlaywright() {
-  try { return require("playwright"); } catch (e) { }
-  try { return require(path.join(execSync("npm root -g").toString().trim(), "playwright")); } catch (e) { }
-  console.error("Playwright is not installed. Install it with: npm install -g playwright");
-  process.exit(2);
-}
 const { chromium } = loadPlaywright();
 
-let failures = 0;
-const results = [];
-function check(name, ok, detail) {
-  results.push({ name, ok });
-  if (!ok) failures++;
-  console.log(`${ok ? "  ok  " : "  FAIL"} ${name}${!ok && detail ? "\n         " + String(detail).replace(/\n/g, "\n         ") : ""}`);
-}
-const section = (t) => console.log("\n" + t);
+const results = checks(), { check, section } = results;
 
 /* ---------- a stand-in for GitHub Pages: the repository under /ripasso-italiano/, which can be taken down or given a new index.html ---------- */
 const site = { down: false, html: fs.readFileSync(path.join(ROOT, "index.html"), "utf8"), hits: [] };
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".webmanifest": "application/manifest+json", ".png": "image/png", ".json": "application/json" };
 function serve() {
-  const server = http.createServer((req, res) => {
+  return listen((req, res) => {
     const url = new URL(req.url, "http://x");
     site.hits.push(url.pathname);
     if (site.down) { res.writeHead(503); res.end("down"); return; }
@@ -73,8 +59,7 @@ function serve() {
     if (!file.startsWith(ROOT) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
     res.writeHead(200, { "content-type": TYPES[path.extname(file)] || "application/octet-stream", "cache-control": "max-age=600" });
     res.end(fs.readFileSync(file));
-  });
-  return new Promise(r => server.listen(0, () => r(server)));
+  }, null); // every address, as http://localhost/ may be either 127.0.0.1 or ::1
 }
 
 const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefined' && (S.screen === 'home' || S.screen === 'data')";
@@ -219,6 +204,7 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
     const dlText = dl ? fs.readFileSync(await dl.path(), "utf8") : "";
     check("…holding the progress", dlText && JSON.parse(dlText).items && Object.keys(JSON.parse(dlText).items).length === 30);
     check("…and the time is recorded, so the reminder goes", (await stored(page, "itapp.backup.v1")).at > Date.now() - 60e3 && !(await page.$("#n-backup")));
+    check("…and Today moves on to What's new in the version just installed", /What's new in 9\.9-test-/.test(await page.evaluate(() => (document.getElementById("n-new") || {}).textContent || "")));
 
     // Sharing, as on Android: a stand-in share menu that keeps the file
     await page.evaluate(() => {
@@ -271,12 +257,10 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
       await c2.close();
     }
   } catch (e) {
-    failures++;
-    console.log("\n  FAIL the test itself stopped: " + (e && e.stack || e));
+    results.stopped(e);
   } finally {
     await browser.close();
     server.close();
   }
-  console.log(failures ? `\n${failures} check(s) failed.` : `\nAll ${results.length} checks passed.`);
-  process.exit(failures ? 1 : 0);
+  results.summary();
 })();

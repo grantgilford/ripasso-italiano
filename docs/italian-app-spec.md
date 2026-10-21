@@ -1,5 +1,7 @@
 # Italian Practice App: Build Spec (Draft v0.1)
 
+> **Kept for history.** This is the original build spec, written before the first version of the app; the app has changed a great deal since (it is now Ripasso Italiano). Where this spec disagrees with the content guide (`docs/italian-app-content-guide.md`), the design system (`docs/design-system.md`) or the catalogue of exercise types (`docs/exercise-types.md`), those documents win. `CLAUDE.md` describes how work is done now.
+
 Owner: Grant Gilford. Purpose: personal study tool, not a commercial product.
 
 ## 1. Goal and principles
@@ -16,7 +18,7 @@ Design principles, in priority order:
 
 ## 2. Learner profile
 
-A single user who speaks English, is roughly A1 level (a few weeks in), and studies alongside Duolingo, podcasts, and *Collins Easy Learning Italian Grammar*. Units should follow the Collins chapter order where practical, so the app reinforces what's being read.
+A single user who speaks English, is roughly A1 level (a few weeks in), and studies alongside Duolingo, podcasts, and *Collins Easy Learning Italian Grammar*.
 
 ## 3. Platform and technical constraints
 
@@ -34,7 +36,7 @@ A single user who speaks English, is roughly A1 level (a few weeks in), and stud
 
 **Course → Units → Items → Exercises.**
 
-A **unit** is a topic (for example "Nouns, gender & articles") tagged with its Collins chapter. An **item** is one piece of content: a word, verb, sentence, or grammar question. **Exercises are generated automatically from items**, so content authors write only items and the app decides how to test them (see section 6).
+A **unit** is a topic (for example "Nouns, gender & articles"). An **item** is one piece of content: a word, verb, sentence, or grammar question. **Exercises are generated automatically from items**, so content authors write only items and the app decides how to test them (see section 6).
 
 All units are open. The home screen suggests the next unit in order, but nothing is locked.
 
@@ -116,7 +118,7 @@ XP: +2 for a correct production answer, +1 for a correct recognition answer, +5 
 | Screen | Contents |
 |---|---|
 | Home | Streak and today's XP, Continue button (shows unit name), Review (N due), Mistakes (N), links to Units, Stats, Settings |
-| Units | List of units in order with Collins chapter, % learned, item count |
+| Units | List of units in order, % learned, item count |
 | Session | Progress counter ("7 / 12"), prompt, input or options, feedback bar. Nothing else on screen |
 | Summary | Accuracy, XP, promotions, missed items with answers |
 | Stats | Total learned, due today and this week, accuracy over the last 7 and 30 days, most-lapsed items |

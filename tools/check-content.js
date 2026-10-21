@@ -17,6 +17,7 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
+const { BOOT_MARK, inlineScripts, loadApp } = require("./lib/load-app");
 
 const args = process.argv.slice(2);
 const VERBOSE = args.includes("--verbose");
@@ -34,8 +35,7 @@ const count = (k, n = 1) => (stats[k] = (stats[k] || 0) + n);
 // One inline script is the app (it holds the boot section). Any other inline script must be a
 // small start-up snippet, such as the one in <head> that applies the Appearance setting before
 // the first paint; it must parse too.
-const BOOT_MARK = "/* ---------- boot ---------- */";
-const scripts = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+const scripts = inlineScripts(html);
 const appScripts = scripts.filter(s => s.includes(BOOT_MARK));
 if (appScripts.length !== 1) problem("Structure", `expected one inline app <script> (the one with the boot section), found ${appScripts.length}`);
 for (const s of scripts.filter(s => !s.includes(BOOT_MARK))) {
@@ -50,21 +50,10 @@ const srcTags = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]
 for (const s of srcTags) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(s)) problem("Structure", `script loaded from outside cdnjs: ${s}`);
 
 /* ---------- 2. load the content (and a few of the app's own helpers) ---------- */
-const boot = code.indexOf("/* ---------- boot ---------- */");
-if (boot < 0) { console.error("Could not find the boot section in the script; the loader needs updating."); process.exit(1); }
-const exportsExpr = "({ BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, getContent: () => content })";
+const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, getContent: () => content";
 const appVersion = (code.match(/const APP_VERSION = "([^"]+)"/) || [])[1];
-const noop = () => {};
-const stubEl = () => ({ addEventListener: noop, appendChild: noop, setAttribute: noop, style: {}, classList: { add: noop, remove: noop, toggle: noop } });
-const sandbox = {
-  console, setTimeout: noop, clearTimeout: noop, setInterval: noop,
-  localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
-  document: { addEventListener: noop, createElement: stubEl, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], body: stubEl(), documentElement: stubEl() },
-  navigator: { userAgent: "node" }, location: { hash: "" }, matchMedia: () => ({ matches: false, addEventListener: noop }),
-};
-sandbox.window = sandbox; sandbox.addEventListener = noop; sandbox.removeEventListener = noop;
 let app;
-try { app = vm.runInNewContext(code.slice(0, boot) + "\n;" + exportsExpr, sandbox, { filename: "index.html <script>" }); }
+try { app = loadApp(exportsExpr, { html }); } // stops with a message if the boot section is missing
 catch (e) { console.error("Could not load the app's content:\n" + e.stack); process.exit(1); }
 app.buildContent();
 const content = app.getContent();
@@ -577,6 +566,26 @@ for (const it of allItems.filter(i => i.type === "verb").concat(vgCheckItems)) {
       if (!/(ando|endo)$/.test(ger)) look("Progressive forms with an unusual gerund", `${where} ${t}: “${ger}”`);
     }
   }
+}
+
+/* ---------- 10. release notes: CHANGES and CHANGELOG.md ---------- */
+// Every version says what changed twice: in CHANGES beside APP_VERSION, shown once on Today as What's new (so one or two
+// plain sentences), and in its line at the top of CHANGELOG.md (newest first).
+{
+  const changes = (code.match(/^const CHANGES = ("(?:[^"\\]|\\.)*");/m) || [])[1];
+  if (changes == null) problem("Release notes", "no const CHANGES = \"…\"; beside APP_VERSION (What's new on Today)");
+  else {
+    const text = String(vm.runInNewContext(changes)).trim();
+    const sentences = text.split(/(?<=[.!?])\s+/).filter(Boolean).length;
+    if (!text) problem("Release notes", "CHANGES is empty: say in a sentence or two what this version changes");
+    else if (sentences > 2 || text.length > 280) problem("Release notes", `CHANGES should be one or two plain sentences (it has ${sentences} sentences, ${text.length} characters)`);
+    if (/[<>]/.test(text)) problem("Release notes", "CHANGES is plain text, without HTML");
+  }
+  const logFile = [path.join(path.dirname(file), "CHANGELOG.md"), path.join(__dirname, "..", "CHANGELOG.md")].find(f => fs.existsSync(f));
+  const versions = logFile ? [...fs.readFileSync(logFile, "utf8").matchAll(/^- \*\*([^*]+)\*\*/gm)].map(m => m[1]) : [];
+  if (!logFile) problem("Release notes", "no CHANGELOG.md beside index.html");
+  else if (versions[0] !== appVersion) problem("Release notes", `the newest line in CHANGELOG.md is for ${versions[0] || "no version"}, not ${appVersion}: add this version's line at the top`);
+  else if (new Set(versions).size !== versions.length) problem("Release notes", "CHANGELOG.md has two lines for the same version");
 }
 
 /* ---------- report ---------- */
