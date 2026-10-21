@@ -2,6 +2,7 @@
 
 Every version of Ripasso since v7.2 (the known-good starting point), newest first, one line each. On GitHub each version is marked by a tag, `v` and its number; from 9.1 the tag is added automatically when the version reaches `main`.
 
+- **9.2** (2026-10-21): No change in the app: its content is laid out one entry per line, so pull requests show content changes line by line, with new tools to confirm the content is unchanged, to edit and remove items, and to measure the variety of exercises in each unit.
 - **9.1** (2026-10-21): A "What's new" card on Today after each update, automatic checks on GitHub for every pull request, a speed test, a tag for each version, and this changelog.
 - **9.0** (2026-10-20): A new Vocab pack 7 of 1,000 upper-intermediate words, between packs 6 and 8; the old pack 7 becomes pack 8.
 - **8.9** (2026-10-20): The Possessives unit grows by 80% (110 new exercises), with a new lesson section on longer phrases.

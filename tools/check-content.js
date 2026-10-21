@@ -588,6 +588,17 @@ for (const it of allItems.filter(i => i.type === "verb").concat(vgCheckItems)) {
   else if (new Set(versions).size !== versions.length) problem("Release notes", "CHANGELOG.md has two lines for the same version");
 }
 
+/* ---------- 11. layout: one entry per line ---------- */
+// The content constants are laid out one unit, item, note, lesson section, verb and alias per line
+// (tools/format-content.js), so a pull request shows a change as the lines it changes, and
+// add-items and edit-items, which write that layout, change only the lines they mean to.
+try {
+  const layout = require("./lib/content-source");
+  for (const name of layout.contentNames(html)) {
+    if (layout.findLiteral(html, name).text !== layout.formatConstant(name, layout.parseLiteral(html, name))) problem("Layout", `${name} is not laid out one entry per line: run node tools/format-content.js`);
+  }
+} catch (e) { problem("Layout", e.message); }
+
 /* ---------- report ---------- */
 const LIMIT = 40;
 function printGroup(title, group) {
