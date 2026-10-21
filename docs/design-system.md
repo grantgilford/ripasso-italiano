@@ -312,9 +312,9 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
   - `.lex` and `.dlg` entries with the Italian in DM Sans 500 and the English muted;
   - `.lfix` "wrong → right" pairs must carry a ✕ and ✓ (or "Not:" and "Say:" labels) as well as red and green;
   - `.xref` links in `--accent`.
-- **Glossary tab:** the filter field as an input (section 7), then the existing groups (Verbs, Nouns, …) each in a card. The box tags (`box 3`, `box 5 ✓`) become small `--tint` pills.
+- **Glossary tab:** the filter field as an input (section 7), then the existing groups (Verbs, Nouns, …) each in a card. The box tags (`box 3`, `box 5 ✓`) become small `--tint` pills. Typing in the filter redraws only the groups under it, once typing pauses (from 9.3), so the field keeps its cursor and the keyboard stays up.
 - **Practise this unit:** a primary button at the end of both tabs (`data-unit`).
-- **Verbs reference:** the same frame.
+- **Verbs reference:** the same frame. Each verb is a row (`details.vref`) that opens to its tables; the tables are drawn when the row is opened (from 9.3), and a filter opens, and draws, the rows it leaves.
 
 ### 8.5 Practice session (`renderSession`), see `mockups/exercise-wrong-*.html`
 
@@ -347,7 +347,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 
 The same content, in the new frame:
 - **Rules:** each unit's rule sheet in a card with a Title S heading.
-- **Look up:** a large search field at the top (sticky), with each hit as a card row (Italian, English, unit name muted).
+- **Look up:** a large search field at the top (sticky), with each hit as a card row (Italian, English, unit name muted). The results (`#lookupResults`, a `.results` wrapper laid out with `display: contents`) are redrawn on their own once typing pauses (150 ms, from 9.3), so the field keeps its cursor and the keyboard stays up.
 
 ### 8.8 You (**new screen**), see `mockups/you-*.html`
 

@@ -169,8 +169,8 @@ async function tour(page, label, opts = {}) {
   check(L("the Rules tab opens Rules"), (await screen(page)) === "rules" && (await page.$$(".rule")).length > 10);
   await layout(page, L("Rules"), opts);
   await tap(page, '.tab[data-go="lookup"]');
-  await page.fill("#lookupBox", "andare"); await page.waitForTimeout(100);
-  check(L("Look up finds andare"), (await screen(page)) === "lookup" && (await page.$$(".hit")).length > 0);
+  await page.fill("#lookupBox", "andare"); await page.waitForSelector("#lookupResults .hit", { timeout: 3000 }).catch(() => { }); // results come once typing pauses
+  check(L("Look up finds andare, and the search box keeps the focus"), (await screen(page)) === "lookup" && (await page.$$(".hit")).length > 0 && (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "lookupBox");
   await layout(page, L("Look up"), opts);
   // You and its sub-screens
   await tap(page, '.tab[data-go="you"]');
@@ -397,7 +397,8 @@ async function readAloud(browser, origin) {
   await page.waitForTimeout(2000);
   const all = (await said(page)).map(x => x.text);
   check("Read aloud: a verb table is read one person at a time (io …, tu …)", table.length === 1 && /^io \S/.test(table[0]) && all.length === 6 && /^tu \S/.test(all[1]), all.join(" | "));
-  await page.evaluate(() => { S.refUnit = "vb"; render(); });
+  await page.evaluate(() => { S.refUnit = "vb"; render(); [...document.querySelectorAll("details.vref")].slice(0, 12).forEach(d => { d.open = true; }); }); // a verb's tables are drawn when its row opens
+  await page.waitForTimeout(100);
   const cmd = await page.evaluate(() => { const d = document.createElement("div"); d.innerHTML = vgTableHtml(vgItem("andare", "imperativo"), "imperativo"); const b = d.querySelector(".conj > .say"); return b && speakable(conjRead(b)).join(" | "); });
   check("Read aloud: in the Verbs section, commands are read bare (va', vada, andiamo…, no “tu va'”)", cmd === "va' | vada | andiamo | andate | vadano", cmd);
   const subj = await page.evaluate(() => { const b = [...document.querySelectorAll(".conj > .say")].find(x => /^che io /.test(conjRead(x))); return b && conjRead(b); });
@@ -503,10 +504,11 @@ async function readAloud(browser, origin) {
     const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light", init: fakeSpeech(null) });
     await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
     const lessonSpeakers = (await page.$$(".say, [data-say]")).length;
-    await page.evaluate(() => { S.refUnit = "vb"; S.screen = "reference"; render(); });
-    const verbSpeakers = (await page.$$(".say, [data-say]")).length;
+    await page.evaluate(() => { S.refUnit = "vb"; S.screen = "reference"; render(); [...document.querySelectorAll("details.vref")].slice(0, 12).forEach(d => { d.open = true; }); });
+    await page.waitForTimeout(100);
+    const verbSpeakers = (await page.$$(".say, [data-say]")).length, verbTables = (await page.$$("details.vref .conjtable")).length;
     await page.evaluate(() => startSession("unit", "fc01"));
-    check("No speech: no speakers are drawn, in a lesson, the verb tables or a session", lessonSpeakers === 0 && verbSpeakers === 0 && (await page.$$(".say, [data-say]")).length === 0);
+    check("No speech: no speakers are drawn, in a lesson, the verb tables or a session", lessonSpeakers === 0 && verbTables > 0 && verbSpeakers === 0 && (await page.$$(".say, [data-say]")).length === 0);
     await page.evaluate(() => { session = null; S.screen = "you"; render(); });
     check("No speech: You says read aloud isn't available in this browser", /Not available/.test(await page.$eval("#readaloud-row", e => e.textContent)) && !(await page.$("[data-audio]")));
     check("No speech: no script errors", !page.errors.length, page.errors.join("\n"));

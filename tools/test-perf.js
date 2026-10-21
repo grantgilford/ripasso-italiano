@@ -10,62 +10,90 @@
   grammar units, vocab packs 1–3 and the Verbs section) and 45 days of daily log, reloads, and times:
 
     - a reload, until Today is drawn;
-    - buildContent(), and a cold knownWords() (the word lists the typo rule uses);
+    - after the reload, the word lists the typo rule uses (knownWords), built in idle time: how long
+      after Today they are ready, and the longest slice of that work (it must stay under 50 ms, so a
+      tap is never kept waiting longer);
+    - buildContent(), a cold knownWords() (the word lists built all at once, as an answer that needs
+      them before they are ready does), and the counts Today, Units, Stats and You show, worked out
+      afresh (as after an answer or a sync);
     - drawing Today, Units, Stats, You, the Verb tenses unit's Lesson and Glossary, the Verbs
-      reference and Vocab pack 1's glossary (1,000 cards), each until the layout is done;
-    - typing "casa" into Look up, one keystroke at a time (c, ca, cas, casa);
+      reference and Vocab pack 1's glossary (1,000 cards), each until the layout is done, with the
+      counts already worked out (a visit to a screen that is no longer the first since a change);
+    - opening a verb in the Verbs reference (its tables are drawn then);
+    - typing "casa" into Look up, one keystroke at a time (c, ca, cas, casa), each until its results
+      are drawn (leaving out the pause the app waits for typing to stop): "ca" is the first search
+      since buildContent, typed the moment Look up opens, so it includes building the search index;
+      then "ca" again in Look up opened afresh, once the idle moment after opening has built it;
+    - typing "andare" into the Verbs filter, and "casa" into the 1,000-card glossary's filter, each
+      all at once;
     - buildSession for every kind of session (the mean of 5, as each takes only milliseconds);
     - with a stand-in for the cloud database, one pushProgress (everything written) and one
       adoptRemote (another device's newer copy merged in, with Today redrawn).
 
-  Each figure is the median of 7 runs (3 for the reload), in milliseconds. The app's random
+  Each figure is the median of 7 runs (3 for the reload and the idle work), in milliseconds. The app's random
   choices (which items a session takes, which exercise each becomes) come from a fixed seed while
   it is timed, so every run of the test does the same work. It prints a table and fails when a
   figure is over its budget in BUDGETS below; --new-budgets also prints a BUDGETS table of this
   run's figures plus 25%, ready to paste.
 
   The figures depend on the computer, so this test is part of npm test but not of the GitHub
-  workflow (shared runners vary in speed). Changes nothing in index.html. Exits with code 1 if a
-  figure is over budget or a script error occurs.
+  workflow (shared runners vary in speed). It also runs on an older index.html (9.2 or before, which
+  had no idle work, no counts cache and no pause in typing), leaving out the figures it can't take,
+  so the same table can show before and after. Changes nothing in index.html. Exits with code 1 if a
+  figure is over budget or missing, or a script error occurs.
 */
 "use strict";
 const path = require("path");
 const { loadPlaywright, serveApp } = require("./lib/browser");
+const { seedProgress } = require("./lib/seed");
 
 /* ---------- budgets, in milliseconds ----------
-   Set when the test was written (version 9.1, in a Claude Code cloud session): each figure's median over
-   three runs of the test, plus 25%. When a change makes something faster, run the test a few times and
-   lower its budget to the new figure plus 25% (--new-budgets prints them); raise one only for a reason
-   worth writing down. If every figure is over by about the same amount, the computer is probably slower
-   than the one the budgets were set on: run the test on the previous version too (for example
-   git show v9.1:index.html > /tmp/old.html, then node tools/test-perf.js /tmp/old.html) to compare. */
+   Set at version 9.3, when the app was made faster (in a Claude Code cloud session): each figure's slowest of five runs
+   of the test, plus 25% (the runs on that computer varied by about a fifth, so the median plus 25% would fail now and
+   then with nothing changed), or the 9.1 budget where that was lower; "Idle work: longest slice" is a limit, not a
+   measurement (FIXED below). When a change makes something faster, run the test a few times and lower its budget to
+   the new figure plus 25% (--new-budgets prints them); raise one only for a reason worth writing down. If every figure
+   is over by about the same amount, the computer is probably slower than the one the budgets were set on: run the
+   test on the previous version too (for example git show v9.2:index.html > /tmp/old.html, then
+   node tools/test-perf.js /tmp/old.html) to compare. */
 const BUDGETS = {
-  "Reload to Today": 3534,
-  "buildContent()": 1128,
-  "knownWords(), cold": 2632,
-  "Draw Today": 318,
-  "Draw Units": 239,
-  "Draw Stats": 257,
-  "Draw You": 67,
+  "Reload to Today": 2027,
+  "Word lists ready, after Today": 6772,
+  "Idle work: longest slice": 50,
+  "buildContent()": 283,
+  "knownWords(), cold": 2543,
+  "Counts, worked out": 93,
+  "Draw Today": 18,
+  "Draw Units": 38,
+  "Draw Stats": 34,
+  "Draw You": 26,
   "Draw Verb tenses lesson": 290,
-  "Draw Verb tenses glossary": 939,
-  "Draw Verbs reference": 2132,
-  "Draw a 1,000-card glossary": 798,
-  "Look up: c": 13,
+  "Draw Verb tenses glossary": 832,
+  "Draw Verbs reference": 544,
+  "Draw a 1,000-card glossary": 739,
+  "Open a verb in the Verbs reference": 165,
+  "Verbs filter: andare": 199,
+  "1,000-card glossary filter: casa": 107,
+  "Look up: c": 3,
   "Look up: ca": 1055,
-  "Look up: cas": 1153,
-  "Look up: casa": 1109,
+  "Look up: cas": 78,
+  "Look up: casa": 89,
+  "Look up: ca, a moment after opening": 73,
   "buildSession continue": 16,
-  "buildSession unit": 15,
-  "buildSession review": 117,
+  "buildSession unit": 13,
+  "buildSession review": 111,
   "buildSession flashcards": 76,
   "buildSession verbs": 54,
-  "buildSession wild": 100,
+  "buildSession wild": 81,
   "buildSession hard": 55,
-  "buildSession mistakes": 32,
+  "buildSession mistakes": 31,
   "pushProgress (fake db)": 225,
-  "adoptRemote (fake db)": 1922,
+  "adoptRemote (fake db)": 932,
 };
+
+// Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work may keep
+// a tap waiting longer than this (the usual threshold for a "long task").
+const FIXED = { "Idle work: longest slice": 50 };
 
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
@@ -75,35 +103,6 @@ const CPU_SLOWDOWN = 4, RUNS = 7, RELOADS = 3;
 const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefined' && S.screen === 'home'";
 
 const { chromium } = loadPlaywright();
-
-// Saved practice on a well-used device: ~3,000 grammar records spread evenly over every grammar unit, all of
-// Vocab pack 1, most of pack 2 and half of pack 3 (cards arrive in order), the first 1,200 Verbs section
-// tenses, and 45 days of log. Built from a fixed seed, so every run saves the same progress.
-function seedProgress() {
-  let s = 20261021; const rnd = () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  const T = Date.now(), D = 864e5;
-  const own = (u) => (content.byUnit[u] || []).filter(i => !content.canon[i.id]).map(i => i.id); // one record per shared exercise
-  const spread = (ids, n) => { const step = ids.length / n; return Array.from({ length: Math.min(n, ids.length) }, (_, k) => ids[Math.floor(k * step)]); };
-  const grammar = content.units.filter(u => !u.mode).flatMap(u => own(u.id));
-  const pack = (title) => own(content.units.find(u => u.title === title).id);
-  const ids = [...spread(grammar, 3000), ...pack("Vocab pack 1"), ...pack("Vocab pack 2").slice(0, 900), ...pack("Vocab pack 3").slice(0, 500), ...own("vb").slice(0, 1200)];
-  const items = {};
-  for (const id of ids) {
-    const box = 1 + Math.floor(rnd() * rnd() * 7.99), lastSeen = T - Math.floor(rnd() * 45 * D);
-    const lapses = rnd() < 0.18 ? 1 + Math.floor(rnd() * 3) : 0, wrong = lapses && rnd() < 0.5;
-    items[id] = { box, due: lastSeen + [0, 1, 2, 4, 8, 16, 32, 64][box] * D * (0.6 + rnd()), lapses, lastSeen, lastWrong: wrong ? lastSeen : lapses ? lastSeen - 3 * D : 0, seenCount: box + 2 * lapses + Math.floor(rnd() * 4), lastRight: wrong ? 0 : lastSeen };
-  }
-  const days = {};
-  for (let d = 0; d < 45; d++) {
-    const n = 20 + Math.floor(rnd() * 60);
-    days[dayKey(T - d * D)] = { xp: n, new: Math.floor(rnd() * 15), cards: Math.floor(rnd() * 30), t: { recall: [Math.floor(n / 3), Math.floor(n / 2)], cloze: [5, 7], flip: [10, 12], translate: [3, 5] } };
-  }
-  const flagged = ids.slice(0, 6);
-  const flags = Object.fromEntries(flagged.map(id => [id, { id, unit: content.items[id].unit, exercise: "Grammar", prompt: "a question", given: "", expected: "x", note: "", createdAt: T - D, updatedAt: T - D }]));
-  localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items, days, flags, synonyms: { [ids[10]]: ["my own answer"] }, currentUnit: content.units.find(u => /^Verb tenses/.test(u.title)).id, settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T - D }));
-  localStorage.setItem("itapp.seen.v1", JSON.stringify(APP_VERSION)); // an ordinary day: What's new already read
-  return Object.keys(items).length;
-}
 
 // Everything timed inside the page, in rounds: each round times every figure once, so a moment when the computer
 // is busy with something else costs each figure one run, which the median then leaves out.
@@ -118,6 +117,8 @@ async function measure(runs) {
   const vt = content.units.find(u => /^Verb tenses/.test(u.title)).id;
   const vb = content.units.find(u => u.mode === "verbs").id;
   const fc = content.units.find(u => u.title === "Vocab pack 1").id;
+  const later = () => typeof drawTyped === "function" && drawTyped(); // results drawn now instead of after the pause in typing (9.3 on)
+  const type = (id, q) => { const box = document.getElementById(id); box.value = q; box.dispatchEvent(new Event("input")); later(); layout(); };
   const screens = [
     ["Draw Today", { screen: "home" }], ["Draw Units", { screen: "units" }], ["Draw Stats", { screen: "stats" }], ["Draw You", { screen: "you" }],
     ["Draw Verb tenses lesson", { screen: "reference", refUnit: vt, refTab: "lesson", refFilter: "" }],
@@ -138,9 +139,22 @@ async function measure(runs) {
   for (let r = 0; r < runs; r++) {
     add("buildContent()", time(() => buildContent()));
     KNOWN_WORDS = null; add("knownWords(), cold", time(() => knownWords()));
+    if (typeof counts === "function") { COUNTS = null; add("Counts, worked out", time(() => counts())); }
     for (const [name, set] of screens) { draw({ screen: "home" }); add(name, draw(set)); }
-    draw({ screen: "lookup", lookup: "" }); // then one keystroke at a time, as the box's input handler sees them
-    for (const q of ["c", "ca", "cas", "casa"]) add("Look up: " + q, time(() => { const box = document.getElementById("lookupBox"); box.value = q; box.dispatchEvent(new Event("input")); layout(); }));
+    draw({ screen: "reference", refUnit: vb, refFilter: "" });
+    { const row = [...document.querySelectorAll("details.vref")].find(d => /^andare\b/.test(d.textContent)) || document.querySelector("details.vref");
+      const t0 = performance.now(); row.open = true; await new Promise(r => row.addEventListener("toggle", r, { once: true })); layout();
+      add("Open a verb in the Verbs reference", performance.now() - t0); }
+    add("Verbs filter: andare", time(() => type("refFilter", "andare")));
+    draw({ screen: "reference", refUnit: fc, refTab: "glossary", refFilter: "" });
+    add("1,000-card glossary filter: casa", time(() => type("refFilter", "casa")));
+    draw({ screen: "lookup", lookup: "", refFilter: "" }); // then one keystroke at a time, as the box's input handler sees them
+    for (const q of ["c", "ca", "cas", "casa"]) add("Look up: " + q, time(() => type("lookupBox", q)));
+    draw({ screen: "home", lookup: "" });
+    if (typeof warmSearch === "function") SEARCH = null; // 9.3 on: Look up opened afresh builds its index in idle time, so wait for it
+    draw({ screen: "lookup", lookup: "" });
+    for (let waited = 0; typeof warmSearch === "function" && !(SEARCH && SEARCH.items) && waited < 30000; waited += 100) await new Promise(r => setTimeout(r, 100));
+    add("Look up: ca, a moment after opening", time(() => type("lookupBox", "ca")));
     draw({ screen: "home", lookup: "" });
     for (const [kind, unit] of kinds) add("buildSession " + kind, time(() => { for (let k = 0; k < 5; k++) if (!buildSession(kind, unit).queue.length) throw new Error("an empty " + kind + " session"); }) / 5); // quick, so the mean of 5
     lastPushed = {}; writing = {}; pendingWrite = {}; // so every document is written
@@ -175,6 +189,12 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
     const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await context.addInitScript(() => { // the moment Today is first drawn, from the start of the page load
       new MutationObserver((_, obs) => { if (document.querySelector("#app .home-hdr")) { window.__todayAt = performance.now(); obs.disconnect(); } }).observe(document, { childList: true, subtree: true });
+      // how long each slice of idle work takes, and when the word lists are ready
+      const ric = window.requestIdleCallback; window.__idle = [];
+      if (ric) window.requestIdleCallback = (fn, o) => ric.call(window, (d) => {
+        const t0 = performance.now();
+        try { fn(d); } finally { window.__idle.push(performance.now() - t0); try { if (!window.__wordsAt && KNOWN_WORDS) window.__wordsAt = performance.now(); } catch (e) { } }
+      }, o);
     });
     const page = await context.newPage();
     const errors = [];
@@ -191,14 +211,21 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
       await page.reload();
       await page.waitForFunction(() => window.__todayAt, null, { timeout: 60000 });
       const t = await page.evaluate("window.__todayAt");
-      if (r) (times["Reload to Today"] = times["Reload to Today"] || []).push(t);
+      if (!r) continue;
+      (times["Reload to Today"] = times["Reload to Today"] || []).push(t);
+      if (await page.evaluate("typeof warmKnownWords === 'function'")) { // 9.3 on: the word lists are built in idle time
+        await page.waitForFunction(() => window.__wordsAt, null, { timeout: 60000, polling: 250 });
+        const idle = await page.evaluate(() => ({ ready: window.__wordsAt - window.__todayAt, longest: Math.max(...window.__idle) }));
+        (times["Word lists ready, after Today"] = times["Word lists ready, after Today"] || []).push(idle.ready);
+        (times["Idle work: longest slice"] = times["Idle work: longest slice"] || []).push(idle.longest);
+      }
     }
     const loaded = await page.evaluate("Object.keys(progress.items).length");
     if (loaded !== records) throw new Error(`the app loaded ${loaded} of the ${records} saved records`);
     Object.assign(times, await page.evaluate(measure, RUNS));
 
     console.log(`Speed test for ${path.relative(process.cwd(), file) || file} (version ${version}): CPU slowed ${CPU_SLOWDOWN}×, 390 × 844, ${records.toLocaleString("en-GB")} progress records and 45 days of log`);
-    console.log(`Each figure is the median of ${RUNS} runs (${RELOADS} for the reload), in milliseconds.\n`);
+    console.log(`Each figure is the median of ${RUNS} runs (${RELOADS} for the reload and the idle work), in milliseconds.\n`);
     const names = [...new Set([...Object.keys(BUDGETS), ...Object.keys(times)])];
     const w = Math.max(...names.map(n => n.length)) + 2;
     console.log("  " + "".padEnd(w) + "ms".padStart(8) + "budget".padStart(9));
@@ -213,7 +240,7 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
     if (errors.length) { over++; console.log("\n  FAIL script errors:\n    " + errors.slice(0, 5).join("\n    ")); }
     if (NEW_BUDGETS) {
       console.log("\nThis run's figures plus 25%, as a BUDGETS table:\nconst BUDGETS = {");
-      for (const [name, ms] of Object.entries(figures)) console.log(`  ${JSON.stringify(name)}: ${Math.ceil(ms * 1.25)},`);
+      for (const [name, ms] of Object.entries(figures)) console.log(`  ${JSON.stringify(name)}: ${FIXED[name] || Math.ceil(ms * 1.25)},`);
       console.log("};");
     }
     console.log(over ? `\n${over} figure(s) over budget or missing.` : `\nAll ${names.length} figures are within budget.`);

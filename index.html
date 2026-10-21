@@ -496,6 +496,8 @@ details > summary { cursor: pointer; }
 .search-in > .ico { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--muted); pointer-events: none; }
 .search-in input[type=text] { min-height: 56px; padding-left: 46px; font-size: 18px; }
 .hits { display: flex; flex-direction: column; gap: 10px; }
+.results { display: contents; } /* what a search box redraws as you type: laid out as if its contents stood in the page */
+.results > p { margin: 0; }
 .hit { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; }
 .hit .unit { color: var(--muted); font-size: 13px; }
 .hit .conjtable { margin-top: 4px; }
@@ -14002,6 +14004,24 @@ const arr = (x) => Array.isArray(x) ? x : (x == null ? [] : [x]);
 const shuffle = (a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const pick = (a) => a[Math.floor(Math.random() * a.length)];
 const canon = (o) => JSON.stringify(o, (k, v) => (v && typeof v === "object" && !Array.isArray(v)) ? Object.keys(v).sort().reduce((acc, key) => (acc[key] = v[key], acc), {}) : v);
+// Work done a slice at a time while the phone is idle, so no task holds up a tap for long. A job is a generator that yields
+// between small steps; a slice stops after 25 ms (sooner if the browser has less idle time to give), and whatever needs
+// the result before the job is done finishes it there and then. (A job lists the items with Object.keys, which is quick,
+// rather than Object.values, which takes as long as a whole slice on a phone.)
+const onIdle = (fn) => window.requestIdleCallback ? window.requestIdleCallback(fn, { timeout: 1000 }) : setTimeout(fn, 30);
+function idleJob(steps, done) {
+  const job = { running: true };
+  const step = () => { const r = steps.next(); if (r.done) { job.running = false; done(r.value); } return !job.running; };
+  const slice = (d) => {
+    if (!job.running) return;
+    const end = Date.now() + Math.max(5, Math.min(25, d && d.timeRemaining ? d.timeRemaining() : 25));
+    while (!step()) if (Date.now() >= end) { onIdle(slice); return; }
+  };
+  job.finish = () => { while (job.running) step(); };
+  job.cancel = () => { job.running = false; };
+  onIdle(slice);
+  return job;
+}
 
 function defaultProgress() {
   return { v: 2, items: {}, days: {}, flags: {}, currentUnit: null, settings: { accents: "lenient", typos: true, goal: 30, newPerDay: 10, flipDir: "both", explain: "wrong", cardsPerSession: 25, newCardsPerSession: 15, fcDir: "it-en", lessonLength: 12, verbsPerSession: 12, verbNewPerSession: 3, verbUnlockBox: 5 }, settingsUpdatedAt: 0, updatedAt: 0 };
@@ -14014,13 +14034,16 @@ function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.par
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 
 function cleanSettings(s) { const d = defaultProgress().settings, out = {}; for (const k of Object.keys(d)) out[k] = (s && s[k] !== undefined) ? s[k] : d[k]; return out; }
-function loadLocal() {
+function loadLocal() { // true when what is saved needs saving again: nothing saved yet, the old format, or settings tidied
   const p = lsGet(LS_PROGRESS);
-  if (p && (p.v === 1 || p.v === 2)) progress = Object.assign(defaultProgress(), p, { v: 2, flags: p.flags || {}, settings: cleanSettings(p.settings) });
   const k = lsGet(LS_PACKS);
   if (k && typeof k === "object") packs = k;
+  if (!(p && (p.v === 1 || p.v === 2))) return true;
+  progress = Object.assign(defaultProgress(), p, { v: 2, flags: p.flags || {}, settings: cleanSettings(p.settings) });
+  return p.v !== 2 || !p.flags || Object.keys(progress).some(key => !(key in p)) || canon(progress.settings) !== canon(p.settings);
 }
 function saveProgress(touch = true) {
+  COUNTS = null; // whatever changed, the counts on Today, Units, Stats and You are worked out again
   if (touch) progress.updatedAt = now();
   const ok = lsSet(LS_PROGRESS, progress);
   if (ok !== !S.saveFailed) { S.saveFailed = !ok; if (S.screen === "home") render(); } // Today warns while the device refuses to save
@@ -14028,9 +14051,12 @@ function saveProgress(touch = true) {
 }
 
 /* ---------- content merge ---------- */
-function buildContent() {
+let BUILT_FROM = null; // the packs the content was last built from: built again from the same ones, it is the same content
+function buildContent() { // returns true if it changed progress (records moved to the id that holds them, or a new current unit)
   const units = {}, items = {};
   const all = BUILTIN_PACKS.concat(Object.values(packs).sort((a, b) => (a.importedAt || 0) - (b.importedAt || 0)));
+  const same = !!BUILT_FROM && BUILT_FROM.length === all.length && all.every((p, i) => p === BUILT_FROM[i]); // a pack is replaced, never changed in place
+  BUILT_FROM = all;
   for (const p of all) {
     for (const u of (p.units || [])) units[u.id] = Object.assign({}, u, { pack: p.pack });
     for (const it of (p.items || [])) items[it.id] = Object.assign({}, it, { pack: p.pack });
@@ -14038,8 +14064,15 @@ function buildContent() {
   const unitList = Object.values(units).sort((a, b) => (a.order || 0) - (b.order || 0) || a.id.localeCompare(b.id));
   const byUnit = {};
   for (const it of Object.values(items)) { (byUnit[it.unit] = byUnit[it.unit] || []).push(it); }
-  content = { units: unitList, unitById: units, items, byUnit, canon: {}, glossIndex: {} };
-  KNOWN_WORDS = null; TU_FORMS = null; // word lists taken from the content are rebuilt on first use
+  content = { units: unitList, unitById: units, items, byUnit, canon: {} };
+  Object.defineProperty(content, "glossIndex", { enumerable: true, get: glossIndex }); // built in idle time, or when first read
+  if (SEARCH && SEARCH.job) SEARCH.job.cancel();
+  SEARCH = null; COUNTS = null;
+  if (!same) { // word lists and indexes taken from the content: rebuilt in idle time, or on first use if that comes sooner
+    for (const job of [wordsJob, glossJob]) if (job) job.cancel();
+    KNOWN_WORDS = null; wordsJob = null; GLOSS = null; glossJob = null; TU_FORMS = null; COUNT_PLAN = null;
+    warmKnownWords(); warmGloss();
+  }
   const firstByKey = {};
   for (const p of all) for (const it of (p.items || [])) {
     const cur = items[it.id]; if (!cur || firstByKey[it.id + "\u0000seen"]) continue;
@@ -14047,13 +14080,24 @@ function buildContent() {
     const k = sameItemKey(cur); if (!k) continue;
     if (firstByKey[k] && firstByKey[k] !== cur.id) content.canon[cur.id] = firstByKey[k]; else firstByKey[k] = cur.id;
   }
-  for (const it of Object.values(items)) {
-    if (it.type !== "vocab") continue;
-    const scope = units[it.unit] && units[it.unit].mode === "flashcards" ? "fc" : "gr";
-    for (const e of arr(it.en)) { const g = scope + "|" + normEn(e); (content.glossIndex[g] = content.glossIndex[g] || []).push(it); }
-  }
-  canonicalizeProgress();
+  const moved = canonicalizeProgress(), was = progress.currentUnit;
   if (!progress.currentUnit || !units[progress.currentUnit] || units[progress.currentUnit].mode === "flashcards" || units[progress.currentUnit].mode === "verbs") { const f = unitList.find(u => u.mode !== "flashcards" && u.mode !== "verbs"); progress.currentUnit = f ? f.id : null; }
+  return moved || progress.currentUnit !== was;
+}
+// Vocab items by scope and English gloss, for altWords(). Kept while the content is the same (its items equal those it holds).
+let GLOSS = null, glossJob = null;
+function warmGloss() { if (!GLOSS && !glossJob) glossJob = idleJob(glossSteps(), (g) => { GLOSS = g; glossJob = null; }); }
+function glossIndex() { if (!GLOSS) { warmGloss(); glossJob.finish(); } return GLOSS; }
+function* glossSteps() {
+  const index = {}, { items, unitById } = content;
+  for (const id of Object.keys(items)) {
+    const it = items[id];
+    if (it.type !== "vocab") continue;
+    const scope = unitById[it.unit] && unitById[it.unit].mode === "flashcards" ? "fc" : "gr";
+    for (const e of arr(it.en)) { const g = scope + "|" + normEn(e); (index[g] = index[g] || []).push(it); }
+    yield;
+  }
+  return index;
 }
 
 /* Items that are the same exercise in different units share one progress record. */
@@ -14116,11 +14160,13 @@ function mergeRec(a, b) {
   out.lastRight = Math.max(a.lastRight || 0, b.lastRight || 0);
   return out;
 }
-function canonicalizeProgress() {
+function canonicalizeProgress() { // returns true if a record moved
+  let moved = false;
   for (const id of Object.keys(progress.items)) {
     const k = pid(id);
-    if (k !== id) { progress.items[k] = mergeRec(progress.items[k], progress.items[id]); delete progress.items[id]; }
+    if (k !== id) { progress.items[k] = mergeRec(progress.items[k], progress.items[id]); delete progress.items[id]; moved = true; }
   }
+  return moved;
 }
 function uniqueByPid(ids) { const seen = new Set(); return ids.filter(id => { const k = pid(id); if (seen.has(k)) return false; seen.add(k); return true; }); }
 
@@ -14236,11 +14282,79 @@ function flashNewIds() { const u = flashNewUnit(); return u ? newIds(u.id) : [];
 function newIds(unitId) {
   return uniqueByPid((content.byUnit[unitId] || []).filter(i => rec(i.id).box === 0).map(i => i.id));
 }
-function unitStats(unitId) {
-  const items = content.byUnit[unitId] || [];
-  const learned = items.filter(i => rec(i.id).box >= 5).length;
-  const started = items.filter(i => rec(i.id).box >= 1).length;
-  return { total: items.length, learned, started, pct: items.length ? Math.round(100 * learned / items.length) : 0 };
+/* The counts on Today, Units, Stats and You, worked out together and kept until one of them can change. saveProgress()
+   and buildContent() drop them (an answer or its undo, a sync merge, a backup loaded, a reset, a setting), and they
+   lapse on a new day and at the next moment time alone changes one: an item falling due (or due within a day or a week,
+   for Stats), or a mistake turning a week old. Each is the number the functions above would give at that moment
+   (tools/test-speedups.js checks it): per unit, its items, learned (box 5+), started, % learned, due (dueIds) and new
+   (newIds); the Review, Verbs, Flashcards and Mistakes tiles; and the figures on Units, Stats and You.
+   Items that are the same exercise share one record (pid), and dueIds and newIds count each record once, so what the
+   counts need from the content is worked out once (countPlan): each unit's records, with how many of its items use
+   each one, the records Review and the course take in, and for each verb tense the record that unlocks it. */
+let COUNTS = null, COUNT_PLAN = null;
+const unitCounts = (unitId) => counts().unit[unitId] || { total: 0, learned: 0, started: 0, pct: 0, due: 0, fresh: 0 };
+function countPlan() { // kept while the content is the same (buildContent drops it otherwise)
+  if (COUNT_PLAN) return COUNT_PLAN;
+  const units = {}, review = new Set(), course = new Map(), every = new Set(), verbs = [], builtin = new Set(BUILTIN_PACKS.map(p => p.pack));
+  for (const id of Object.keys(content.items)) {
+    const it = content.items[id], p = pid(id), u = units[it.unit] || (units[it.unit] = new Map());
+    u.set(p, (u.get(p) || 0) + 1);
+    if (!isSideUnit(it.unit)) review.add(p);
+    if (builtin.has(it.pack)) course.set(p, (course.get(p) || 0) + 1);
+    if (it.unit === "vb") { // as vgUnlocked: the nearest earlier tense the verb has
+      let before = null;
+      for (let k = it.step - 1; k >= 0; k--) if (content.items[vgId(it.it, VG_TENSES[k])]) { before = pid(vgId(it.it, VG_TENSES[k])); break; }
+      verbs.push({ p, verb: it.it, before });
+    }
+    every.add(p);
+  }
+  const list = (m) => ({ ids: [...m.keys()], n: [...m.values()] });
+  return COUNT_PLAN = { units: Object.fromEntries(Object.entries(units).map(([u, m]) => [u, list(m)])), review: [...review], course: list(course), items: every.size, verbs };
+}
+function counts() {
+  const t = now(), day = dayKey(t);
+  if (COUNTS && COUNTS.progress === progress && COUNTS.content === content && t < COUNTS.until && COUNTS.day === day) return COUNTS;
+  const plan = countPlan(), recs = progress.items, none = { box: 0 }, isDueNow = (r) => r.box >= 1 && r.due <= t;
+  let until = Infinity;
+  const soon = (x) => { if (x > t && x < until) until = x; }; // a moment when a count changes
+  const unit = {};
+  for (const [u, { ids, n }] of Object.entries(plan.units)) {
+    const c = unit[u] = { total: 0, learned: 0, started: 0, pct: 0, due: 0, fresh: 0 };
+    for (let k = 0; k < ids.length; k++) {
+      const r = recs[ids[k]] || none, m = n[k];
+      c.total += m;
+      if (r.box >= 5) c.learned += m;
+      if (r.box >= 1) { c.started += m; if (r.due <= t) c.due++; else soon(r.due); }
+      if (r.box === 0) c.fresh++;
+    }
+    c.pct = c.total ? Math.round(100 * c.learned / c.total) : 0;
+  }
+  let course = 0, courseLearned = 0;
+  plan.course.ids.forEach((p, k) => { course += plan.course.n[k]; if ((recs[p] || none).box >= 5) courseLearned += plan.course.n[k]; });
+  const unlockBox = progress.settings.verbUnlockBox || 5, verbsStarted = new Set();
+  let verbsNew = 0;
+  for (const v of plan.verbs) { const b = (recs[v.p] || none).box; if (b >= 1) verbsStarted.add(v.verb); if (b === 0 && (!v.before || (recs[v.before] || none).box >= unlockBox)) verbsNew++; }
+  const vb = unit.vb || { learned: 0, total: 0, due: 0 }, flash = flashUnits().map(u => unit[u.id] || { due: 0, fresh: 0 });
+  let learned = 0, started = 0, dueToday = 0, dueWeek = 0, mistakes = 0, anyLapses = false;
+  const lapsed = [];
+  for (const id of Object.keys(recs)) { // the records Stats and You count (those of items in the content), as rec(id) sees them
+    if (!content.items[id]) continue;
+    const r = rec(id);
+    if (r.box >= 5) learned++;
+    if (r.box >= 1) {
+      started++;
+      if (r.due <= t + 864e5) dueToday++; else soon(r.due - 864e5);
+      if (r.due <= t + 7 * 864e5) dueWeek++; else soon(r.due - 7 * 864e5);
+    }
+    if (r.lapses > 0) lapsed.push([id, r.lapses]);
+    if (isRecentMistake(id, t)) { mistakes++; soon(recs[id].lastWrong + 7 * 864e5 + 1); }
+    if (recs[id].lapses >= 1) anyLapses = true;
+  }
+  return COUNTS = { progress, content, day, until, unit, due: plan.review.filter(p => isDueNow(recs[p] || none)).length, mistakes,
+    coursePct: course ? Math.round(100 * courseLearned / course) : 0,
+    verbs: { verbs: verbsStarted.size, totalVerbs: VERB_GYM.length, learned: vb.learned, total: vb.total, due: vb.due, fresh: verbsNew },
+    flashDue: flash.reduce((n, c) => n + c.due, 0), flashNew: (flash.find(c => c.fresh) || { fresh: 0 }).fresh,
+    learned, started, dueToday, dueWeek, items: plan.items, lapsed: lapsed.sort((a, b) => b[1] - a[1]).slice(0, 10), anyLapses };
 }
 function bumpStat(key, correct, delta) {
   const d = today(); d.t = d.t || {};
@@ -14323,25 +14437,30 @@ function lev1(a, b) { // true if edit distance is exactly 1 (sub/ins/del)
 // Every word the content uses, Italian and English, normalised as typed answers are (Italian also without accents).
 // A slip that turns the answer into one of them (quando for quanto, siamo for siano, night for right) is a different
 // word, so the typo rule never forgives it.
-let KNOWN_WORDS = null;
+// Built in idle time once the app is on screen (buildContent starts it), so the first answer that needs it doesn't wait.
+let KNOWN_WORDS = null, wordsJob = null;
+function warmKnownWords() { if (!KNOWN_WORDS && !wordsJob) wordsJob = idleJob(knownWordsSteps(), (w) => { KNOWN_WORDS = w; wordsJob = null; }); }
 function knownWords(english) {
-  if (!KNOWN_WORDS) {
-    const it = new Set(), en = new Set();
-    const addIt = (s) => normalize(String(s).replace(/\([^)]*\)/g, " ").replace(/(\p{L}+)\/(\p{L}{1,2})(?=[^\p{L}]|$)/gu, (m, w, e) => w + " " + w.slice(0, -e.length) + e)).split(" ").forEach(w => { if (w) { it.add(w); it.add(deaccent(w)); } }); // notes in brackets left out; andato/a → andato andata
-    for (const x of Object.values(content.items)) {
-      if (x.type !== "grammar_mc") { // multiple-choice options are deliberately wrong, so only answers count
-        const own = x.type === "spot" ? [spotAnswer(x), x.fix] // a spot sentence shows a mistake on purpose: only its corrected version counts
-          : x.type === "endings" ? [endingsFull(x)]
-          : [x.it, x.answer, x.alt, x.plural, x.cloze && x.cloze.text, x.line, arr(x.rows).map(r => r.say || r.it), arr(x.pairs).map(p => x.right === "en" ? p[0] : p)];
-        own.flat(2).forEach(v => arr(v).forEach(addIt));
-        if (x.forms) (Array.isArray(x.forms) ? [x.forms] : Object.values(x.forms)).forEach(fs => arr(fs).forEach(addIt));
-      }
-      arr(x.en).forEach(e => enForms(String(e)).forEach(f => f.split(" ").forEach(w => { if (w) en.add(w); })));
-    }
-    for (const v of VERB_GYM) { addIt(v.it); (v.f || []).forEach(t => arr(t).forEach(addIt)); }
-    KNOWN_WORDS = { it, en };
-  }
+  if (!KNOWN_WORDS) { warmKnownWords(); wordsJob.finish(); }
   return english ? KNOWN_WORDS.en : KNOWN_WORDS.it;
+}
+function* knownWordsSteps() { // yields after each item and each verb
+  const it = new Set(), en = new Set();
+  const addIt = (s) => normalize(String(s).replace(/\([^)]*\)/g, " ").replace(/(\p{L}+)\/(\p{L}{1,2})(?=[^\p{L}]|$)/gu, (m, w, e) => w + " " + w.slice(0, -e.length) + e)).split(" ").forEach(w => { if (w) { it.add(w); it.add(deaccent(w)); } }); // notes in brackets left out; andato/a → andato andata
+  for (const id of Object.keys(content.items)) {
+    const x = content.items[id];
+    if (x.type !== "grammar_mc") { // multiple-choice options are deliberately wrong, so only answers count
+      const own = x.type === "spot" ? [spotAnswer(x), x.fix] // a spot sentence shows a mistake on purpose: only its corrected version counts
+        : x.type === "endings" ? [endingsFull(x)]
+        : [x.it, x.answer, x.alt, x.plural, x.cloze && x.cloze.text, x.line, arr(x.rows).map(r => r.say || r.it), arr(x.pairs).map(p => x.right === "en" ? p[0] : p)];
+      own.flat(2).forEach(v => arr(v).forEach(addIt));
+      if (x.forms) (Array.isArray(x.forms) ? [x.forms] : Object.values(x.forms)).forEach(fs => arr(fs).forEach(addIt));
+    }
+    arr(x.en).forEach(e => enForms(String(e)).forEach(f => f.split(" ").forEach(w => { if (w) en.add(w); })));
+    yield;
+  }
+  for (const v of VERB_GYM) { addIt(v.it); (v.f || []).forEach(t => arr(t).forEach(addIt)); yield; }
+  return { it, en };
 }
 function typoMatch(typed, target, known) {
   const tw = typed.split(" "), aw = target.split(" ");
@@ -15349,11 +15468,6 @@ function verbNewIds() {
   while (up.length || nu.length) { if (up.length) out.push(up.shift().id); if (nu.length) out.push(nu.shift().id); }
   return out;
 }
-function verbStats() {
-  const items = content.byUnit.vb || [];
-  const verbs = new Set(items.filter(i => rec(i.id).box >= 1).map(i => i.it)).size;
-  return { verbs, totalVerbs: VERB_GYM.length, learned: items.filter(i => rec(i.id).box >= 5).length, total: items.length, due: dueIds("vb").length, fresh: verbNewIds().length };
-}
 function vgAcc(item, p) { // the shown form plus any second accepted form (prevedrò / prevederò)
   const a = item.alts && item.alts[p];
   return vgAccepted(item.forms[p], p, item.tense).concat(a ? vgAccepted(a, p, item.tense) : []);
@@ -15668,30 +15782,42 @@ function vgStatus(i) {
   return vgUnlocked(i) ? "new" : "locked";
 }
 function renderVerbReference(u) {
-  const f = normalize(S.refFilter || "");
-  const byVerb = VERB_GYM.filter(v => !f || [v.it, arr(v.en).join(" "), v.f.flat().join(" ")].some(x => normalize(x).includes(f)));
-  const st = verbStats();
-  let h = unitHead(u) + `<p class="small muted">${st.totalVerbs} verbs · ${st.verbs} started · ${st.learned} of ${st.total} verb tenses learned</p>
+  const st = counts().verbs;
+  return unitHead(u) + `<p class="small muted">${st.totalVerbs} verbs · ${st.verbs} started · ${st.learned} of ${st.total} verb tenses learned</p>
   <button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`
     + groupHtml("Rules", `<div class="card notes">` + (u.notes || []).map(n => `<p>${esc(n)}</p>`).join("") + `</div>`)
-    + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`;
+    + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`
+    + `<div class="results" id="refResults">${verbListHtml()}</div><button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`;
+}
+// Every verb is a row that opens to show its tables. The tables are drawn when a row is opened (the listener below),
+// since all of them together would take several seconds on a phone; a filter opens the rows it leaves, so they come drawn.
+const filterVerbs = (f) => VERB_GYM.filter(v => !f || verbText(v).includes(f)); // f normalised
+function verbListHtml() {
+  const f = normalize(S.refFilter || ""), byVerb = filterVerbs(f);
   const famOrder = Object.keys(VERB_FAMILIES);
   const sorted = byVerb.slice().sort((a, b) => famOrder.indexOf(a.fam) - famOrder.indexOf(b.fam) || a.it.localeCompare(b.it));
-  let fam = null, rows = "";
+  let h = "", fam = null, rows = "";
   const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p><div class="card rows">${rows}</div>`); rows = ""; };
   for (const v of sorted) {
     if (v.fam !== fam) { flush(); fam = v.fam; }
-    const items = VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
-    const summ = items.map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
-    rows += `<details class="vref"${f ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>`
-      + items.map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)).join("")
-      + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "") + `</details>`;
+    const summ = verbTenses(v).map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
+    rows += `<details class="vref" data-verb="${esc(v.it)}"${f ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>${f ? verbTablesHtml(v) : ""}</details>`;
   }
   flush();
   if (!sorted.length) h += `<p class="muted">No verbs match.</p>`;
-  h += `<button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`;
   return h;
 }
+const verbTenses = (v) => VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
+function verbTablesHtml(v) {
+  return verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)).join("")
+    + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "");
+}
+document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this listens on the way down
+  const d = e.target;
+  if (!d.open || !d.matches("details.vref") || d.children.length > 1) return; // closed, another kind, or drawn already
+  const v = VERB_GYM.find(x => x.it === d.dataset.verb); if (!v) return;
+  d.insertAdjacentHTML("beforeend", verbTablesHtml(v)); nbHyphens(d); markSaying();
+}, true);
 
 /* ---------- sessions ---------- */
 let S = { screen: "home" }; // ui state
@@ -15843,6 +15969,7 @@ function render() {
   const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou }[S.screen] || renderHome;
   const key = S.screen === "reference" ? "reference:" + S.refUnit + ":" + (S.refTab || "lesson") : S.screen;
   const prev = S.viewKey, mem = S.scrollMem || (S.scrollMem = {});
+  clearTimeout(typingTimer); typingDraw = null; // the whole screen is drawn now, with what has been typed so far
   if (S.screen !== "units" && S.screen !== "reference") S.unitPick = null; // the card opened on Units lasts while you stay there or in its units
   if (prev && prev !== key) { mem[prev] = window.scrollY; stopSaying(); } // speech belongs to the screen it started on
   const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
@@ -15857,6 +15984,7 @@ function render() {
   wire();
   if (S.screen === "home") fitTip();
   if (S.screen === "reference") markLessonChip();
+  if (S.screen === "lookup") warmSearch();
   syncHistory();
 }
 function nbHyphens(root) { // a hyphen that starts a word (-iamo, (-ato), -o/-a) becomes a non-breaking hyphen, so the line can't break after it
@@ -16016,7 +16144,6 @@ function accuracy(days) { // [right, answered] over the last `days` days of the 
   return [c, tot];
 }
 const pctOf = (a) => a[1] ? Math.round(100 * a[0] / a[1]) + "%" : "–";
-const learnedCount = () => Object.keys(progress.items).filter(id => content.items[id] && rec(id).box >= 5).length;
 /* ---------- "Lo sapevi?": one short tidbit from the built-in content, picked once per app load ---------- */
 let TIDBIT; // undefined: not picked yet; null: nothing suitable
 const TIP_LIMIT = 140; // characters: about three lines at 390 px
@@ -16072,7 +16199,7 @@ function renderYou() {
   const row = (ic, label, value, attrs) => `<button type="button" class="srow" ${attrs}><span class="well">${icon(ic, 20)}</span><span class="srow-l">${label}</span>${value != null ? `<span class="srow-v">${value}</span>` : ""}${icon("next", 18, 2)}</button>`;
   return `<header class="hdr"><h1 class="title">You</h1></header>
   <button type="button" class="card statcard" data-go="stats"><span class="statcard-h"><span class="label">Stats</span><span class="see">See all${icon("next", 18, 2)}</span></span>
-  <span class="bigs"><span><span class="big">${streak()}</span><span class="small muted">day streak</span></span><span><span class="big">${fmtN(learnedCount())}</span><span class="small muted">items learned</span></span><span><span class="big">${pctOf(accuracy(30))}</span><span class="small muted">accuracy</span></span></span></button>`
+  <span class="bigs"><span><span class="big">${streak()}</span><span class="small muted">day streak</span></span><span><span class="big">${fmtN(counts().learned)}</span><span class="small muted">items learned</span></span><span><span class="big">${pctOf(accuracy(30))}</span><span class="small muted">accuracy</span></span></span></button>`
   + groupHtml("Settings", `<div class="card rows">
     <div class="srow static"><span class="well">${icon("theme", 20)}</span><span class="srow-l" id="appearance">Appearance</span><div class="seg mini" role="group" aria-labelledby="appearance">${[["light", "Light"], ["dark", "Dark"], ["auto", "Auto"]].map(([v, l]) => `<button type="button" data-appearance="${v}" aria-pressed="${theme === v}">${l}</button>`).join("")}</div></div>
     <div class="srow static" id="readaloud-row"><span class="well">${icon("speaker", 20)}</span><span class="srow-l" id="readaloud">Read aloud</span>${TTS
@@ -16093,11 +16220,10 @@ function renderYou() {
     <p class="small muted">Typefaces: Bricolage Grotesque and DM Sans, both under the SIL Open Font Licence.</p></div></details>`);
 }
 function renderHome() {
-  const unit = content.unitById[progress.currentUnit];
-  const due = dueIds().length;
-  const mistakes = Object.keys(progress.items).filter(id => isRecentMistake(id)).length;
+  const unit = content.unitById[progress.currentUnit], c = counts(), uc = unit && unitCounts(unit.id);
+  const due = c.due, mistakes = c.mistakes;
   const t = today(), goal = progress.settings.goal || 30, xp = t.xp || 0;
-  const unitDone = unit && newIds(unit.id).length === 0 && dueIds(unit.id).length === 0;
+  const unitDone = unit && uc.fresh === 0 && uc.due === 0;
   const C = 2 * Math.PI * 22, arc = Math.min(1, xp / goal) * C, st = streak();
   let h = `<header class="home-hdr"><div class="brand">${logo(32)}<h1 class="wordmark">ripasso</h1></div>
   <div class="home-meta"><span class="pill streak">${icon("flame", 16, 2)}<span>${st}</span><span class="vh"> day streak</span></span>
@@ -16106,22 +16232,20 @@ function renderHome() {
   if (S.flash) h += `<div class="card flash" role="status">${esc(S.flash)}</div>`;
   h += noticeHtml();
   if (unit) {
-    const us = unitStats(unit.id);
-    h += `<button type="button" class="hero" data-start="continue"><span class="hero-top"><span class="hero-chip">${esc(unitEyebrow(unit))}</span><span>${us.pct}% learned</span></span>
-    <span class="hero-title">${esc(unit.title.split(": ")[0])}</span>${bar(us.pct)}
-    <span class="hero-foot"><span>${unitDone ? "Nothing due, extra practice" : `${newIds(unit.id).length} new · ${dueIds(unit.id).length} to review`}</span><span class="hero-btn">Continue</span></span></button>`;
+    h += `<button type="button" class="hero" data-start="continue"><span class="hero-top"><span class="hero-chip">${esc(unitEyebrow(unit))}</span><span>${uc.pct}% learned</span></span>
+    <span class="hero-title">${esc(unit.title.split(": ")[0])}</span>${bar(uc.pct)}
+    <span class="hero-foot"><span>${unitDone ? "Nothing due, extra practice" : `${uc.fresh} new · ${uc.due} to review`}</span><span class="hero-btn">Continue</span></span></button>`;
   } else h += `<button type="button" class="hero" data-start="continue"><span class="hero-title">No units loaded</span><span class="hero-foot"><span></span><span class="hero-btn">Continue</span></span></button>`;
   const tile = (start, ic, label, count, on, cls) => `<button type="button" class="tile${cls ? " " + cls : ""}" data-start="${start}"${on ? "" : " disabled"}>${icon(ic, 22)}<span class="label">${label}</span><span class="small muted">${count}</span></button>`;
   let tiles = tile("review", "review", "Review", `${due} due`, due);
-  if (content.unitById.vb) { const vs = verbStats(); tiles += tile("verbs", "verbs", "Verbs", `${vs.due} due · ${vs.fresh} new`, vs.due + vs.fresh + vs.verbs); }
-  if (flashUnits().length) { const fd = flashDueIds().length, fn = flashNewIds().length; tiles += tile("flashcards", "cards", "Flashcards", `${fd} due · ${fn} new`, fd + fn); }
+  if (content.unitById.vb) { const vs = c.verbs; tiles += tile("verbs", "verbs", "Verbs", `${vs.due} due · ${vs.fresh} new`, vs.due + vs.fresh + vs.verbs); }
+  if (flashUnits().length) { const fd = c.flashDue, fn = c.flashNew; tiles += tile("flashcards", "cards", "Flashcards", `${fd} due · ${fn} new`, fd + fn); }
   tiles += tile("mistakes", "mistakes", "Mistakes", `${mistakes} to fix`, mistakes, "bad");
   return h + `<div class="tiles">${tiles}</div>
   <button type="button" class="card rowbtn" data-start="wild"><span class="rowbtn-t"><span class="label">Wild card</span><span class="small muted">A random mix from every grammar unit</span></span>${icon("next", 20)}</button>` + tipCardHtml();
 }
 function renderUnits() {
-  const all = Object.values(content.items).filter(i => isBuiltinPack(i.pack));
-  const pct = all.length ? Math.round(100 * all.filter(i => rec(i.id).box >= 5).length / all.length) : 0;
+  const pct = counts().coursePct;
   const cur = content.unitById[progress.currentUnit];
   const segs = [["grammar", "Grammar"], ["vocab", "Vocab"], ["verbs", "Verbs"]].map(([k, l]) => [k, l, content.units.filter(u => unitSeg(u) === k)]).filter(s => s[2].length);
   if (!segs.some(s => s[0] === S.unitSeg)) S.unitSeg = cur && segs.some(s => s[0] === unitSeg(cur)) ? unitSeg(cur) : (segs[0] || ["grammar"])[0];
@@ -16132,20 +16256,20 @@ function renderUnits() {
   <div class="ulist">${list.map(u => unitRow(u, u === open, u === cur)).join("")}</div>`;
 }
 function unitRow(u, isOpen, isCur) {
-  const st = unitStats(u.id), state = st.total && st.learned === st.total ? "done" : st.started ? "going" : "new";
+  const st = unitCounts(u.id), state = st.total && st.learned === st.total ? "done" : st.started ? "going" : "new";
   const badge = `<span class="badge ${state}" aria-hidden="true">${u.mode === "verbs" ? icon("verbs", 20, 2) : unitNumber(u)}</span>`;
   const name = (unitSeg(u) === "grammar" ? `<span class="vh">Unit ${unitNumber(u)}: </span>` : "") + esc(u.title);
   const pack = isBuiltinPack(u.pack) ? "" : `<span class="small muted">pack ${esc(u.pack)}</span>`;
-  const counts = u.mode === "verbs" ? ((vs) => `${vs.fresh} new · ${vs.due} to review`)(verbStats()) : `${newIds(u.id).length} new · ${dueIds(u.id).length} to review`;
+  const todo = u.mode === "verbs" ? ((vs) => `${vs.fresh} new · ${vs.due} to review`)(counts().verbs) : `${st.fresh} new · ${st.due} to review`;
   if (isOpen) return `<div class="card ucard"><div class="urow">${badge}<div class="urow-t"><div class="urow-h"><span class="label">${name}</span><span class="ustat cur">${st.pct}%</span></div>
-    <span class="small muted">${isCur ? "Current unit · " : ""}${counts}</span>${pack}${bar(st.pct)}</div></div>
+    <span class="small muted">${isCur ? "Current unit · " : ""}${todo}</span>${pack}${bar(st.pct)}</div></div>
     <div class="ucard-btns"><button type="button" class="primary" data-unit="${esc(u.id)}">Practise</button>${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">${icon("book", 18)}Read lesson</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}</div></div>`;
   const status = state === "done" ? `<span class="ustat done">${icon("tick", 14, 2.6)}Learned</span>` : state === "new" ? `<span class="ustat none">Not started</span>` : `<span class="ustat">${st.pct}%</span>`;
   const line = [isCur ? "Current unit" : "", u.description ? esc(u.description) : ""].filter(Boolean).join(" · ");
   return `<button type="button" class="card urow" data-upick="${esc(u.id)}">${badge}<span class="urow-t"><span class="urow-h"><span class="label">${name}</span>${status}</span>${line ? `<span class="small muted clamp1">${line}</span>` : ""}${pack}${state === "going" ? bar(st.pct) : ""}</span></button>`;
 }
 function unitHead(u) {
-  const st = unitStats(u.id);
+  const st = unitCounts(u.id);
   return `<div class="hgroup">` + screenHead(u.title, { back: "units", backLabel: "Units", eyebrow: unitEyebrow(u), right: `<span class="pill">${st.pct}% learned</span>` })
     + (isSideUnit(u.id) ? "" : `<div class="umeta">${u.id === progress.currentUnit ? `<p class="small muted">This is your Continue unit</p>` : `<button type="button" class="quiet" data-setunit="${esc(u.id)}">Make this my Continue unit</button>`}</div>`) + `</div>`;
 }
@@ -16388,13 +16512,10 @@ function lessonStrings(b) { // every piece of text in a lesson block, for Look u
   return ["h", "tip", "ex", "table", "list", "dlg", "fix"].flatMap(k => b[k] != null ? rowsOf(b[k]) : []);
 }
 function lessonSearch(f) { // f is already normalised; returns the sections whose text contains it
-  const key = (x) => deaccent(normalize(plainText(x))), q = deaccent(f), out = [];
-  for (const u of content.units) {
-    const L = lessonOf(u); if (!L) continue;
-    (L.sections || []).forEach((s, i) => {
-      const hit = [s.h].concat((s.b || []).flatMap(lessonStrings)).find(x => key(x).includes(q));
-      if (hit) out.push({ u, i, h: s.h, text: plainText(hit).replace(/\n~?/g, " · ") });
-    });
+  const q = deaccent(f), out = [];
+  for (const s of searchLessons()) {
+    const k = s.keys.findIndex(x => x.includes(q));
+    if (k >= 0) out.push({ u: s.u, i: s.i, h: s.h, text: plainText(s.strs[k]).replace(/\n~?/g, " · ") });
   }
   return out;
 }
@@ -16433,19 +16554,22 @@ function markLessonChip() { // select the chip of the section in view and keep i
 function renderReference() {
   const u = content.unitById[S.refUnit]; if (!u) return renderUnits();
   if (u.mode === "verbs") return renderVerbReference(u);
-  const L = lessonOf(u), tab = refTab(u), st = unitStats(u.id);
+  const L = lessonOf(u), tab = refTab(u), st = unitCounts(u.id);
   let h = unitHead(u) + `<div class="hgroup" style="gap:4px">${u.description ? `<p class="muted desc">${esc(u.description)}</p>` : ""}<p class="small muted">${st.total} items · ${st.learned} learned${isBuiltinPack(u.pack) ? "" : " · pack " + esc(u.pack)}</p></div>`;
   if (u.mode === "flashcards") h += `<button type="button" class="primary wide" data-unit="${esc(u.id)}">Practise this unit</button>`;
   if (L) h += `<div class="refbar"><div class="seg" role="tablist" aria-label="Unit">` + [["lesson", "Lesson"], ["glossary", "Glossary"]].map(([k, l]) => `<button type="button" role="tab" aria-selected="${tab === k}" data-reftab="${k}">${l}</button>`).join("") + `</div>${tab === "lesson" ? lessonChips(u, L) : ""}</div>`;
   if (tab === "lesson") return h + lessonHtml(u, L);
-  const f = normalize(S.refFilter || "");
-  const match = (i) => !f || itemFields(i).some(x => normalize(x).includes(f));
-  const items = (content.byUnit[u.id] || []).filter(match);
+  h += `<label class="vh" for="refFilter">Filter this unit</label><input type="text" id="refFilter" placeholder="Filter…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`;
+  if (u.notes && u.notes.length) h += groupHtml("Rules", `<div class="card notes">` + u.notes.map(n => `<p>${esc(n)}</p>`).join("") + `</div>`);
+  return h + `<div class="results" id="refResults">${glossaryHtml(u)}</div><button type="button" class="primary wide" data-unit="${esc(u.id)}">Practise this unit</button>`;
+}
+const filterItems = (unitId, f) => (content.byUnit[unitId] || []).filter(i => !f || searchText(i).includes(f)); // f normalised
+function glossaryHtml(u) { // a unit's items, by kind, as the filter leaves them
+  const items = filterItems(u.id, normalize(S.refFilter || ""));
+  let h = "";
   const verbs = items.filter(i => i.type === "verb"), nouns = items.filter(i => i.type === "vocab" && i.pos === "noun" && i.art), other = items.filter(i => i.type === "vocab" && !(i.pos === "noun" && i.art)), sents = items.filter(i => i.type === "sentence"), gram = items.filter(i => i.type === "grammar_mc"), nums = items.filter(i => i.type === "number"), preps = items.filter(i => i.type === "prep"), trans = items.filter(i => i.type === "transform"), clocks = items.filter(i => i.type === "clock"), practice = items.filter(i => PRACTICE_TYPES.includes(i.type)).sort((a, b) => PRACTICE_TYPES.indexOf(a.type) - PRACTICE_TYPES.indexOf(b.type));
   const table = (title, rows, head) => groupHtml(title, `<div class="card gcard"><div class="tablewrap"><table class="gloss">${head || ""}${rows}</table></div></div>`);
   const list = (title, html) => groupHtml(title, `<div class="card gcard">${html}</div>`);
-  h += `<label class="vh" for="refFilter">Filter this unit</label><input type="text" id="refFilter" placeholder="Filter…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`;
-  if (u.notes && u.notes.length) h += groupHtml("Rules", `<div class="card notes">` + u.notes.map(n => `<p>${esc(n)}</p>`).join("") + `</div>`);
   if (verbs.length) h += list("Verbs", verbs.map(v => `<div class="gitem"><div><span class="itx">${esc(v.it)}</span>${sayBtn(v.it)} <span class="muted">${esc(arr(v.en).join(", "))}${v.group ? " · " + esc(v.group) : ""}</span> ${boxTag(v.id)}</div>${Object.keys(v.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(v, t)).join("")}${v.note ? `<div class="small muted">${esc(v.note)}</div>` : ""}</div>`).join(""));
   if (nouns.length) h += table("Nouns", nouns.map(n => `<tr><td class="it">${esc(joinArt(n.art, arr(n.it)[0]))}${sayBtn(joinArt(n.art, arr(n.it)[0]))}<div class="gf">${esc(joinArt(n.indef, arr(n.it)[0]))} · ${esc(joinArt(n.artPl, n.plural))}</div></td><td>${esc(enList(n).join(", "))}${boxTag(n.id)}${n.note ? `<div class="small muted">${esc(n.note)}</div>` : ""}</td></tr>`).join(""), `<tr><th>noun · a/an · plural</th><th>meaning</th></tr>`);
   if (clocks.length) h += table("Telling the time", clocks.map(c => `<tr><td style="width:1%;white-space:nowrap">${esc(c.value)}</td><td class="it">${esc(arr(c.it)[0])}${sayBtn(arr(c.it)[0])}${boxTag(c.id)}${arr(c.it).length > 1 ? `<div class="small muted">also: ${esc(arr(c.it).slice(1).join(" · "))}</div>` : ""}</td></tr>`).join(""));
@@ -16457,7 +16581,7 @@ function renderReference() {
   if (practice.length) h += list("Practice sets", practice.map(x => `<div class="gitem">${rowHtml(x)}</div>`).join(""));
   if (gram.length) h += list("Grammar points", gram.map(g => `<div class="gitem">${esc(g.prompt)}${boxTag(g.id)}<div class="it">${esc(g.answer)}</div>${g.explanation ? `<div class="small muted">${esc(g.explanation)}</div>` : ""}</div>`).join(""));
   if (!items.length) h += `<p class="muted">No items match.</p>`;
-  return h + `<button type="button" class="primary wide" data-unit="${esc(u.id)}">Practise this unit</button>`;
+  return h;
 }
 function rowHtml(i) {
   if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableHtml(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
@@ -16484,18 +16608,71 @@ function itemFields(i) { // the text of an item that Look up and the glossary fi
     Array.isArray(i.forms) ? i.forms.join(" ") : (i.forms ? Object.values(i.forms).flat().join(" ") : ""),
     i.line || "", i.cue || "", i.text ? endingsFull(i) : "", arr(i.fix).join(" "), arr(i.rows).map(r => r.it + " " + (r.say || "")).join(" "), arr(i.pairs).flat().join(" ")];
 }
-function renderLookup() {
-  const f = normalize(S.lookup || "");
-  let hits = [];
-  if (f.length >= 2) {
-    const fields = itemFields;
-    const score = (i) => { const fs = fields(i).map(normalize); if (fs.some(x => x === f)) return 0; if (fs.some(x => x.split(" ").includes(f))) return 1; if (fs.some(x => x.startsWith(f))) return 2; return fs.some(x => x.includes(f)) ? 3 : 9; };
-    hits = Object.values(content.items).map(i => [score(i), i]).filter(x => x[0] < 9).sort((a, b) => a[0] - b[0] || (isFlashUnit(a[1].unit) ? 1 : 0) - (isFlashUnit(b[1].unit) ? 1 : 0)).slice(0, 40).map(x => x[1]);
+/* ---------- search: Look up, a unit's glossary filter and the Verbs filter ----------
+   The text each one searches, normalised once and kept until buildContent: each item's fields (itemFields), each verb's
+   and each lesson section's. An item's and a verb's fields are joined with "\n" between them and at both ends, which
+   normalised text never holds, so a match can't run from one field into the next, and a field or a word can be found
+   by what stands on either side of it. */
+let SEARCH = null;
+const searchData = () => SEARCH || (SEARCH = { text: new Map(), items: null, lessons: null, job: null, verbs: new Map() });
+function searchText(i) { // an item's fields, as the glossary filter and Look up search them
+  const m = searchData().text;
+  let t = m.get(i.id);
+  if (t === undefined) m.set(i.id, t = "\n" + itemFields(i).map(normalize).join("\n") + "\n");
+  return t;
+}
+// What Look up searches: built in idle time once Look up is opened (render() starts it), or all at once by the first search.
+function warmSearch() { const d = searchData(); if (!d.items && !d.job) d.job = idleJob(searchSteps(), (x) => { Object.assign(d, x); d.job = null; }); }
+function searchItems() { const d = searchData(); if (!d.items) { warmSearch(); d.job.finish(); } return d.items; }
+function searchLessons() { const d = searchData(); if (!d.lessons) { warmSearch(); d.job.finish(); } return d.lessons; }
+function* searchSteps() {
+  const items = [], lessons = [];
+  for (const id of Object.keys(content.items)) { const i = content.items[id]; items.push({ i, t: searchText(i), flash: isFlashUnit(i.unit) }); yield; } // every item, in content order, with whether it is a flashcard (listed after the others)
+  for (const u of content.units) { // every lesson section, with each piece of its text as written and as Look up compares it
+    const L = lessonOf(u); if (!L) continue;
+    for (const [i, s] of (L.sections || []).entries()) { const strs = [s.h].concat((s.b || []).flatMap(lessonStrings)); lessons.push({ u, i, h: s.h, strs, keys: strs.map(x => deaccent(normalize(plainText(x)))) }); yield; }
   }
+  return { items, lessons };
+}
+function verbText(v) { // a verb of the Verbs section: its infinitive, meanings and every form
+  const m = searchData().verbs;
+  let t = m.get(v);
+  if (t === undefined) m.set(v, t = "\n" + [v.it, arr(v.en).join(" "), v.f.flat().join(" ")].map(normalize).join("\n") + "\n");
+  return t;
+}
+function lookupHits(f) { // f normalised, 2 letters or more: the first 40 items whose fields hold it, best first:
+  // a whole field, then a whole word (f without spaces), the start of a field, anywhere; at each level flashcards come last
+  const sp = f.includes(" "), found = [];
+  for (const e of searchItems()) {
+    let at = e.t.indexOf(f), best = 3;
+    if (at < 0) continue;
+    for (; at >= 0 && best > 0; at = e.t.indexOf(f, at + 1)) {
+      const a = e.t[at - 1], b = e.t[at + f.length];
+      const s = a === "\n" && b === "\n" ? 0 : !sp && (a === "\n" || a === " ") && (b === "\n" || b === " ") ? 1 : a === "\n" ? 2 : 3;
+      if (s < best) best = s;
+    }
+    found.push([best, e]);
+  }
+  return found.sort((x, y) => x[0] - y[0] || x[1].flash - y[1].flash).slice(0, 40).map(x => x[1].i);
+}
+// While typing in a search box, only the results under it are drawn again, once typing pauses: the box, its cursor and the keyboard stay as they are.
+let typingTimer = 0, typingDraw = null;
+function afterTyping(draw) { clearTimeout(typingTimer); typingDraw = draw; typingTimer = setTimeout(drawTyped, 150); }
+function drawTyped() { clearTimeout(typingTimer); const d = typingDraw; typingDraw = null; if (d) d(); }
+function redrawResults(id, html) {
+  const box = document.getElementById(id); if (!box) return;
+  box.innerHTML = html(); nbHyphens(box); wire(box);
+}
+function renderLookup() {
   return `<header class="hdr"><h1 class="title">Look up</h1></header>
   <div class="searchbar"><div class="search-in">${icon("search", 20)}<label class="vh" for="lookupBox">Search the course</label><input type="text" id="lookupBox" placeholder="e.g. uomini, andrò, whose, 88" value="${esc(S.lookup || "")}" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"></div></div>
-  <p class="small muted">Search every word, verb form, sentence and rule question across all units, and the unit lessons. Try a plural, a conjugated form or an English meaning.</p>` +
-  (f.length < 2 ? "" : (hits.length ? `<div class="hits">` + hits.map(i => `<div class="card hit"><div class="unit">${esc((content.unitById[i.unit] || {}).title || i.unit)}</div>${rowHtml(i)}</div>`).join("") + `</div>` + (hits.length === 40 ? `<p class="small muted">Showing the first 40 matches.</p>` : "") : "") + lessonHitsHtml(f, hits.length));
+  <p class="small muted">Search every word, verb form, sentence and rule question across all units, and the unit lessons. Try a plural, a conjugated form or an English meaning.</p><div class="results" id="lookupResults">${lookupResultsHtml()}</div>`;
+}
+function lookupResultsHtml() {
+  const f = normalize(S.lookup || "");
+  if (f.length < 2) return "";
+  const hits = lookupHits(f);
+  return (hits.length ? `<div class="hits">` + hits.map(i => `<div class="card hit"><div class="unit">${esc((content.unitById[i.unit] || {}).title || i.unit)}</div>${rowHtml(i)}</div>`).join("") + `</div>` + (hits.length === 40 ? `<p class="small muted">Showing the first 40 matches.</p>` : "") : "") + lessonHitsHtml(f, hits.length);
 }
 function renderRules() {
   const units = content.units.filter(u => u.notes && u.notes.length);
@@ -16504,12 +16681,7 @@ function renderRules() {
     + units.map(u => `<section class="card rule" id="rules-${esc(u.id)}"><div class="eyebrow">${esc(unitEyebrow(u))}</div><h2 class="title-s">${esc(u.title)}</h2><div class="notes">${u.notes.map(n => `<p>${esc(n)}</p>`).join("")}</div><div class="btnrow wrap">${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">Lesson</button><button type="button" data-ref="${esc(u.id)}" data-tab="glossary">Glossary</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}<button type="button" data-unit="${esc(u.id)}">Practise</button><button type="button" class="quiet" data-rjump="top">Units ↑</button></div></section>`).join("");
 }
 function renderStats() {
-  const ids = Object.keys(progress.items).filter(id => content.items[id]);
-  const t = now();
-  const learned = ids.filter(id => rec(id).box >= 5).length;
-  const dueToday = ids.filter(id => rec(id).box >= 1 && rec(id).due <= t + 864e5).length;
-  const dueWeek = ids.filter(id => rec(id).box >= 1 && rec(id).due <= t + 7 * 864e5).length;
-  const lapsed = ids.map(id => [id, rec(id).lapses]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const t = now(), { learned, started, dueToday, dueWeek, lapsed, anyLapses, items } = counts();
   const days = Object.keys(progress.days).sort().slice(-14).reverse();
   const acc = (n) => { const a = accuracy(n); return a[1] ? pctOf(a) + " (" + a[0] + "/" + a[1] + ")" : "–"; };
   const byType = (() => { const cut = dayKey(t - 29 * 864e5), m = {}; for (const [d, v] of Object.entries(progress.days)) if (d >= cut && v.t) for (const [k, x] of Object.entries(v.t)) if (k !== "all") { m[k] = m[k] || [0, 0]; m[k][0] += x[0]; m[k][1] += x[1]; } return Object.entries(m).filter(e => e[1][1] > 0).sort((a, b) => (a[1][0] / a[1][1]) - (b[1][0] / b[1][1])); })();
@@ -16518,9 +16690,9 @@ function renderStats() {
   const stat = (k, v) => `<div class="stat"><span>${k}</span><span>${v}</span></div>`;
   return screenHead("Stats", { back: "you", backLabel: "You" }) + `
   <div class="card"><div class="bigs"><div><span class="big">${streak()}</span><span class="small muted">day streak</span></div><div><span class="big">${fmtN(learned)}</span><span class="small muted">items learned</span></div><div><span class="big">${pctOf(accuracy(30))}</span><span class="small muted">accuracy</span></div></div></div>
-  <div class="card rows">${stat("Accuracy, last 7 days", acc(7))}${stat("Accuracy, last 30 days", acc(30))}${stat("Items started", `${ids.filter(id => rec(id).box >= 1).length} of ${new Set(Object.keys(content.items).map(pid)).size}`)}${stat("Learned (box 5+)", learned)}${stat("Due today", dueToday)}${stat("Due this week", dueWeek)}${stat("Streak", `${streak()} day${streak() === 1 ? "" : "s"}`)}</div>
+  <div class="card rows">${stat("Accuracy, last 7 days", acc(7))}${stat("Accuracy, last 30 days", acc(30))}${stat("Items started", `${started} of ${items}`)}${stat("Learned (box 5+)", learned)}${stat("Due today", dueToday)}${stat("Due this week", dueWeek)}${stat("Streak", `${streak()} day${streak() === 1 ? "" : "s"}`)}</div>
   ${lapsed.length ? table("Most missed", lapsed.map(([id, n]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapse${n === 1 ? "" : "s"}</td><td class="muted">box ${rec(id).box}</td></tr>`).join("")) : ""}
-  ${Object.keys(progress.items).some(id => content.items[id] && progress.items[id].lapses >= 1) ? `<button type="button" class="wide" data-start="hard">Practise the most-missed items<small>the 15 items you have got wrong most often, across all units</small></button>` : ""}
+  ${anyLapses ? `<button type="button" class="wide" data-start="hard">Practise the most-missed items<small>the 15 items you have got wrong most often, across all units</small></button>` : ""}
   ${days.length ? table("Recent days", days.map(d => `<tr><td>${d}</td><td>${progress.days[d].xp || 0} XP</td><td class="muted">${progress.days[d].new || 0} new</td></tr>`).join("")) : ""}
   ${byType.length ? table("Accuracy by exercise type, 30 days", byType.map(([k, v]) => `<tr><td>${esc(typeName[k] || k)}</td><td>${Math.round(100 * v[0] / v[1])}%</td><td class="muted">${v[0]}/${v[1]}</td></tr>`).join(""), `<p class="small muted">Weakest types first.</p>`) : ""}`;
 }
@@ -16574,8 +16746,8 @@ function renderData() {
 }
 
 /* ---------- wiring ---------- */
-function wire() {
-  app.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
+function wire(root = app) { // root: the screen, or the part of it just drawn again (only its buttons and links are wired)
+  root.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
     const g = b.dataset.go;
     S.flash = null; S.report = null; S.exportText = null;
     if (g === "quit") { session = null; S.feedback = null; S.leaveAsk = false; S.screen = "home"; }
@@ -16583,33 +16755,33 @@ function wire() {
     S.scrollTo = b.dataset.to || null; // a You row can open a screen at one of its sections
     render();
   });
-  app.querySelectorAll("[data-start]").forEach(b => b.onclick = () => { S.flash = null; startSession(b.dataset.start); });
-  app.querySelectorAll("[data-setunit]").forEach(b => b.onclick = () => { progress.currentUnit = b.dataset.setunit; saveProgress(); render(); });
-  app.querySelectorAll("[data-unflag]").forEach(b => b.onclick = () => { const f = progress.flags[b.dataset.unflag]; if (f) { f.removed = true; f.updatedAt = now(); saveProgress(); render(); } });
-  app.querySelectorAll("[data-ref]").forEach(b => b.onclick = (e) => { e.preventDefault(); S.flash = null; S.refUnit = b.dataset.ref; S.refFilter = ""; if (b.dataset.tab) S.refTab = b.dataset.tab; S.jumpSec = b.dataset.jump != null ? Number(b.dataset.jump) : null; S.screen = "reference"; render(); });
-  app.querySelectorAll("[data-reftab]").forEach(b => b.onclick = () => { S.refTab = b.dataset.reftab; render(); });
-  app.querySelectorAll("[data-rjump]").forEach(b => b.onclick = () => { const t = document.getElementById(b.dataset.rjump === "top" ? "rulestop" : "rules-" + b.dataset.rjump); if (t) t.scrollIntoView({ block: "start" }); });
-  app.querySelectorAll("[data-lsec]").forEach(b => b.onclick = (e) => { e.preventDefault(); const t = document.getElementById(b.dataset.lsec === "toc" ? "toclabel" : "lsec-" + b.dataset.lsec); if (t) t.scrollIntoView({ block: "start" }); });
-  app.querySelectorAll("[data-unit]").forEach(b => b.onclick = () => { S.flash = null; startSession(isFlashUnit(b.dataset.unit) ? "flashcards" : isVerbUnit(b.dataset.unit) ? "verbs" : "unit", b.dataset.unit); });
-  app.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => answerOption(b.dataset.opt));
-  app.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { S.bankPicked = (S.bankPicked || []).concat(Number(b.dataset.pick)); render(); });
-  app.querySelectorAll("[data-unpick]").forEach(b => b.onclick = () => { const i = Number(b.dataset.unpick); S.bankPicked = (S.bankPicked || []).filter(x => x !== i); render(); });
-  app.querySelectorAll("[data-spot]").forEach(b => b.onclick = () => spotTap(Number(b.dataset.spot)));
-  app.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { const [r, g] = b.dataset.sort.split(":").map(Number); S.sortSel = Object.assign({}, S.sortSel, { [r]: g }); render(); });
-  app.querySelectorAll("[data-match]").forEach(b => b.onclick = () => matchTap(b.dataset.match));
-  app.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => insertChar(b.dataset.ch));
-  app.querySelectorAll("[data-set]").forEach(sel => sel.onchange = () => {
+  root.querySelectorAll("[data-start]").forEach(b => b.onclick = () => { S.flash = null; startSession(b.dataset.start); });
+  root.querySelectorAll("[data-setunit]").forEach(b => b.onclick = () => { progress.currentUnit = b.dataset.setunit; saveProgress(); render(); });
+  root.querySelectorAll("[data-unflag]").forEach(b => b.onclick = () => { const f = progress.flags[b.dataset.unflag]; if (f) { f.removed = true; f.updatedAt = now(); saveProgress(); render(); } });
+  root.querySelectorAll("[data-ref]").forEach(b => b.onclick = (e) => { e.preventDefault(); S.flash = null; S.refUnit = b.dataset.ref; S.refFilter = ""; if (b.dataset.tab) S.refTab = b.dataset.tab; S.jumpSec = b.dataset.jump != null ? Number(b.dataset.jump) : null; S.screen = "reference"; render(); });
+  root.querySelectorAll("[data-reftab]").forEach(b => b.onclick = () => { S.refTab = b.dataset.reftab; render(); });
+  root.querySelectorAll("[data-rjump]").forEach(b => b.onclick = () => { const t = document.getElementById(b.dataset.rjump === "top" ? "rulestop" : "rules-" + b.dataset.rjump); if (t) t.scrollIntoView({ block: "start" }); });
+  root.querySelectorAll("[data-lsec]").forEach(b => b.onclick = (e) => { e.preventDefault(); const t = document.getElementById(b.dataset.lsec === "toc" ? "toclabel" : "lsec-" + b.dataset.lsec); if (t) t.scrollIntoView({ block: "start" }); });
+  root.querySelectorAll("[data-unit]").forEach(b => b.onclick = () => { S.flash = null; startSession(isFlashUnit(b.dataset.unit) ? "flashcards" : isVerbUnit(b.dataset.unit) ? "verbs" : "unit", b.dataset.unit); });
+  root.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => answerOption(b.dataset.opt));
+  root.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { S.bankPicked = (S.bankPicked || []).concat(Number(b.dataset.pick)); render(); });
+  root.querySelectorAll("[data-unpick]").forEach(b => b.onclick = () => { const i = Number(b.dataset.unpick); S.bankPicked = (S.bankPicked || []).filter(x => x !== i); render(); });
+  root.querySelectorAll("[data-spot]").forEach(b => b.onclick = () => spotTap(Number(b.dataset.spot)));
+  root.querySelectorAll("[data-sort]").forEach(b => b.onclick = () => { const [r, g] = b.dataset.sort.split(":").map(Number); S.sortSel = Object.assign({}, S.sortSel, { [r]: g }); render(); });
+  root.querySelectorAll("[data-match]").forEach(b => b.onclick = () => matchTap(b.dataset.match));
+  root.querySelectorAll("[data-ch]").forEach(b => b.onclick = () => insertChar(b.dataset.ch));
+  root.querySelectorAll("[data-set]").forEach(sel => sel.onchange = () => {
     let v = sel.value; if (v === "true") v = true; else if (v === "false") v = false; else if (/^\d+$/.test(v)) v = Number(v);
     progress.settings[sel.dataset.set] = v; progress.settingsUpdatedAt = now(); saveProgress();
   });
-  app.querySelectorAll("[data-removepack]").forEach(b => b.onclick = () => {
+  root.querySelectorAll("[data-removepack]").forEach(b => b.onclick = () => {
     const id = b.dataset.removepack;
     if (!confirm(`Remove pack "${id}"? Progress on its items is kept but hidden.`)) return;
     delete packs[id]; lsSet(LS_PACKS, packs); buildContent(); syncPackDelete(id); render();
   });
-  app.querySelectorAll("[data-act]").forEach(b => b.onclick = () => action(b.dataset.act));
-  app.querySelectorAll("[data-useg]").forEach(b => b.onclick = () => { S.unitSeg = b.dataset.useg; render(); });
-  app.querySelectorAll("[data-upick]").forEach(b => b.onclick = () => {
+  root.querySelectorAll("[data-act]").forEach(b => b.onclick = () => action(b.dataset.act));
+  root.querySelectorAll("[data-useg]").forEach(b => b.onclick = () => { S.unitSeg = b.dataset.useg; render(); });
+  root.querySelectorAll("[data-upick]").forEach(b => b.onclick = () => {
     const top = b.getBoundingClientRect().top;
     S.flash = null; S.unitPick = b.dataset.upick; render();
     const card = app.querySelector(".ucard"); if (!card) return;
@@ -16618,9 +16790,10 @@ function wire() {
     if (over > 0) window.scrollBy(0, over); // and its buttons clear the tab bar
     const go = card.querySelector("[data-unit]"); if (go) go.focus({ preventScroll: true });
   });
-  app.querySelectorAll("[data-appearance]").forEach(b => b.onclick = () => setTheme(b.dataset.appearance));
-  app.querySelectorAll("[data-audio]").forEach(b => b.onclick = () => setAudio(b.dataset.audio));
+  root.querySelectorAll("[data-appearance]").forEach(b => b.onclick = () => setTheme(b.dataset.appearance));
+  root.querySelectorAll("[data-audio]").forEach(b => b.onclick = () => setAudio(b.dataset.audio));
   markSaying();
+  if (root !== app) return;
   const pk = document.getElementById("sec-packs"); if (pk) pk.ontoggle = () => { S.packsOpen = pk.open; };
   const sb = document.getElementById("sheetBg");
   if (sb) { sb.onclick = (e) => { if (e.target === sb) action("stay"); }; const k = sb.querySelector(".sheet"); if (k) k.focus({ preventScroll: true }); } // focus moves into the sheet (and the keyboard closes)
@@ -16634,9 +16807,9 @@ function wire() {
   if (fldInputs.length && !S.feedback && !S.leaveAsk) fldInputs[0].focus();
   if (S.feedback && !S.leaveAsk) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
   const lb = document.getElementById("lookupBox");
-  if (lb) { lb.oninput = () => { const pos = lb.selectionStart; S.lookup = lb.value; render(); const n = document.getElementById("lookupBox"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }; if (!S.lookup) lb.focus(); }
+  if (lb) { lb.oninput = () => { S.lookup = lb.value; afterTyping(() => redrawResults("lookupResults", lookupResultsHtml)); }; if (!S.lookup) lb.focus(); }
   const rf = document.getElementById("refFilter");
-  if (rf) { rf.oninput = () => { const pos = rf.selectionStart; S.refFilter = rf.value; render(); const n = document.getElementById("refFilter"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } }; }
+  if (rf) rf.oninput = () => { S.refFilter = rf.value; afterTyping(() => { const u = content.unitById[S.refUnit]; if (u) redrawResults("refResults", () => u.mode === "verbs" ? verbListHtml() : glossaryHtml(u)); }); };
   const pf = document.getElementById("packFile"); if (pf) pf.onchange = () => readFile(pf, txt => { document.getElementById("packText").value = txt; action("importPack"); });
   const prf = document.getElementById("progressFile"); if (prf) prf.onchange = () => readFile(prf, txt => { document.getElementById("progressText").value = txt; action("importProgress"); });
 }
@@ -16964,12 +17137,15 @@ function initInstall() {
   const l = document.createElement("link"); l.rel = "manifest"; l.href = "manifest.webmanifest"; document.head.appendChild(l);
   navigator.serviceWorker.addEventListener("message", e => onWorkerMessage(e.data || {}));
   navigator.serviceWorker.register("sw.js").catch(e => { S.offlineError = true; console.warn("offline copy unavailable", e); });
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkForUpdate(); });
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && now() - lastUpdateCheck >= 3 * 3600e3) checkForUpdate(); });
   protectStorage();
   checkForUpdate();
 }
+// A check on opening, and from Check for updates; coming back to the app checks again only if the last check was over 3 hours ago.
+let lastUpdateCheck = 0;
 function checkForUpdate(manual) {
   if (!HOSTED) return;
+  lastUpdateCheck = now();
   if (manual) { S.updateState = "checking"; render(); }
   navigator.serviceWorker.ready.then(r => { if (r.active) r.active.postMessage({ type: "check" }); }).catch(() => { });
 }
@@ -17031,13 +17207,12 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.2";
-const CHANGES = "Nothing in the app should look or work any differently. Behind the scenes, the lessons, words and exercises are now stored one entry per line, so each change to them can be checked line by line."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.3";
+const CHANGES = "Ripasso is quicker on the phone: it opens sooner, Look up answers as you type, the Verbs list opens at once, and Today, Units and Stats come up straight away. Nothing else changes: the same exercises, answers and progress."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
-loadLocal();
+const tidied = loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new
-buildContent();
-saveProgress(false);
+if (buildContent() || tidied) saveProgress(false); // saved again only if loading it changed it
 render();
 initSync();
 initInstall();
