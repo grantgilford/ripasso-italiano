@@ -2,7 +2,7 @@
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
-To see which types a unit already uses, run `node tools/unit-items.js --counts`; to read a unit's items, `node tools/unit-items.js u01` (add `--type spot` for one type).
+To see which types a unit already uses, run `node tools/unit-items.js --counts`; to read a unit's items, `node tools/unit-items.js u01` (add `--type spot` for one type). To see the mix of exercises a unit actually gives (how many kinds, and how much the commonest takes), run `node tools/variety.js`; its figures for the current version are under Measured mix below.
 
 ## How an exercise is chosen
 
@@ -65,6 +65,61 @@ Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all
 | reply | u04 (*Hai fame? Sì, ho fame*), u09 (answering question words), u14 (formal exchanges, commands), u15 (*Che ore sono?*), u18 (reactions and slang replies) |
 | sort | u05 (*essere* or *avere* in the *passato prossimo*), u08 (adjective or adverb), u10 (*di* or *da*), u11 (conjunctions that take the subjunctive or not), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
 | match | u07 (digits ↔ words), u09 (question word ↔ meaning), u11 (conjunction ↔ meaning), u15 (clock times), u16 (sentence halves joined by *che / cui*), u18 (slang ↔ plain Italian) |
+
+## Measured mix (9.2)
+
+What `node tools/variety.js --markdown` printed for version 9.2: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
+
+| Unit | Items | Kinds | Most common | Second | Flag |
+|---|---:|---:|---|---|---|
+| u01 Essere, subject pronouns & basics | 304 | 18 | `recall` 26% | `grammar` 12% |  |
+| u02 Nouns, gender & articles | 325 | 16 | `recall` 17% | `article` 15% |  |
+| u03 Present tense: regular -are verbs | 299 | 13 | `conjugation` 36% | `grammar` 15% | conjugation above 35% |
+| u04 Irregular verbs: present tense | 271 | 7 | `grammar` 23% | `conjugation` 21% | fewer than 10 kinds |
+| u05 Verb tenses: present, past, future and conditional | 329 | 7 | `conjugation` 31% | `grammar` 19% | fewer than 10 kinds |
+| u06 Adjectives | 268 | 11 | `recall` 29% | `agreement` 26% |  |
+| u19 Possessives | 248 | 14 | `transform` 16% | `spot` 12% |  |
+| u07 Numbers | 159 | 12 | `number` 48% | `recall` 17% | number above 35% |
+| u08 Adverbs | 196 | 8 | `recall` 54% | `grammar` 16% | fewer than 10 kinds; recall above 35% |
+| u09 Questions | 192 | 9 | `recall` 38% | `cloze` 18% | fewer than 10 kinds; recall above 35% |
+| u10 Prepositions | 200 | 11 | `recall` 42% | `cloze` 15% | recall above 35% |
+| u11 Conjunctions | 140 | 8 | `recall` 44% | `grammar` 17% | fewer than 10 kinds; recall above 35% |
+| u12 The subjunctive (congiuntivo) | 202 | 10 | `recall` 21% | `cloze` 17% |  |
+| u13 Object pronouns, reflexives, ne & ci | 158 | 10 | `transform` 34% | `recall` 20% |  |
+| u14 Formal & informal: register and the imperative | 284 | 12 | `transform` 26% | `recall` 25% |  |
+| u15 Time: days, months, dates, clock, duration | 268 | 14 | `recall` 48% | `clock` 9% | recall above 35% |
+| u16 Building longer sentences: relative pronouns, gerund, impersonal si | 101 | 10 | `transform` 25% | `recall` 24% |  |
+| u18 Colloquial Italian & slang | 218 | 13 | `recall` 32% | `cloze` 14% |  |
+| u17 Wild card | 98 | 16 | `transform` 22% | `grammar` 16% |  |
+
+Over all 19 units (4260 items):
+
+| Kind | Share | Units using it |
+|---|---:|---:|
+| `recall` | 23% | 17 |
+| `grammar` | 14% | 19 |
+| `cloze` | 13% | 19 |
+| `conjugation` | 9% | 12 |
+| `transform` | 9% | 13 |
+| `translate` | 7% | 19 |
+| `listen` | 6% | 19 |
+| `bank` | 5% | 19 |
+| `agreement` | 2% | 6 |
+| `article` | 2% | 10 |
+| `number` | 2% | 2 |
+| `plural` | 2% | 10 |
+| `spot` | 2% | 3 |
+| `endings` | 1% | 3 |
+| `reply` | 1% | 3 |
+| `meaning` | 1% | 17 |
+| `match` | 1% | 3 |
+| `sort` | 1% | 3 |
+| `clock` | 1% | 2 |
+| `flip` | 1% | 17 |
+| `preparticle` | <1% | 2 |
+| `intro` | <1% | 1 |
+
+Flagged: 9 of 19 units.
 
 ## Ideas not yet built
 

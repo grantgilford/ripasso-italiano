@@ -17031,8 +17031,8 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.1";
-const CHANGES = "After each update, a card like this one tells you what's new. Behind the scenes, GitHub now tests every change automatically before it reaches you."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.2";
+const CHANGES = "Nothing in the app should look or work any differently. Behind the scenes, the lessons, words and exercises are now stored one entry per line, so each change to them can be checked line by line."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
 loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new
