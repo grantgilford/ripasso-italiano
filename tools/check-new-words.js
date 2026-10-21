@@ -22,27 +22,14 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
+const { loadApp } = require("./lib/load-app");
 
 const args = process.argv.slice(2);
 if (!args[0]) { console.error("Usage: node tools/check-new-words.js words.txt [path/to/index.html]"); process.exit(2); }
 const html = fs.readFileSync(args[1] || path.join(__dirname, "..", "index.html"), "utf8");
 
-/* load the content, as tools/check-content.js does */
-// the app's script is the inline one with the boot section (a small snippet in <head> comes first)
-const code = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes("/* ---------- boot ---------- */")) || "";
-const boot = code.indexOf("/* ---------- boot ---------- */");
-if (boot < 0) { console.error("Could not find the boot section in the script; the loader needs updating."); process.exit(1); }
-const noop = () => {};
-const stubEl = () => ({ addEventListener: noop, appendChild: noop, setAttribute: noop, style: {}, classList: { add: noop, remove: noop, toggle: noop } });
-const sandbox = {
-  console, setTimeout: noop, clearTimeout: noop, setInterval: noop,
-  localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
-  document: { addEventListener: noop, createElement: stubEl, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], body: stubEl(), documentElement: stubEl() },
-  navigator: { userAgent: "node" }, location: { hash: "" }, matchMedia: () => ({ matches: false, addEventListener: noop }),
-};
-sandbox.window = sandbox; sandbox.addEventListener = noop; sandbox.removeEventListener = noop;
-const app = vm.runInNewContext(code.slice(0, boot) + "\n;({ BUILTIN_PACKS, VERB_GYM })", sandbox, { filename: "index.html <script>" });
+/* load the content (tools/lib/load-app.js) */
+const app = loadApp("BUILTIN_PACKS, VERB_GYM", { html });
 const arr = x => Array.isArray(x) ? x : (x == null ? [] : [x]);
 
 const known = []; // { w, where }

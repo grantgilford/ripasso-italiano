@@ -18,7 +18,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const vm = require("vm");
+const { loadApp } = require("./lib/load-app");
 
 const args = process.argv.slice(2);
 const DRY = args.includes("--dry-run");
@@ -32,15 +32,7 @@ if (!Array.isArray(items)) items = items.items;
 if (!Array.isArray(items) || !items.length) { console.error("No items found."); process.exit(1); }
 
 // the app's own checks
-const code = [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]).find(s => s.includes("/* ---------- boot ---------- */"));
-const boot = code.indexOf("/* ---------- boot ---------- */");
-const noop = () => {};
-const el = () => ({ addEventListener: noop, appendChild: noop, setAttribute: noop, style: {}, classList: { add: noop, remove: noop, toggle: noop } });
-const sb = { console, setTimeout: noop, clearTimeout: noop, setInterval: noop, localStorage: { getItem: () => null, setItem: noop, removeItem: noop },
-  document: { addEventListener: noop, createElement: el, getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], body: el(), documentElement: el() },
-  navigator: { userAgent: "node" }, location: { hash: "" }, matchMedia: () => ({ matches: false, addEventListener: noop }) };
-sb.window = sb; sb.addEventListener = noop; sb.removeEventListener = noop;
-const app = vm.runInNewContext(code.slice(0, boot) + "\n;({ buildContent, validatePack, getContent: () => content, BUILTIN })", sb);
+const app = loadApp("buildContent, validatePack, getContent: () => content, BUILTIN", { html });
 app.buildContent();
 const content = app.getContent();
 

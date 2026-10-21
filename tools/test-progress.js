@@ -27,8 +27,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const http = require("http");
-const { execSync } = require("child_process");
+const { loadPlaywright, serveApp, checks } = require("./lib/browser");
 
 const args = process.argv.slice(2);
 const UPDATE_IDS = args.includes("--update-ids");
@@ -36,12 +35,6 @@ const HEADED = args.includes("--headed");
 const file = path.resolve(args.find(a => !a.startsWith("--")) || path.join(__dirname, "..", "index.html"));
 const IDS_FILE = path.join(__dirname, "item-ids.txt");
 
-function loadPlaywright() {
-  try { return require("playwright"); } catch (e) { }
-  try { return require(path.join(execSync("npm root -g").toString().trim(), "playwright")); } catch (e) { }
-  console.error("Playwright is not installed. Install it with: npm install -g playwright");
-  process.exit(2);
-}
 const { chromium } = loadPlaywright();
 
 /* ---------- the storage formats, as documented in CLAUDE.md ---------- */
@@ -58,27 +51,10 @@ const packRec = r => REC_FIELDS.map(k => r[k] || 0);
 const unpackRec = a => Object.fromEntries(REC_FIELDS.map((k, i) => [k, a[i] || 0]));
 
 /* ---------- results ---------- */
-let failures = 0;
-const results = [];
-function check(name, ok, detail) {
-  results.push({ name, ok });
-  if (!ok) failures++;
-  console.log(`${ok ? "  ok  " : "  FAIL"} ${name}${!ok && detail ? "\n         " + String(detail).replace(/\n/g, "\n         ") : ""}`);
-}
-const section = t => console.log("\n" + t);
+const results = checks(), { check, section } = results;
 const canon = o => JSON.stringify(o, (k, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
 const same = (a, b) => canon(a) === canon(b); // ignores the order of keys
 const recEq = (a, b) => a && b && REC_FIELDS.every(k => (a[k] || 0) === (b[k] || 0));
-
-/* ---------- a local server: the app, plus a blank page on the same origin for seeding storage ---------- */
-function serve() {
-  const html = fs.readFileSync(file);
-  const server = http.createServer((req, res) => {
-    if (req.url.startsWith("/index.html")) { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
-    else { res.writeHead(200, { "content-type": "text/html" }); res.end("<!doctype html><title>blank</title>"); }
-  });
-  return new Promise(r => server.listen(0, "127.0.0.1", () => r(server)));
-}
 
 /* ---------- a fake cloud database, shaped like window.claude.use("db") ----------
    The documents live here in Node, so they survive page reloads and can be inspected. */
@@ -195,7 +171,7 @@ async function runSession(page, start, maxSteps = 200) {
 
 /* ---------- main ---------- */
 (async () => {
-  const server = await serve();
+  const server = await serveApp(file); // the app, plus a blank page on the same origin for seeding storage
   const origin = "http://127.0.0.1:" + server.address().port;
   const browser = await chromium.launch({ headless: !HEADED });
   const T = Date.now(), DAY = 864e5;
@@ -411,12 +387,10 @@ async function runSession(page, start, maxSteps = 200) {
       } else if (added.length) console.log(`  note ${added.length} new items are not in tools/item-ids.txt yet; run with --update-ids to add them`);
     }
   } catch (e) {
-    failures++;
-    console.log("\n  FAIL the test itself stopped: " + (e && e.stack || e));
+    results.stopped(e);
   } finally {
     await browser.close();
     server.close();
   }
-  console.log(failures ? `\n${failures} check(s) failed.` : `\nAll ${results.length} checks passed.`);
-  process.exit(failures ? 1 : 0);
+  results.summary();
 })();

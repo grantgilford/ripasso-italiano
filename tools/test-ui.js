@@ -46,43 +46,26 @@
        mistake), Sort the words, Match the pairs, Choose / Write the reply,
        Complete the endings (Enter moves between blanks), Listen and type (Play,
        Slow, and Can't listen now, which costs nothing) and Make it plural, each
-       with the 44 px and no-sideways-scroll rules and the right answer panel.
+       with the 44 px and no-sideways-scroll rules and the right answer panel;
+   10. What's new: a new device starts with this version seen (no card); after
+       the version changes Today shows "What's new in <version>" with CHANGES,
+       as its only notice, in the layout rules, until Got it is tapped, which is
+       remembered per device in itapp.seen.v1 (never in progress); a device with
+       progress from before 9.1 gets it too, and so does the copy in claude.ai.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
 "use strict";
-const fs = require("fs");
 const path = require("path");
-const http = require("http");
-const { execSync } = require("child_process");
+const { loadPlaywright, serveApp, checks } = require("./lib/browser");
 
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
 const file = path.resolve(args.find(a => !a.startsWith("--")) || path.join(__dirname, "..", "index.html"));
 
-function loadPlaywright() {
-  try { return require("playwright"); } catch (e) { }
-  try { return require(path.join(execSync("npm root -g").toString().trim(), "playwright")); } catch (e) { }
-  console.error("Playwright is not installed. Install it with: npm install -g playwright");
-  process.exit(2);
-}
 const { chromium } = loadPlaywright();
 
-let failures = 0, total = 0;
-function check(name, ok, detail) {
-  total++;
-  if (!ok) failures++;
-  if (!ok || process.env.VERBOSE) console.log(`${ok ? "  ok  " : "  FAIL"} ${name}${!ok && detail ? "\n         " + String(detail).replace(/\n/g, "\n         ") : ""}`);
-}
-
-function serve() {
-  const html = fs.readFileSync(file);
-  const server = http.createServer((req, res) => {
-    if (req.url.startsWith("/index.html")) { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); res.end(html); }
-    else { res.writeHead(200, { "content-type": "text/html" }); res.end("<!doctype html><title>blank</title>"); }
-  });
-  return new Promise(r => server.listen(0, "127.0.0.1", () => r(server)));
-}
+const results = checks({ onlyFailures: true }), { check } = results; // VERBOSE=1 prints every check
 
 const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefined' && S.screen === 'home'";
 // Some saved practice, so every screen has something on it: units learned and under way, cards, verbs, mistakes, a streak, a flag.
@@ -533,7 +516,7 @@ async function readAloud(browser, origin) {
 }
 
 (async () => {
-  const server = await serve();
+  const server = await serveApp(file);
   const origin = "http://127.0.0.1:" + server.address().port;
   const browser = await chromium.launch({ headless: !HEADED });
   try {
@@ -717,18 +700,54 @@ async function readAloud(browser, origin) {
       console.log("  English contractions checked");
     }
 
+    /* What's new: once on Today after the version changes, in every copy, remembered per device and never synced */
+    {
+      const { page, context } = await openApp(browser, origin, { width: 360, height: 740, scheme: "dark" });
+      const card = () => page.evaluate(() => { const c = document.getElementById("n-new"); return c ? { title: c.querySelector(".notice-h").textContent, text: c.querySelector("p").textContent, notices: document.querySelectorAll(".notice").length } : null; });
+      const seen = () => page.evaluate(() => JSON.parse(localStorage.getItem("itapp.seen.v1")));
+      const reload = async () => { await page.reload(); await page.waitForFunction(ready); };
+      const v = await page.evaluate("APP_VERSION"), changes = await page.evaluate("CHANGES");
+      check("What's new: a new device starts with this version seen, so Today shows no card", !(await card()) && (await seen()) === v, JSON.stringify(await seen()));
+      const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
+      await page.evaluate(() => localStorage.setItem("itapp.seen.v1", JSON.stringify("9.0-old"))); await reload();
+      const c = await card();
+      check("What's new: after the version changes, Today shows What's new in this version with its CHANGES, as its only notice", c && c.title === `What's new in ${v}` && c.text === changes && c.notices === 1, JSON.stringify(c));
+      check("What's new: the Continue card is still on Today", !!(await page.$('.hero[data-start="continue"]')));
+      await layout(page, "What's new, 360×740 dark");
+      await reload();
+      check("What's new: it stays until it is dismissed", !!(await card()));
+      await tap(page, '#n-new [data-act="newSeen"]');
+      check("What's new: Got it dismisses it and remembers this version", !(await card()) && (await seen()) === v, JSON.stringify(await seen()));
+      await reload();
+      check("What's new: …for good, on this device", !(await card()));
+      await page.evaluate(() => localStorage.removeItem("itapp.seen.v1")); await reload();
+      check("What's new: a device with progress from before 9.1 (no key yet) gets the card too", !!(await card()));
+      check("What's new: saved progress is untouched", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore);
+      check("What's new: it is not part of progress, so it never syncs", await page.evaluate(() => !/9\.0-old|itapp\.seen/.test(JSON.stringify(progress)) && !Object.keys(progress).some(k => /seen/i.test(k)) && !Object.keys(progress.settings).some(k => /seen/i.test(k))));
+      check("What's new: no script errors", !page.errors.length, page.errors.join("\n"));
+      await context.close();
+    }
+    { // not installed-copy code, so the copy in claude.ai shows it too
+      const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light", init: () => { window.claude = { use: async () => null }; } });
+      await page.evaluate(() => localStorage.setItem("itapp.seen.v1", JSON.stringify("9.0-old")));
+      await page.reload(); await page.waitForFunction(ready);
+      check("What's new: inside claude.ai, Today shows it too", !!(await page.$("#n-new")) && (await page.evaluate("IN_CLAUDE")));
+      await layout(page, "What's new, in claude.ai at 390×844");
+      check("What's new, in claude.ai: no script errors", !page.errors.length, page.errors.join("\n"));
+      await context.close();
+      console.log("  What's new checked");
+    }
+
     /* The exercise types added in v8.6 */
     await newTypes(browser, origin);
 
     /* Read aloud */
     await readAloud(browser, origin);
   } catch (e) {
-    failures++;
-    console.log("\n  FAIL the test itself stopped: " + (e && e.stack || e));
+    results.stopped(e);
   } finally {
     await browser.close();
     server.close();
   }
-  console.log(failures ? `\n${failures} of ${total} check(s) failed.` : `\nAll ${total} checks passed.`);
-  process.exit(failures ? 1 : 0);
+  results.summary({ ofTotal: true });
 })();
