@@ -22,7 +22,7 @@ function seedProgress() {
   const ids = [...spread(grammar, 3000), ...pack("Vocab pack 1"), ...pack("Vocab pack 2").slice(0, 900), ...pack("Vocab pack 3").slice(0, 500), ...own("vb").slice(0, 1200)];
   const items = {};
   for (const id of ids) {
-    const box = 1 + Math.floor(rnd() * rnd() * 7.99), lastSeen = T - Math.floor(rnd() * 45 * D);
+    const box = Math.min(7, 1 + Math.floor(rnd() * rnd() * 7.99)), lastSeen = T - Math.floor(rnd() * 45 * D);
     const lapses = rnd() < 0.18 ? 1 + Math.floor(rnd() * 3) : 0, wrong = lapses && rnd() < 0.5;
     items[id] = { box, due: lastSeen + [0, 1, 2, 4, 8, 16, 32, 64][box] * D * (0.6 + rnd()), lapses, lastSeen, lastWrong: wrong ? lastSeen : lapses ? lastSeen - 3 * D : 0, seenCount: box + 2 * lapses + Math.floor(rnd() * 4), lastRight: wrong ? 0 : lastSeen };
   }

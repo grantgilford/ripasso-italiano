@@ -18,6 +18,18 @@
     6. A new device with an empty browser gets all its progress from the cloud.
     7. Every item id that has ever had progress still exists or is aliased
        (the list is tools/item-ids.txt; --update-ids adds new ids to it).
+    8. Room: with a record for every item in the course, each cloud document
+       stays under 200 KB (the limit is 256 KB) and the browser copy under
+       3 MB; both sizes are printed.
+    9. Damaged records (a box out of range, numbers written as text, negatives,
+       nulls, records that aren't records) are repaired or left out: in the
+       browser copy, in a backup file (which says how many) and in the cloud's
+       shards, whose copy is then written back repaired.
+   10. Only what changed is written to the cloud: an answer, an undo, a
+       setting and the current unit write only their own documents; another
+       device's write is merged and answered only where this device is newer;
+       a change made without being marked still reaches the cloud when the app
+       is put away; a backup and a reset reach it too.
 
   The storage formats are written out here by hand, not borrowed from the app,
   so a change to either format makes this test fail until a migration is
@@ -52,6 +64,7 @@ const unpackRec = a => Object.fromEntries(REC_FIELDS.map((k, i) => [k, a[i] || 0
 
 /* ---------- results ---------- */
 const results = checks(), { check, section } = results;
+const KB = 1024, MB = 1024 * 1024, kb = n => (n / KB).toFixed(1) + " KB";
 const canon = o => JSON.stringify(o, (k, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
 const same = (a, b) => canon(a) === canon(b); // ignores the order of keys
 const recEq = (a, b) => a && b && REC_FIELDS.every(k => (a[k] || 0) === (b[k] || 0));
@@ -385,6 +398,176 @@ async function runSession(page, start, maxSteps = 200) {
         fs.writeFileSync(IDS_FILE, known.concat(added.sort()).join("\n") + "\n");
         console.log(`         added ${added.length} new ids to tools/item-ids.txt`);
       } else if (added.length) console.log(`  note ${added.length} new items are not in tools/item-ids.txt yet; run with --update-ids to add them`);
+    }
+
+    /* 8. Room */
+    section("8. Room: a record for every item in the course fits");
+    {
+      // Every record the course can hold (an alias's old id and a shared exercise's copies hold none of their own), each
+      // with figures as long as they get, two years of daily log using 15 kinds of exercise a day, and the seed's flags.
+      const ids = [...new Set(info.items.map(i => canonicalOf(i[0])))];
+      const items = Object.fromEntries(ids.map(id => [id, { box: 7, due: T + 60 * DAY, lapses: 12, lastSeen: T - 1, lastWrong: T - DAY, seenCount: 123, lastRight: T - 1 }]));
+      const kinds = ["all", "recall", "cloze", "flip", "translate", "meaning", "flashcard", "conjugation", "grammar", "transform", "spot", "reply", "sort", "match", "listen"], days = {};
+      for (let d = 0; d < 730; d++) { const t = new Date(T - d * DAY); days[t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0")] = { xp: 650, new: 15, cards: 40, t: Object.fromEntries(kinds.map(k => [k, [45, 52]])) }; }
+      const big = Object.assign({}, seed, { items, days });
+      const cloud = makeCloud();
+      const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: big }, cloud });
+      await settleSync(page);
+      const saved = await page.evaluate(() => { saveProgress(); return !S.saveFailed; }); // saved once more, as after an answer
+      const lsSize = await page.evaluate(k => localStorage.getItem(k).length, LS_PROGRESS);
+      const sizes = [...cloud.docs.entries()].filter(([k]) => k.startsWith("progress2/")).map(([k, v]) => [k.slice(10), Buffer.byteLength(JSON.stringify(v))]).sort((a, b) => b[1] - a[1]);
+      const shards = sizes.filter(([k]) => /^s\d\d$/.test(k)), others = sizes.filter(([k]) => !/^s\d\d$/.test(k));
+      const inCloud = shards.reduce((n, [k]) => n + Object.keys(cloud.docs.get("progress2/" + k).items).length, 0);
+      console.log(`         ${ids.length} records: largest shard ${shards[0][0]} ${kb(shards[0][1])}, smallest ${kb(shards[shards.length - 1][1])}; largest other document ${others[0][0]} ${kb(others[0][1])}; browser copy ${(lsSize / MB).toFixed(2)} MB`);
+      check(`all ${ids.length} records reach the cloud`, inCloud === ids.length, `${inCloud} in the cloud`);
+      check(`the largest shard document stays under 200 KB (${kb(shards[0][1])}, ${shards[0][0]}; the limit is 256 KB)`, shards[0][1] < 200 * KB);
+      check(`every other cloud document stays under 200 KB too (largest ${others[0][0]}, ${kb(others[0][1])})`, others[0][1] < 200 * KB);
+      check(`the browser copy stays under 3 MB (${(lsSize / MB).toFixed(2)} MB)`, lsSize < 3 * MB);
+      check("…and the browser agreed to save it", saved);
+      check("no script errors", !page.__errors, page.__errors);
+      await context.close();
+    }
+
+    /* 9. Damaged records */
+    section("9. Damaged records are repaired or left out");
+    {
+      // Ids the seed doesn't hold, each given a damaged record: what the guard should make of it (null: left out).
+      const spare = pickN(i => i[2] === "grammar" && !seedItems[i[0]], 400).slice(200, 212);
+      const ok = { due: T + DAY, lapses: 1, lastSeen: T - DAY, lastWrong: T - 2 * DAY, seenCount: 4, lastRight: T - DAY };
+      const cases = [
+        ["a box above 7", Object.assign({}, ok, { box: 9 }), Object.assign({}, ok, { box: 7 })],
+        ["numbers written as text", Object.assign({}, ok, { box: "3", due: String(T), seenCount: "6" }), Object.assign({}, ok, { box: 3, due: T, seenCount: 6 })],
+        ["fractions where whole numbers belong, and a negative count", Object.assign({}, ok, { box: 2.6, seenCount: 3.7, lapses: -1 }), Object.assign({}, ok, { box: 3, seenCount: 4, lapses: 0 })],
+        ["a negative time, a NaN saved as null, text and infinity", Object.assign({}, ok, { box: 4, due: -5, lastWrong: null, lastRight: "soon", lastSeen: "Infinity" }), Object.assign({}, ok, { box: 4, due: 0, lastWrong: 0, lastRight: 0, lastSeen: 0 })],
+        ["a negative box", Object.assign({}, ok, { box: -2 }), Object.assign({}, ok, { box: 0 })],
+        ["null instead of a record", null, null],
+        ["text instead of a record", "box 3", null],
+        ["a record with no box", Object.assign({}, ok), null],
+        ["a box saved as null (NaN)", Object.assign({}, ok, { box: null }), null],
+        ["a packed array in the browser copy", [3, T, 0, T - DAY, 0, 2, 0], null],
+      ];
+      const damaged = Object.fromEntries(cases.map((c, k) => [spare[k], c[1]]));
+      const nRepaired = cases.filter(c => c[2]).length, nSkipped = cases.length - nRepaired;
+      const verdict = (p) => cases.map((c, k) => [c[0], spare[k], c[2], p.items[spare[k]]]).filter(([, , want, got]) => want ? !(got && REC_FIELDS.every(f => got[f] === want[f])) : got !== undefined)
+        .map(([label, id, want, got]) => `${label} (${id}): expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+
+      // the browser copy
+      {
+        const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: Object.assign({}, seed, { items: Object.assign({}, seedItems, damaged) }) } });
+        const p = await stored(page);
+        const wrong = verdict(p);
+        check(`in the browser copy, ${nRepaired} damaged records are repaired and ${nSkipped} left out, and the repaired copy is saved`, !wrong.length, wrong.join("\n"));
+        check("…and the sound records are unchanged", seedIds.every(id => recEq(p.items[id], seedItems[id])));
+        check("…and the app opens on Today with no script errors", (await page.evaluate("S.screen")) === "home" && !page.__errors, page.__errors);
+        await context.close();
+      }
+      // a backup file
+      {
+        const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: seed } });
+        const report = await page.evaluate(b => { S.screen = "data"; render(); document.getElementById("progressText").value = JSON.stringify(b); action("importProgress"); return S.report; }, { v: 2, items: damaged, days: {} });
+        const p = await stored(page);
+        const wrong = verdict(p);
+        check(`loading a backup repairs ${nRepaired} damaged records and leaves out ${nSkipped}`, !wrong.length, wrong.join("\n"));
+        check("…and says so", report.includes(`${nRepaired} damaged records in it were repaired`) && report.includes(`${nSkipped} records in it couldn't be read and were skipped`), report);
+        check("…and keeps every record that was there", seedIds.every(id => recEq(p.items[id], seedItems[id])));
+        const clean = await page.evaluate(b => { S.screen = "data"; render(); document.getElementById("progressText").value = JSON.stringify(b); action("importProgress"); return S.report; }, { v: 2, items: { [spare[0]]: Object.assign({}, ok, { box: 2 }) }, days: {} });
+        check("a sound backup says nothing about damage", !/damaged|skipped/.test(clean), clean);
+        check("no script errors", !page.__errors, page.__errors);
+        await context.close();
+      }
+      // the cloud's shards: a new device, and a device whose record is older than the cloud's damaged one
+      {
+        const packedCases = [
+          ["a box of 9", [9, T, 0, T - DAY, 0, 3, 0], { box: 7, due: T, lapses: 0, lastSeen: T - DAY, lastWrong: 0, seenCount: 3, lastRight: 0 }],
+          ["a negative due time and a fractional lapse count", [2, -1, 1.4, T - DAY, 0, 3, T - DAY], { box: 2, due: 0, lapses: 1, lastSeen: T - DAY, lastWrong: 0, seenCount: 3, lastRight: T - DAY }],
+          ["a short array (the missing figures count as 0)", [3, T], { box: 3, due: T, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 0, lastRight: 0 }],
+          ["a box saved as null (NaN)", [null, T, 0, T - DAY, 0, 3, 0], null],
+          ["text instead of a record", "garbage", null],
+          ["null instead of a record", null, null],
+        ];
+        const initial = {};
+        const put = (id, packed) => { const s = "progress2/" + shardOf(id); (initial[s] = initial[s] || { items: {} }).items[id] = packed; };
+        packedCases.forEach((c, k) => put(spare[k], c[1]));
+        const a = seedIds[3]; put(a, [12, T + DAY, 0, T - 60e3, 0, seedItems[a].seenCount + 1, T - 60e3]); // newer than this device's record, and damaged
+        const cloud = makeCloud(initial);
+        const { page, context } = await newPage(browser, origin, { storage: {}, cloud });
+        await settleSync(page);
+        const p = await stored(page);
+        const wrong = packedCases.map((c, k) => [c[0], spare[k], c[2], p.items[spare[k]]]).filter(([, , want, got]) => want ? !recEq(got, want) : got !== undefined).map(([label, id, want, got]) => `${label} (${id}): expected ${JSON.stringify(want)}, got ${JSON.stringify(got)}`);
+        check(`a new device repairs the cloud's damaged records (${packedCases.filter(c => c[2]).length}) and leaves out the unreadable (${packedCases.filter(c => !c[2]).length})`, !wrong.length, wrong.join("\n"));
+        const bad = [];
+        for (const k of [...cloud.docs.keys()].filter(k => /^progress2\/s\d\d$/.test(k))) for (const [id, x] of Object.entries(cloud.docs.get(k).items || {})) {
+          if (!(Array.isArray(x) && x.length === 7 && x.every(n => typeof n === "number" && n >= 0) && Number.isInteger(x[0]) && x[0] <= 7)) bad.push(`${id}: ${JSON.stringify(x)}`);
+        }
+        check("…and writes the cloud's copy back repaired: no damaged record is left in it", !bad.length, bad.join("\n"));
+        await context.close();
+        const { page: page2, context: ctx2 } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: seed }, cloud: makeCloud(initial) });
+        await settleSync(page2);
+        const p2 = await stored(page2);
+        check("merging, a newer damaged record from the cloud wins, repaired (box 12 becomes 7)", p2.items[a] && p2.items[a].box === 7 && p2.items[a].lastSeen === T - 60e3, JSON.stringify(p2.items[a]));
+        check("no script errors", !page.__errors && !page2.__errors, [page.__errors, page2.__errors]);
+        await ctx2.close();
+      }
+    }
+
+    /* 10. Only what changed is written */
+    section("10. Only what changed is written to the cloud");
+    {
+      const cloud = makeCloud();
+      const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: seed }, cloud });
+      page.on("dialog", d => d.accept());
+      await settleSync(page);
+      const year = String(new Date().getFullYear());
+      const since = async (fn) => { const n = cloud.writes.length; await fn(); await settleSync(page); return cloud.writes.slice(n); };
+      const only = (w, names) => w.every(x => names.includes(x.replace(/^progress2\//, "")));
+      const cloudRec = id => { const d = cloud.docs.get("progress2/" + shardOf(id)); return d && d.items[id] ? unpackRec(d.items[id]) : null; };
+
+      let w = await since(() => page.waitForTimeout(1000));
+      check("once the two copies are in step, nothing more is written (the echo of its own writes isn't written back)", !w.length, w.join(", "));
+      const id = seedIds[5];
+      w = await since(() => page.evaluate(i => { window.__res = applyResult(i, true, "production", false, "recall"); }, id));
+      const p = await stored(page);
+      check(`an answer writes only its record's shard, this year's daily log and meta (${w.join(", ")})`, w.includes("progress2/" + shardOf(id)) && only(w, [shardOf(id), "days_" + year, "meta"]));
+      check("…and the cloud holds the new record and today's log", recEq(cloudRec(id), p.items[id]) && same((cloud.docs.get("progress2/days_" + year) || { days: {} }).days, Object.fromEntries(Object.entries(p.days).filter(([d]) => d.startsWith(year)))));
+      w = await since(() => page.evaluate(i => undoResult(i, window.__res), id));
+      check(`an undo writes only the same documents (${w.join(", ")})`, only(w, [shardOf(id), "days_" + year, "meta"]) && recEq(cloudRec(id), seedItems[id]), JSON.stringify(cloudRec(id)));
+      w = await since(() => page.evaluate(() => { S.screen = "settings"; render(); const sel = document.querySelector('[data-set="goal"]'); sel.value = sel.options[sel.options.length - 1].value; sel.dispatchEvent(new Event("change")); }));
+      const goal = (await stored(page)).settings.goal;
+      check(`a setting writes only meta (${w.join(", ")})`, w.length && only(w, ["meta"]) && cloud.docs.get("progress2/meta").settings.goal === goal);
+      w = await since(() => page.evaluate(() => { progress.currentUnit = "u03"; saveProgress(); S.screen = "home"; render(); }));
+      check(`a new current unit writes only meta (${w.join(", ")})`, w.length && only(w, ["meta"]) && cloud.docs.get("progress2/meta").currentUnit === "u03");
+
+      // Another device writes a shard: one record newer than this device's, one older.
+      const byShard = {}; seedIds.forEach(i => (byShard[shardOf(i)] = byShard[shardOf(i)] || []).push(i));
+      const [s, [newerId, olderId]] = Object.entries(byShard).find(([, list]) => list.length >= 2);
+      const theirs = JSON.parse(JSON.stringify(cloud.docs.get("progress2/" + s)));
+      const newerRec = Object.assign({}, seedItems[newerId], { box: 6, lastSeen: T + 1000, seenCount: seedItems[newerId].seenCount + 2 });
+      theirs.items[newerId] = packRec(newerRec);
+      theirs.items[olderId] = packRec(Object.assign({}, seedItems[olderId], { box: 1, lastSeen: seedItems[olderId].lastSeen - DAY }));
+      w = await since(() => page.evaluate(([name, body]) => db.doc(name).set(body), ["progress2/" + s, theirs]));
+      const p2 = await stored(page);
+      check("another device's newer record arrives", recEq(p2.items[newerId], newerRec), JSON.stringify(p2.items[newerId]));
+      check("where this device's record is newer, it is kept and written back to that shard", recEq(p2.items[olderId], seedItems[olderId]) && recEq(cloudRec(olderId), seedItems[olderId]), JSON.stringify(cloudRec(olderId)));
+      check(`…writing only that shard (${w.join(", ")})`, only(w, [s]));
+
+      // A change that nothing marked still reaches the cloud when the app is put away.
+      const unmarked = pickN(i => i[2] === "grammar" && !seedItems[i[0]], 30)[25];
+      const unmarkedRec = { box: 3, due: T + DAY, lapses: 0, lastSeen: T, lastWrong: 0, seenCount: 2, lastRight: T };
+      await page.evaluate(([i, r]) => { progress.items[i] = r; Object.defineProperty(document, "hidden", { configurable: true, get: () => true }); document.dispatchEvent(new Event("visibilitychange")); delete document.hidden; }, [unmarked, unmarkedRec]);
+      await settleSync(page);
+      check("a change made without being marked reaches the cloud when the app is put away (every document compared then)", recEq(cloudRec(unmarked), unmarkedRec), JSON.stringify(cloudRec(unmarked)));
+
+      // A backup and a reset compare every document.
+      const fromBackup = pickN(i => i[2] === "grammar" && !seedItems[i[0]], 30)[27], backupRec = { box: 5, due: T + DAY, lapses: 0, lastSeen: T, lastWrong: 0, seenCount: 9, lastRight: T };
+      await page.evaluate(b => { S.screen = "data"; render(); document.getElementById("progressText").value = JSON.stringify(b); action("importProgress"); }, { v: 2, items: { [fromBackup]: backupRec }, days: {} });
+      await settleSync(page);
+      check("a backup's records reach the cloud", recEq(cloudRec(fromBackup), backupRec), JSON.stringify(cloudRec(fromBackup)));
+      await page.evaluate(() => { S.screen = "data"; render(); action("reset"); });
+      await settleSync(page);
+      const left = [...cloud.docs.keys()].filter(k => /^progress2\/s\d\d$/.test(k)).reduce((n, k) => n + Object.keys(cloud.docs.get(k).items || {}).length, 0);
+      check("a reset empties the cloud's shards", left === 0 && cloud.docs.get("progress2/meta").resetAt > 0, `${left} records left`);
+      check("no script errors", !page.__errors, page.__errors);
+      await context.close();
     }
   } catch (e) {
     results.stopped(e);

@@ -27,8 +27,11 @@
     - typing "andare" into the Verbs filter, and "casa" into the 1,000-card glossary's filter, each
       all at once;
     - buildSession for every kind of session (the mean of 5, as each takes only milliseconds);
-    - with a stand-in for the cloud database, one pushProgress (everything written) and one
-      adoptRemote (another device's newer copy merged in, with Today redrawn).
+    - with a stand-in for the cloud database: one pushProgress with every document compared and
+      written; one answer and the pushProgress after it; a snapshot from the cloud that is only the echo
+      of those writes, and the pushProgress after it; and another device's newer copy merged in, as
+      adoptRemote and as a whole snapshot, with Today redrawn. (The snapshots go through
+      onProgressSnapshot from 9.4; on 9.3 and before, through the same steps as their handler.)
 
   Each figure is the median of 7 runs (3 for the reload and the idle work), in milliseconds. The app's random
   choices (which items a session takes, which exercise each becomes) come from a fixed seed while
@@ -87,8 +90,14 @@ const BUDGETS = {
   "buildSession wild": 81,
   "buildSession hard": 55,
   "buildSession mistakes": 31,
-  "pushProgress (fake db)": 225,
-  "adoptRemote (fake db)": 932,
+  // the sync figures, set at 9.4 (dirty tracking and the record-by-record merge) in the same way; the push after an echo
+  // takes well under a millisecond, so its budget leaves room for the timer's own granularity
+  "pushProgress (fake db)": 94,
+  "adoptRemote (fake db)": 166,
+  "pushProgress after an answer": 23,
+  "Snapshot: the echo of own writes": 43,
+  "pushProgress after the echo": 3,
+  "Snapshot: another device's changes": 160,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work may keep
@@ -129,10 +138,19 @@ async function measure(runs) {
   const kinds = [["continue"], ["unit", vt], ["review"], ["flashcards"], ["verbs"], ["wild"], ["hard"], ["mistakes"]];
   // A stand-in for window.claude.use("db") that keeps what is written.
   const store = {};
+  const cloudDocs = () => Object.fromEntries(Object.entries(store).filter(([k]) => k.startsWith("progress2/")).map(([k, v]) => [k.slice("progress2/".length), v]));
+  const snapshot = (docs) => { // a snapshot of the progress2 collection, handled as the app handles one
+    const snap = { docs: Object.entries(docs).map(([id, v]) => ({ id, data: () => v })) };
+    if (typeof onProgressSnapshot === "function") onProgressSnapshot(snap, false);
+    else { const list = snap.docs.map(d => [d.id, d.data()]); list.forEach(([name, data]) => { lastPushed[name] = canon(data); }); adoptRemote(docsToProgress(list)); scheduleSync(); } // 9.3 and before
+    clearTimeout(syncTimer);
+  };
+  const answerIds = Object.keys(progress.items).filter(id => content.items[id] && !isVerbUnit(content.items[id].unit));
   db = { doc: (p) => ({ set: async (body) => { store[p] = body; }, get: async () => ({ exists: p in store, data: () => store[p] }), delete: async () => { delete store[p]; } }),
     collection: () => ({ get: async () => ({ docs: [] }), onSnapshot: () => () => { } }) };
   dbState = "on";
   const settle = () => new Promise(r => setTimeout(r, 0));
+  progress = mergeProgress(progress, {}); // in the form a merge leaves it, as on a device that has synced before
   const mine = JSON.stringify(progress);
   let theirs = null;
 
@@ -158,7 +176,14 @@ async function measure(runs) {
     draw({ screen: "home", lookup: "" });
     for (const [kind, unit] of kinds) add("buildSession " + kind, time(() => { for (let k = 0; k < 5; k++) if (!buildSession(kind, unit).queue.length) throw new Error("an empty " + kind + " session"); }) / 5); // quick, so the mean of 5
     lastPushed = {}; writing = {}; pendingWrite = {}; // so every document is written
+    if (typeof DIRTY !== "undefined") DIRTY = null; // 9.4 on: and every one compared
     add("pushProgress (fake db)", time(() => pushProgress()));
+    await settle();
+    applyResult(answerIds[r * 37], true, "production", false, "recall"); clearTimeout(syncTimer); // one answer; the push that follows it 1.5 s later
+    add("pushProgress after an answer", time(() => pushProgress()));
+    await settle();
+    add("Snapshot: the echo of own writes", time(() => { snapshot(cloudDocs()); layout(); }));
+    add("pushProgress after the echo", time(() => pushProgress()));
     await settle();
     if (!theirs) { // another device's copy: what was just written, with 150 records practised since and more done today
       const remote = docsToProgress(Object.entries(store).filter(([k]) => k.startsWith("progress2/")).map(([k, v]) => [k.slice("progress2/".length), v]));
@@ -169,7 +194,10 @@ async function measure(runs) {
     }
     const copy = JSON.parse(theirs);
     add("adoptRemote (fake db)", time(() => { adoptRemote(copy); layout(); }));
-    progress = JSON.parse(mine); buildContent(); draw({ screen: "home" }); // back to this device's own progress for the next round
+    progress = JSON.parse(mine); buildContent(); draw({ screen: "home" }); // back to this device's own progress
+    const docs = progressToDocs(JSON.parse(theirs));
+    add("Snapshot: another device's changes", time(() => { snapshot(docs); layout(); }));
+    progress = JSON.parse(mine); buildContent(); draw({ screen: "home" }); // and again, for the next round
   }
   clearTimeout(syncTimer); db = null; dbState = "off";
   lsSet(LS_PROGRESS, progress);
