@@ -14034,16 +14034,63 @@ function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.par
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
 
 function cleanSettings(s) { const d = defaultProgress().settings, out = {}; for (const k of Object.keys(d)) out[k] = (s && s[k] !== undefined) ? s[k] : d[k]; return out; }
-function loadLocal() { // true when what is saved needs saving again: nothing saved yet, the old format, or settings tidied
+/* The record guard. Every item record that comes from storage passes through checkRec: the browser copy when it loads, a
+   backup file, the cloud's shards as they are unpacked, and both sides of a merge. A sound record has box a whole number
+   0–7; due, lastSeen, lastWrong and lastRight numbers of 0 or more; lapses and seenCount whole numbers of 0 or more (a
+   field left out counts as 0, as packRec writes it). A bad value is repaired: a number written as text is read as one, a
+   fraction where a whole number belongs is rounded, a box outside 0–7 is brought into it, and anything else (a negative,
+   NaN, which JSON keeps as null, infinity, text) becomes 0. A record that isn't an object, or whose box can't be read as a
+   number, is dropped (null), since nothing then says how well the item is known. A sound record is returned as it is, so
+   it is never copied or saved again; a repaired one is a new object. */
+const REC_TIMES = ["due", "lastSeen", "lastWrong", "lastRight"], REC_COUNTS = ["lapses", "seenCount"];
+const recNum = (v) => typeof v === "number" ? v : typeof v === "string" && v.trim() ? Number(v) : NaN;
+const okTime = (v) => v === undefined || (typeof v === "number" && v >= 0 && v < Infinity), okCount = (v) => v === undefined || (Number.isInteger(v) && v >= 0);
+function checkRec(r) {
+  if (!r || typeof r !== "object" || Array.isArray(r)) return null;
+  if (Number.isInteger(r.box) && r.box >= 0 && r.box <= 7 && okTime(r.due) && okTime(r.lastSeen) && okTime(r.lastWrong) && okTime(r.lastRight) && okCount(r.lapses) && okCount(r.seenCount)) return r; // sound: the usual case, checked quickly
+  let out = r;
+  const fix = (k, v) => { if (out === r) out = Object.assign({}, r); out[k] = v; };
+  const box = recNum(r.box);
+  if (!Number.isFinite(box)) return null;
+  const b = Math.min(7, Math.max(0, Math.round(box)));
+  if (b !== r.box) fix("box", b);
+  for (const k of REC_TIMES) if (r[k] !== undefined) { const n = recNum(r[k]), v = Number.isFinite(n) && n > 0 ? n : 0; if (v !== r[k]) fix(k, v); }
+  for (const k of REC_COUNTS) if (r[k] !== undefined) { const n = recNum(r[k]), v = Number.isFinite(n) && n > 0 ? Math.round(n) : 0; if (v !== r[k]) fix(k, v); }
+  return out;
+}
+function guardItems(items) { // { items, repaired, skipped }: the records that pass checkRec (repaired where needed), and how many were repaired or dropped
+  const out = { items: {}, repaired: 0, skipped: 0 };
+  if (!items || typeof items !== "object" || Array.isArray(items)) return out;
+  for (const id of Object.keys(items)) {
+    const r = items[id], g = checkRec(r);
+    if (!g) out.skipped++; else { if (g !== r) out.repaired++; out.items[id] = g; }
+  }
+  return out;
+}
+function loadLocal() { // true when what is saved needs saving again: nothing saved yet, the old format, settings tidied or records repaired
   const p = lsGet(LS_PROGRESS);
   const k = lsGet(LS_PACKS);
   if (k && typeof k === "object") packs = k;
   if (!(p && (p.v === 1 || p.v === 2))) return true;
   progress = Object.assign(defaultProgress(), p, { v: 2, flags: p.flags || {}, settings: cleanSettings(p.settings) });
-  return p.v !== 2 || !p.flags || Object.keys(progress).some(key => !(key in p)) || canon(progress.settings) !== canon(p.settings);
+  const g = guardItems(p.items); progress.items = g.items;
+  return p.v !== 2 || !p.flags || Object.keys(progress).some(key => !(key in p)) || canon(progress.settings) !== canon(p.settings)
+    || g.repaired > 0 || g.skipped > 0 || !p.items || typeof p.items !== "object" || Array.isArray(p.items);
 }
+/* What has changed since the last push to the cloud, so pushProgress builds and compares only those documents: the shard
+   of each record that changed (markItem), the days_YYYY of each day that changed (markDay), and meta (every saveProgress,
+   since meta holds updatedAt). Whatever changes progress marks what it changed: applyResult and undoResult their record,
+   today() its year's days (an answer, an undo, a session's bonus), canonicalizeProgress the records it moves, a merge the
+   documents where this device and the cloud now differ. DIRTY is null while it isn't known (on loading, after a backup
+   is loaded or progress is reset, after the first snapshot from the cloud): the next push then compares every document,
+   as before 9.4, and so does the push when the app is put away. */
+let DIRTY = null;
+function markDirty(name) { if (DIRTY) DIRTY.add(name); }
+const markItem = (id) => markDirty(shardName(id));
+const markDay = (d) => markDirty("days_" + String(d).slice(0, 4));
 function saveProgress(touch = true) {
   COUNTS = null; // whatever changed, the counts on Today, Units, Stats and You are worked out again
+  markDirty("meta");
   if (touch) progress.updatedAt = now();
   const ok = lsSet(LS_PROGRESS, progress);
   if (ok !== !S.saveFailed) { S.saveFailed = !ok; if (S.screen === "home") render(); } // Today warns while the device refuses to save
@@ -14081,8 +14128,12 @@ function buildContent() { // returns true if it changed progress (records moved 
     if (firstByKey[k] && firstByKey[k] !== cur.id) content.canon[cur.id] = firstByKey[k]; else firstByKey[k] = cur.id;
   }
   const moved = canonicalizeProgress(), was = progress.currentUnit;
-  if (!progress.currentUnit || !units[progress.currentUnit] || units[progress.currentUnit].mode === "flashcards" || units[progress.currentUnit].mode === "verbs") { const f = unitList.find(u => u.mode !== "flashcards" && u.mode !== "verbs"); progress.currentUnit = f ? f.id : null; }
+  fixCurrentUnit();
   return moved || progress.currentUnit !== was;
+}
+function fixCurrentUnit() { // the current unit is a unit of the course (not a vocab pack or the Verbs section): the first one if not
+  const u = content.unitById[progress.currentUnit];
+  if (!progress.currentUnit || !u || u.mode === "flashcards" || u.mode === "verbs") { const f = content.units.find(u => u.mode !== "flashcards" && u.mode !== "verbs"); progress.currentUnit = f ? f.id : null; }
 }
 // Vocab items by scope and English gloss, for altWords(). Kept while the content is the same (its items equal those it holds).
 let GLOSS = null, glossJob = null;
@@ -14164,7 +14215,7 @@ function canonicalizeProgress() { // returns true if a record moved
   let moved = false;
   for (const id of Object.keys(progress.items)) {
     const k = pid(id);
-    if (k !== id) { progress.items[k] = mergeRec(progress.items[k], progress.items[id]); delete progress.items[id]; moved = true; }
+    if (k !== id) { progress.items[k] = mergeRec(progress.items[k], progress.items[id]); delete progress.items[id]; markItem(id); markItem(k); moved = true; }
   }
   return moved;
 }
@@ -14267,7 +14318,7 @@ function validatePack(obj) {
 /* ---------- item records & scheduling ---------- */
 function rec(id) { return progress.items[pid(id)] || { box: 0, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 0, lastRight: 0 }; }
 function isRecentMistake(id, t = now()) { const r = progress.items[id]; return !!(r && content.items[id] && r.lastWrong >= t - 7 * 864e5 && !((r.lastRight || 0) > r.lastWrong)); }
-function today() { const k = dayKey(now()); return progress.days[k] || (progress.days[k] = { xp: 0, new: 0 }); }
+function today() { const k = dayKey(now()); markDay(k); return progress.days[k] || (progress.days[k] = { xp: 0, new: 0 }); } // marked, as whoever asks for today may change it
 function newLeftToday() { return Math.max(0, (progress.settings.newPerDay || 10) - (today().new || 0)); }
 function isDue(id, t = now()) { const r = rec(id); return r.box >= 1 && r.due <= t; }
 function dueIds(unitId) {
@@ -14384,7 +14435,7 @@ function applyResult(itemId, correct, kind, repeat, typeKey) {
       r.box = Math.max(1, r.box - 2); r.lapses++; r.lastWrong = t; r.due = t + INTERVALS[1];
     }
   } else if (correct && r.box === 0) { r.box = 1; r.due = t + INTERVALS[1]; }
-  progress.items[id] = r;
+  progress.items[id] = r; markItem(id);
   today().xp = (today().xp || 0) + xp;
   saveProgress();
   return { promoted, xp, before, dayDelta, typeKey: (!repeat && typeKey) ? typeKey : null, correct };
@@ -14392,6 +14443,7 @@ function applyResult(itemId, correct, kind, repeat, typeKey) {
 function undoResult(itemId, res) {
   const id = pid(itemId);
   if (res.before) progress.items[id] = res.before; else delete progress.items[id];
+  markItem(id);
   const d = today();
   d.xp = Math.max(0, (d.xp || 0) - res.xp); d.new = Math.max(0, (d.new || 0) - res.dayDelta.new); d.cards = Math.max(0, (d.cards || 0) - res.dayDelta.cards);
   if (res.typeKey) { bumpStat("all", res.correct, -1); bumpStat(res.typeKey, res.correct, -1); }
@@ -16880,14 +16932,15 @@ function action(a) {
       const txt = document.getElementById("progressText").value.trim();
       let obj; try { obj = JSON.parse(txt); } catch (e) { S.report = "Not valid JSON: " + e.message; render(); return; }
       if (!obj || (obj.v !== 1 && obj.v !== 2) || typeof obj.items !== "object") { S.report = "This doesn't look like a progress backup."; render(); return; }
-      progress = mergeProgress(progress, obj); buildContent(); saveProgress();
-      S.report = "Backup loaded: its progress is now merged with what was here (for each item, the newest record is kept)."; render(); break;
+      const g = guardItems(obj.items);
+      progress = mergeProgress(progress, Object.assign({}, obj, { items: g.items })); DIRTY = null; buildContent(); saveProgress();
+      S.report = "Backup loaded: its progress is now merged with what was here (for each item, the newest record is kept)." + damageNote(g); render(); break;
     }
     case "reset":
       if (confirm("Reset all progress? This cannot be undone.")) {
         const settings = progress.settings, flags = progress.flags;
         progress = defaultProgress(); progress.settings = settings; progress.flags = flags || {}; progress.resetAt = now();
-        buildContent(); saveProgress(); S.report = "Progress reset."; render();
+        DIRTY = null; buildContent(); saveProgress(); S.report = "Progress reset."; render();
       }
       break;
   }
@@ -16927,10 +16980,18 @@ document.addEventListener("keydown", (e) => {
 });
 
 /* ---------- merge & sync ---------- */
-function mergeProgress(a, b) {
+function mergeDay(da, db) { // one day of the log from two copies: the higher of each figure
+  da = da || {}; db = db || {};
+  const out = { xp: Math.max(da.xp || 0, db.xp || 0), new: Math.max(da.new || 0, db.new || 0) };
+  if (da.cards || db.cards) out.cards = Math.max(da.cards || 0, db.cards || 0);
+  const ta = da.t || {}, tb = db.t || {}; const keys = new Set([...Object.keys(ta), ...Object.keys(tb)]);
+  if (keys.size) { out.t = {}; for (const k of keys) { const x = ta[k] || [0, 0], y = tb[k] || [0, 0]; out.t[k] = x[1] >= y[1] ? x.slice() : y.slice(); } }
+  return out;
+}
+function mergeProgress(a, b) { // two copies of progress made into one (a backup loaded); adoptRemote works out the same in place
   const out = defaultProgress();
   a = a || {}; b = b || {};
-  const ai = a.items || {}, bi = b.items || {};
+  const ai = guardItems(a.items).items, bi = guardItems(b.items).items;
   const ids = new Set([...Object.keys(ai), ...Object.keys(bi)]);
   for (const id of ids) {
     const ra = ai[id], rb = bi[id];
@@ -16938,13 +16999,7 @@ function mergeProgress(a, b) {
   }
   const ad = a.days || {}, bd = b.days || {};
   const days = new Set([...Object.keys(ad), ...Object.keys(bd)]);
-  for (const d of days) {
-    const da = ad[d] || {}, db = bd[d] || {};
-    out.days[d] = { xp: Math.max(da.xp || 0, db.xp || 0), new: Math.max(da.new || 0, db.new || 0) };
-    if (da.cards || db.cards) out.days[d].cards = Math.max(da.cards || 0, db.cards || 0);
-    const ta = da.t || {}, tb = db.t || {}; const keys = new Set([...Object.keys(ta), ...Object.keys(tb)]);
-    if (keys.size) { out.days[d].t = {}; for (const k of keys) { const x = ta[k] || [0, 0], y = tb[k] || [0, 0]; out.days[d].t[k] = x[1] >= y[1] ? x.slice() : y.slice(); } }
-  }
+  for (const d of days) out.days[d] = mergeDay(ad[d], bd[d]);
   const synKeys = new Set([...Object.keys(a.synonyms || {}), ...Object.keys(b.synonyms || {})]);
   if (synKeys.size) { out.synonyms = {}; for (const k of synKeys) out.synonyms[k] = [...new Set([...(a.synonyms && a.synonyms[k] || []), ...(b.synonyms && b.synonyms[k] || [])])]; }
   const af = a.flags || {}, bf = b.flags || {};
@@ -16967,14 +17022,21 @@ function mergeProgress(a, b) {
    flags/<id> (items flagged for correction). The old single document progress/main is read
    once per device and merged in; it is never written again. */
 const SYNC_COL = "progress2", SHARDS = 16;
-function shardName(id) { let h = 2166136261; for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); } return "s" + String((h >>> 0) % SHARDS).padStart(2, "0"); }
+const SHARD_OF = new Map(); // each id's shard, worked out once
+function shardName(id) {
+  let s = SHARD_OF.get(id);
+  if (s === undefined) { let h = 2166136261; for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619); } SHARD_OF.set(id, s = "s" + String((h >>> 0) % SHARDS).padStart(2, "0")); }
+  return s;
+}
 const packRec = (r) => [r.box || 0, r.due || 0, r.lapses || 0, r.lastSeen || 0, r.lastWrong || 0, r.seenCount || 0, r.lastRight || 0];
 const unpackRec = (a) => Array.isArray(a) ? { box: a[0], due: a[1], lapses: a[2], lastSeen: a[3], lastWrong: a[4], seenCount: a[5], lastRight: a[6] || 0 } : a;
-function progressToDocs(p) {
-  const docs = { meta: { v: 2, settings: p.settings, settingsUpdatedAt: p.settingsUpdatedAt || 0, currentUnit: p.currentUnit || null, updatedAt: p.updatedAt || 0, resetAt: p.resetAt || 0, synonyms: p.synonyms || {} } };
-  for (let i = 0; i < SHARDS; i++) docs["s" + String(i).padStart(2, "0")] = { items: {} };
-  for (const [d, v] of Object.entries(p.days || {})) { const y = "days_" + d.slice(0, 4); (docs[y] = docs[y] || { days: {} }).days[d] = v; }
-  for (const [id, r] of Object.entries(p.items || {})) docs[shardName(id)].items[id] = packRec(r);
+function progressToDocs(p, only) { // every document, or only those named in the set only (pushProgress's changed ones)
+  const want = (name) => !only || only.has(name), docs = {};
+  if (want("meta")) docs.meta = { v: 2, settings: p.settings, settingsUpdatedAt: p.settingsUpdatedAt || 0, currentUnit: p.currentUnit || null, updatedAt: p.updatedAt || 0, resetAt: p.resetAt || 0, synonyms: p.synonyms || {} };
+  let shards = 0;
+  for (let i = 0; i < SHARDS; i++) { const s = "s" + String(i).padStart(2, "0"); if (want(s)) { docs[s] = { items: {} }; shards++; } }
+  for (const [d, v] of Object.entries(p.days || {})) { const y = "days_" + d.slice(0, 4); if (want(y)) (docs[y] = docs[y] || { days: {} }).days[d] = v; }
+  if (shards) for (const [id, r] of Object.entries(p.items || {})) { const s = docs[shardName(id)]; if (s) s.items[id] = packRec(r); }
   return docs;
 }
 function docsToProgress(list) { // list: [[name, data], ...]
@@ -16983,11 +17045,11 @@ function docsToProgress(list) { // list: [[name, data], ...]
     if (!data) continue;
     if (name === "meta") Object.assign(p, { settings: data.settings, settingsUpdatedAt: data.settingsUpdatedAt, currentUnit: data.currentUnit, updatedAt: data.updatedAt, resetAt: data.resetAt, synonyms: data.synonyms });
     else if (/^days_/.test(name)) Object.assign(p.days, data.days || {});
-    else if (/^s\d\d$/.test(name)) for (const [id, a] of Object.entries(data.items || {})) p.items[id] = unpackRec(a);
+    else if (/^s\d\d$/.test(name)) for (const [id, a] of Object.entries(data.items || {})) { const r = checkRec(unpackRec(a)); if (r) p.items[id] = r; } // a damaged record is repaired or left out
   }
   return p;
 }
-let db = null, dbState = "checking", syncTimer = null, lastPushed = {}, writing = {}, pendingWrite = {};
+let db = null, dbState = "checking", syncTimer = null, lastPushed = {}, writing = {}, pendingWrite = {}, seenDocs = {};
 function syncLabel() { return { checking: "", off: "Saved on this device", on: "Synced", error: "Sync error, saved locally" }[dbState] || ""; }
 function syncDetail() {
   return { checking: "Checking for cloud sync…",
@@ -17001,21 +17063,26 @@ function scheduleSync() {
   syncTimer = setTimeout(pushProgress, 1500);
 }
 async function writeDoc(ref, key, name, body) {
-  if (writing[name]) { pendingWrite[name] = true; return; }
+  if (writing[name]) { pendingWrite[name] = true; markDirty(name); return; } // compared again once the write under way is done
   writing[name] = true;
   try { await ref.set(body); lastPushed[name] = key; if (dbState !== "on") { dbState = "on"; if (S.screen === "home" || S.screen === "data" || S.screen === "you") render(); } }
-  catch (e) { dbState = "error"; console.warn("db write failed", name, e); if (S.screen === "home" || S.screen === "data" || S.screen === "you") render(); }
+  catch (e) { dbState = "error"; markDirty(name); console.warn("db write failed", name, e); if (S.screen === "home" || S.screen === "data" || S.screen === "you") render(); }
   writing[name] = false;
   if (pendingWrite[name]) { pendingWrite[name] = false; scheduleSync(); }
 }
-function pushProgress() {
+// What the cloud was last known to hold, by document: the key (canon) of what this device wrote, or the data a snapshot
+// brought, turned into its key only when the document is next compared (most of a snapshot's documents never are).
+function pushedKey(name) { const v = lastPushed[name]; return v && typeof v === "object" ? (lastPushed[name] = canon(v)) : v; }
+function pushProgress(full) { // writes each document that differs from what the cloud holds: only those marked as changed (DIRTY), or every one when full is true or DIRTY isn't known
   if (!db) return;
-  const docs = progressToDocs(JSON.parse(JSON.stringify(progress)));
+  const only = full === true ? null : DIRTY;
+  DIRTY = new Set();
+  const docs = progressToDocs(progress, only);
   for (const [name, body] of Object.entries(docs)) {
-    const key = canon(body);
-    if (key === lastPushed[name]) continue;
-    if (/^s\d\d$/.test(name) && !Object.keys(body.items).length && lastPushed[name] === undefined) continue; // don't create empty shards
-    writeDoc(db.doc(SYNC_COL + "/" + name), key, name, body);
+    const key = canon(body), shard = /^s\d\d$/.test(name);
+    if (key === pushedKey(name)) continue;
+    if (shard && !Object.keys(body.items).length && lastPushed[name] === undefined) continue; // don't create empty shards
+    writeDoc(db.doc(SYNC_COL + "/" + name), key, name, shard ? body : JSON.parse(key)); // a copy (a shard's packed records are new already), so later changes can't reach a write under way
   }
   for (const [fid, f] of Object.entries(progress.flags || {})) {
     const name = "flag:" + fid, key = canon(f);
@@ -17024,9 +17091,94 @@ function pushProgress() {
 }
 function syncPackWrite(p) { if (!db) return; db.doc("packs/" + p.pack.replace(/[^\w.\-~:@+]/g, "_")).set(JSON.parse(JSON.stringify(p))).catch(e => console.warn(e)); }
 function syncPackDelete(id) { if (!db) return; db.doc("packs/" + id.replace(/[^\w.\-~:@+]/g, "_")).delete().catch(e => console.warn(e)); }
+/* Another copy of progress (the cloud's, the old progress/main, the cloud's flags) merged into this device's, record by
+   record, giving what mergeProgress(progress, remote) gives (tools/test-speedups.js checks it). Whether anything changed
+   is decided from what was merged in: a record, day, flag, setting, accepted answer or the current unit taken from the
+   other copy. The content is the same, so it isn't built again: records arriving under an old id are moved to the id that
+   holds them (canonicalizeProgress) and the current unit is checked. Saved and drawn again only when something changed,
+   and never drawn mid-session. Each document it changes is marked for the next push. */
+const sameData = (a, b) => a === b || (!!a && !!b && typeof a === "object" && typeof b === "object" && Array.isArray(a) === Array.isArray(b)
+  && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => k in b && sameData(a[k], b[k]))); // the same JSON value, whatever the order of keys
+function mergeInto(p, b) { // mergeProgress(p, b), worked out in p: true when p changed
+  b = b || {};
+  let changed = false, meta = false;
+  const resetAt = Math.max(p.resetAt || 0, b.resetAt || 0);
+  if (resetAt > (p.resetAt || 0)) { p.resetAt = resetAt; meta = true; }
+  const bi = b.items || {};
+  for (const id of Object.keys(bi)) {
+    const rb = checkRec(bi[id]), ra = p.items[id];
+    if (rb && (rb.lastSeen || 0) >= resetAt && (!ra || (rb.lastSeen || 0) > (ra.lastSeen || 0))) { p.items[id] = Object.assign({}, rb); markItem(id); changed = true; }
+  }
+  if (resetAt) for (const id of Object.keys(p.items)) if ((p.items[id].lastSeen || 0) < resetAt) { delete p.items[id]; markItem(id); changed = true; }
+  const bd = b.days || {};
+  for (const d of Object.keys(bd)) {
+    const da = p.days[d], m = mergeDay(da, bd[d]);
+    if (!da || !sameData(mergeDay(da), m)) { p.days[d] = m; markDay(d); changed = true; } // a day the same in all but form (cards: 0 or none) is left as it is
+  }
+  const bf = b.flags || {};
+  p.flags = p.flags || {};
+  for (const k of Object.keys(bf)) { const x = p.flags[k], y = bf[k]; if (y && (!x || (y.updatedAt || 0) > (x.updatedAt || 0))) { p.flags[k] = y; changed = true; } }
+  if ((b.settingsUpdatedAt || 0) > (p.settingsUpdatedAt || 0)) { p.settings = cleanSettings(b.settings || p.settings); p.settingsUpdatedAt = b.settingsUpdatedAt; meta = true; }
+  const newer = (b.updatedAt || 0) > (p.updatedAt || 0);
+  const unit = (newer ? b.currentUnit || p.currentUnit : p.currentUnit || b.currentUnit) || null;
+  if (unit !== (p.currentUnit || null)) { p.currentUnit = unit; meta = true; }
+  if (newer) { p.updatedAt = b.updatedAt; meta = true; }
+  const bs = b.synonyms || {};
+  for (const k of Object.keys(bs)) {
+    const l = (p.synonyms && p.synonyms[k]) || null, m = [...new Set([...(l || []), ...(bs[k] || [])])];
+    if (!l || m.length !== l.length || m.some((x, i) => x !== l[i])) { (p.synonyms = p.synonyms || {})[k] = m; meta = true; }
+  }
+  if (meta) markDirty("meta");
+  return changed || meta;
+}
 function adoptRemote(remote) {
-  const merged = mergeProgress(progress, remote);
-  if (canon(merged) !== canon(progress)) { progress = merged; buildContent(); lsSet(LS_PROGRESS, progress); if (S.screen !== "session") render(); }
+  if (!mergeInto(progress, remote)) return false;
+  canonicalizeProgress(); fixCurrentUnit(); COUNTS = null;
+  lsSet(LS_PROGRESS, progress);
+  if (S.screen !== "session") render();
+  return true;
+}
+// After a snapshot of the cloud's progress is merged in: of the documents it brought new (list, and gone: those no longer
+// there), marks each where this device's progress now differs from what the cloud holds (a record the cloud lacks, holds
+// differently or holds when this device doesn't; a day not the same; meta, which is small), so the push that follows
+// writes exactly those.
+const samePacked = (a, r) => Array.isArray(a) && a.length === 7 && a[0] === (r.box || 0) && a[1] === (r.due || 0) && a[2] === (r.lapses || 0) && a[3] === (r.lastSeen || 0) && a[4] === (r.lastWrong || 0) && a[5] === (r.seenCount || 0) && a[6] === (r.lastRight || 0);
+function markCloudDiff(list, remote, gone) {
+  if (!DIRTY) return;
+  const cloud = {}, names = new Set(gone);
+  for (const [name, data] of list) { cloud[name] = data; names.add(name); }
+  const shards = [...names].filter(n => /^s\d\d$/.test(n)), years = [...names].filter(n => /^days_/.test(n)).map(n => n.slice(5));
+  if (shards.length) for (const id of Object.keys(progress.items)) {
+    const s = shardName(id), d = cloud[s];
+    if (names.has(s) && !DIRTY.has(s) && !(d && d.items && samePacked(d.items[id], progress.items[id]))) DIRTY.add(s);
+  }
+  for (const name of shards) if (!DIRTY.has(name)) {
+    const d = cloud[name];
+    if (!d || typeof d !== "object" || Object.keys(d).length !== 1 || !d.items || typeof d.items !== "object") { DIRTY.add(name); continue; }
+    for (const id of Object.keys(d.items)) if (!progress.items[id]) { DIRTY.add(name); break; }
+  }
+  if (years.length) for (const d of Object.keys(progress.days)) if (years.includes(d.slice(0, 4)) && !sameData(progress.days[d], remote.days[d])) markDay(d);
+  if (names.has("meta")) DIRTY.add("meta");
+}
+/* Each snapshot of the cloud's progress brings every document, but most are as the last one brought them, and those were
+   merged then: anything this device has changed since is marked (DIRTY) until it is written. So only the documents that
+   are new, or changed, or gone since the last snapshot are merged and compared (seenDocs holds each one's text, as JSON);
+   the first snapshot is merged whole. */
+function onProgressSnapshot(snap, first) {
+  const list = snap.docs.map(d => [d.id, d.data()]), was = seenDocs, fresh = [];
+  seenDocs = {};
+  for (const [name, data] of list) {
+    lastPushed[name] = data;
+    const text = JSON.stringify(data);
+    seenDocs[name] = text;
+    if (first || !(name in was) || text !== was[name]) fresh.push([name, data]);
+  }
+  const gone = first ? [] : Object.keys(was).filter(name => !(name in seenDocs));
+  const remote = docsToProgress(fresh);
+  adoptRemote(remote);
+  if (first) DIRTY = null; // the first push after loading compares every document
+  else markCloudDiff(fresh, remote, gone);
+  scheduleSync(); // pushes only documents that differ from what the cloud now holds
 }
 async function initSync() {
   S.standalone = !(window.claude && window.claude.use);
@@ -17055,10 +17207,7 @@ async function initSync() {
       }, err => console.warn("flags subscription error", err));
       let first = true;
       db.collection(SYNC_COL).onSnapshot(snap => {
-        const list = snap.docs.map(d => [d.id, d.data()]);
-        list.forEach(([name, data]) => { lastPushed[name] = canon(data); });
-        adoptRemote(docsToProgress(list));
-        scheduleSync(); // pushes only documents that differ from what the cloud now holds
+        onProgressSnapshot(snap, first);
         if (first) { first = false; dbState = "on"; if (S.screen === "home" || S.screen === "data" || S.screen === "you") render(); }
       }, err => { dbState = "error"; console.warn("db subscription error", err); if (S.screen !== "session") render(); });
     }
@@ -17067,6 +17216,12 @@ async function initSync() {
   if (S.screen === "data") render();
 }
 function backupText() { return JSON.stringify(progress); }
+function damageNote(g) { // what loading a backup says about the records the guard repaired or skipped (guardItems)
+  const n = (k, one, many) => k + " " + (k === 1 ? one : many), parts = [];
+  if (g.repaired) parts.push(n(g.repaired, "damaged record in it was repaired", "damaged records in it were repaired"));
+  if (g.skipped) parts.push(n(g.skipped, "record in it couldn't be read and was skipped", "records in it couldn't be read and were skipped"));
+  return parts.length ? " " + parts.join("; ") + "." : "";
+}
 function saveBlob(filename, text) {
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
@@ -17204,11 +17359,11 @@ function leaveSheetHtml() {
   <h2 class="label" id="leave-t">Leave this session?</h2><p class="small muted" id="leave-d">The answers you've given so far are already saved.</p>
   <div class="btnrow"><button type="button" class="primary" data-act="stay">Keep practising</button><button type="button" data-go="quit">Leave</button></div></div></div>`;
 }
-document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(); } });
+document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(true); } }); // every document compared, in case a change went unmarked
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.3";
-const CHANGES = "Ripasso is quicker on the phone: it opens sooner, Look up answers as you type, the Verbs list opens at once, and Today, Units and Stats come up straight away. Nothing else changes: the same exercises, answers and progress."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.4";
+const CHANGES = "Syncing with your Claude account now does far less work after each answer, so the app stays quick, and a damaged progress record (in a broken backup file, say) is now repaired or skipped instead of causing trouble; loading a backup tells you if it found any."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
 const tidied = loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new

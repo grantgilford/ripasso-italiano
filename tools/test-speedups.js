@@ -22,6 +22,11 @@
        altWords uses) against building them at once; kept when the content is built again unchanged,
        built again when a pack changes it.
     5. Start-up: progress already saved in order isn't written again; progress tidied while loading is.
+    6. The sync merge (from 9.4): adoptRemote, which merges record by record in place, against 9.3's, which
+       merged into a new copy (mergeProgress, as it was then) and built the content again: the same progress
+       and the same answer to "did anything change", for the echo of this device's own writes, another
+       device's practice, older and newer copies, records under an old id, a reset elsewhere, the flags and
+       a current unit that isn't a unit of the course.
 
   Time stands still while counts are compared (Date.now is fixed), so both sides see the same moment.
   Changes nothing in index.html. Exits with code 1 if any check fails.
@@ -116,6 +121,48 @@ function REFERENCE() {
       lapsed: ids.map(id => [id, rec(id).lapses]).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 10),
       anyLapses: Object.keys(progress.items).some(id => content.items[id] && progress.items[id].lapses >= 1),
     };
+  };
+  // the sync merge as 9.3 did it (adoptRemote): mergeProgress, as it was then, into a new copy, changed if that differs,
+  // then what buildContent did to progress: records moved to the id that holds them, and the current unit checked
+  R.mergeProgress = (a, b) => {
+    const out = defaultProgress();
+    a = a || {}; b = b || {};
+    const ai = a.items || {}, bi = b.items || {};
+    for (const id of new Set([...Object.keys(ai), ...Object.keys(bi)])) { const ra = ai[id], rb = bi[id]; out.items[id] = !ra ? rb : !rb ? ra : ((rb.lastSeen || 0) > (ra.lastSeen || 0) ? rb : ra); }
+    const ad = a.days || {}, bd = b.days || {};
+    for (const d of new Set([...Object.keys(ad), ...Object.keys(bd)])) {
+      const da = ad[d] || {}, db = bd[d] || {};
+      out.days[d] = { xp: Math.max(da.xp || 0, db.xp || 0), new: Math.max(da.new || 0, db.new || 0) };
+      if (da.cards || db.cards) out.days[d].cards = Math.max(da.cards || 0, db.cards || 0);
+      const ta = da.t || {}, tb = db.t || {}; const keys = new Set([...Object.keys(ta), ...Object.keys(tb)]);
+      if (keys.size) { out.days[d].t = {}; for (const k of keys) { const x = ta[k] || [0, 0], y = tb[k] || [0, 0]; out.days[d].t[k] = x[1] >= y[1] ? x.slice() : y.slice(); } }
+    }
+    const synKeys = new Set([...Object.keys(a.synonyms || {}), ...Object.keys(b.synonyms || {})]);
+    if (synKeys.size) { out.synonyms = {}; for (const k of synKeys) out.synonyms[k] = [...new Set([...(a.synonyms && a.synonyms[k] || []), ...(b.synonyms && b.synonyms[k] || [])])]; }
+    const af = a.flags || {}, bf = b.flags || {};
+    for (const k of new Set([...Object.keys(af), ...Object.keys(bf)])) { const x = af[k], y = bf[k]; out.flags[k] = !x ? y : !y ? x : ((y.updatedAt || 0) > (x.updatedAt || 0) ? y : x); }
+    const newerSettings = (b.settingsUpdatedAt || 0) > (a.settingsUpdatedAt || 0) ? b : a;
+    out.settings = cleanSettings(newerSettings.settings || (newerSettings === a ? b.settings : a.settings));
+    out.settingsUpdatedAt = newerSettings.settingsUpdatedAt || 0;
+    const newer = (b.updatedAt || 0) > (a.updatedAt || 0) ? b : a;
+    out.currentUnit = newer.currentUnit || a.currentUnit || b.currentUnit || null;
+    out.updatedAt = Math.max(a.updatedAt || 0, b.updatedAt || 0);
+    const resetAt = Math.max(a.resetAt || 0, b.resetAt || 0);
+    if (resetAt) { out.resetAt = resetAt; for (const id of Object.keys(out.items)) if ((out.items[id].lastSeen || 0) < resetAt) delete out.items[id]; }
+    return out;
+  };
+  R.adopt = (p, remote) => {
+    const m = R.mergeProgress(p, remote), changed = canon(m) !== canon(p);
+    if (!changed) return { p, changed };
+    for (const id of Object.keys(m.items)) { const k = pid(id); if (k !== id) { m.items[k] = mergeRec(m.items[k], m.items[id]); delete m.items[id]; } }
+    const u = content.unitById[m.currentUnit];
+    if (!m.currentUnit || !u || u.mode === "flashcards" || u.mode === "verbs") { const f = content.units.find(x => x.mode !== "flashcards" && x.mode !== "verbs"); m.currentUnit = f ? f.id : null; }
+    return { p: m, changed };
+  };
+  R.diff = (a, b, at = "") => { // the first place two values differ
+    if (JSON.stringify(a) === JSON.stringify(b)) return "";
+    if (a && b && typeof a === "object" && typeof b === "object") for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) { const d = R.diff(a[k], b[k], at + "." + k); if (d) return d; }
+    return `${at || "progress"}: 9.3 gives ${JSON.stringify(a)}, now ${JSON.stringify(b)}`;
   };
   // the app's counts, in the same shape
   R.cached = () => {
@@ -351,7 +398,7 @@ async function openApp(browser, origin, { seed = false, init = null } = {}) {
         buildContent();
         return { kept: !!(k && g && tu) && KNOWN_WORDS === k && GLOSS === g && TU_FORMS === tu, search: had && SEARCH === null };
       });
-      check("building the content again unchanged keeps them (as after a sync merge)", again.kept, JSON.stringify(again));
+      check("building the content again unchanged keeps them (as when the packs are read from the cloud again)", again.kept, JSON.stringify(again));
       check("…and drops the search index", again.search);
       const cold = await page.evaluate(() => { KNOWN_WORDS = null; GLOSS = null; const k = REF.knownWords(); return REF.sameSet(knownWords(), k.it) && REF.sameSet(knownWords(true), k.en) && REF.sameIndex(content.glossIndex, REF.glossIndex()); });
       check("needed before idle time comes, they are built at once, the same", cold);
@@ -383,6 +430,61 @@ async function openApp(browser, origin, { seed = false, init = null } = {}) {
       await page.reload(); await page.waitForFunction(ready);
       check("progress with a setting missing is written again, with the setting", await page.evaluate(() => __writes.includes("itapp.progress.v1") && JSON.parse(localStorage.getItem("itapp.progress.v1")).settings.verbUnlockBox === 5));
       check("start-up: no script errors", !page.errors.length, page.errors.join("\n"));
+      await context.close();
+    }
+
+    /* 6. The sync merge */
+    section("6. The sync merge: record by record, the same as 9.3's");
+    {
+      const { page, context } = await openApp(browser, origin, { seed: true });
+      const res = await page.evaluate(() => {
+        const T = Date.now(), D = 864e5, copy = (x) => JSON.parse(JSON.stringify(x));
+        const base = REF.mergeProgress(progress, {}); // this device's progress, in the form a merge leaves it
+        const ids = Object.keys(base.items), fresh = Object.keys(content.items).filter(id => pid(id) === id && !base.items[id]);
+        const grammar = content.units.filter(u => !u.mode).map(u => u.id).filter(u => u !== base.currentUnit);
+        const cloud = (p) => docsToProgress(Object.entries(progressToDocs(copy(p)))); // as a snapshot from the cloud brings it
+        const days = Object.keys(base.days).sort(), flagId = Object.keys(base.flags)[0];
+        const cases = [];
+        cases.push(["the echo of this device's own writes", cloud(base), false]);
+        { const r = cloud(base); r.items = Object.fromEntries(Object.entries(r.items).reverse()); cases.push(["the same progress, its records in another order", r, false]); }
+        { const r = cloud(base);
+          ids.slice(0, 150).forEach((id, k) => { const x = r.items[id]; x.lastSeen = T - k; x.box = Math.min(7, x.box + 1); x.seenCount++; x.due = T + D; });
+          ids.slice(150, 250).forEach(id => { const x = r.items[id]; x.lastSeen -= D; x.box = 7; }); // older: this device's record stays
+          fresh.slice(0, 50).forEach((id, k) => { r.items[id] = { box: 1, due: T + D, lapses: 0, lastSeen: T - k, lastWrong: 0, seenCount: 1, lastRight: T - k }; });
+          r.days[days[days.length - 1]].xp += 50; r.days[days[0]].xp = 0; r.days[days[1]].t = { recall: [99, 999], cloze: [0, 0] }; r.days[days[2]].cards = 0; r.days["2020-01-05"] = { xp: 7, new: 1 };
+          r.updatedAt = T + 1000; r.currentUnit = grammar[3];
+          cases.push(["another device's practice: newer and older records, new ones, and higher and lower day totals", r, true]); }
+        { const r = cloud(base);
+          r.updatedAt = base.updatedAt - D; r.currentUnit = grammar[5]; r.settingsUpdatedAt = (base.settingsUpdatedAt || 0) - D; r.settings = Object.assign({}, r.settings, { goal: 99 });
+          r.synonyms = { [ids[20]]: ["another answer"], [ids[10]]: ["my own answer", "a second one"] };
+          r.flags = { [flagId]: Object.assign({}, base.flags[flagId], { note: "older", updatedAt: 1 }), "f-new": { id: "f-new", note: "from the phone", updatedAt: T } };
+          cases.push(["an older copy (its current unit and settings lose) with accepted answers and flags of its own", r, true]); }
+        { const r = cloud(base); r.settingsUpdatedAt = T + 5; r.settings = Object.assign({}, base.settings, { goal: 120, typos: false }); cases.push(["newer settings", r, true]); }
+        { const r = cloud(base); const alias = Object.keys(ID_ALIASES).find(a => !base.items[pid(a)]) || Object.keys(ID_ALIASES)[0], shared = Object.keys(content.canon)[0];
+          r.items[alias] = { box: 4, due: T, lapses: 1, lastSeen: T, lastWrong: T - D, seenCount: 5, lastRight: T };
+          r.items[shared] = { box: 6, due: T + D, lapses: 0, lastSeen: T - 5, lastWrong: 0, seenCount: 8, lastRight: T - 5 };
+          cases.push(["records under an old id and under a shared exercise's other id", r, true]); }
+        { const r = cloud(base), cut = T - 10 * D; r.resetAt = cut; for (const id of Object.keys(r.items)) if (r.items[id].lastSeen < cut) delete r.items[id]; r.updatedAt = T + 9;
+          cases.push(["progress reset on another device", r, true]); }
+        cases.push(["the cloud's flags, one changed", { flags: { [flagId]: Object.assign({}, base.flags[flagId], { note: "changed", updatedAt: T + 3 }) } }, true]);
+        cases.push(["the cloud's flags, unchanged", { flags: copy(base.flags) }, false]);
+        { const r = cloud(base); r.updatedAt = T + 7; r.currentUnit = content.units.find(u => u.mode === "flashcards").id; cases.push(["a newer current unit that is a vocab pack", r, true]); }
+        const out = [];
+        S.screen = "home";
+        for (const [label, remote, expect] of cases) {
+          const want = REF.adopt(copy(base), copy(remote));
+          progress = copy(base); COUNTS = null;
+          const changed = adoptRemote(copy(remote));
+          out.push({ label, diff: REF.diff(JSON.parse(canon(want.p)), JSON.parse(canon(progress))), changed, was: want.changed, expect });
+        }
+        progress = base; saveProgress(false);
+        return out;
+      });
+      for (const r of res) {
+        check(`${r.label}: the same progress as 9.3's merge`, !r.diff, r.diff);
+        check(`…and ${r.expect ? "it says it changed" : "it says nothing changed"}, as 9.3 did`, r.changed === r.expect && r.was === r.expect, `now ${r.changed}, 9.3 ${r.was}`);
+      }
+      check("sync merge: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
     }
   } catch (e) {
