@@ -1,5 +1,5 @@
 # The automatic checks: on every pull request, and on every push to main (a merge), GitHub runs the
-# content check and the three browser tests on index.html. A red cross on the pull request means one of
+# content check and the four browser tests on index.html. A red cross on the pull request means one of
 # them failed; open the run to see which step and why. The speed test (tools/test-perf.js) is left out,
 # because the shared computers GitHub runs this on vary in speed; run it with npm test instead.
 name: Checks
@@ -51,3 +51,7 @@ jobs:
       - name: Installed-copy test (tools/test-install.js)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/test-install.js
+
+      - name: Speed-ups test (tools/test-speedups.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node tools/test-speedups.js

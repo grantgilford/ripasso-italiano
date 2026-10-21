@@ -16,7 +16,9 @@
     3. a new index.html on the website is downloaded and offered on Today as
        "Update now", never during a session; Later hides it; Update now
        switches to the new version and keeps all progress (and Today then
-       says What's new in it); Check for updates in Your data works;
+       says What's new in it); Check for updates in Your data works; opening
+       the app checks, and coming back to it checks again only if the last
+       check was over three hours ago;
     4. the back button steps back through the screens (Units, You, Settings,
        a unit, the summary), and in a session first asks "Leave this
        session?" (Keep practising stays, Leave goes to Today); on Today the
@@ -161,6 +163,18 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
     await waitFor(page, () => S.updateState === "current");
     check("Check for updates reports the latest version", /latest version/.test(await page.textContent("#sec-app")));
     await page.evaluate(() => { S.screen = "home"; render(); });
+    // coming back to the app: a check only if the last one was over three hours ago (opening the app always checks)
+    const back3h = await page.evaluate(() => {
+      const opened = lastUpdateCheck > 0, real = checkForUpdate; let n = 0;
+      checkForUpdate = function (manual) { n++; return real(manual); };
+      const comeBack = () => { Object.defineProperty(document, "hidden", { value: false, configurable: true }); document.dispatchEvent(new Event("visibilitychange")); return n; };
+      const soon = comeBack();
+      lastUpdateCheck = Date.now() - 3 * 3600e3 - 1000; const later = comeBack(); const again = comeBack();
+      checkForUpdate = real;
+      return { opened, soon, later, again };
+    });
+    check("opening the app checks for a new version", back3h.opened);
+    check("coming back to it checks again only if the last check was over three hours ago", back3h.soon === 0 && back3h.later === 1 && back3h.again === 1, JSON.stringify(back3h));
 
     /* 4. The back button */
     section("4. The back button steps back through the app");
