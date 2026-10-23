@@ -1,5 +1,5 @@
 /*
-  Helpers shared by the browser tests (test-progress, test-ui, test-install, test-items, test-perf):
+  Helpers shared by the browser tests (test-progress, test-ui, test-install, test-items, test-perf, test-sessions, test-speedups, test-choices):
   finding Playwright, serving the app to the browser, and counting and printing checks.
 
     const { loadPlaywright, serveApp, checks } = require("./lib/browser");

@@ -1,6 +1,7 @@
 /*
   Loads the app's content into Node, for the tools that read index.html without a browser
-  (check-content, unit-items, add-items, check-new-words and pack-levels).
+  (check-content, unit-items, add-items, edit-items, check-new-words, pack-levels, same-content, variety,
+  link-sections and test-choices).
 
   The app's script is the inline <script> holding the boot section (a small start-up snippet in
   <head> comes first). Everything before the boot section only defines things (the content, the
