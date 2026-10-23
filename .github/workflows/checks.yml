@@ -59,3 +59,7 @@ jobs:
       - name: Session test (tools/test-sessions.js)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/test-sessions.js
+
+      - name: Choices test (tools/test-choices.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node tools/test-choices.js

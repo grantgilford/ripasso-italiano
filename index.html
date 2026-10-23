@@ -438,6 +438,11 @@ details > summary { cursor: pointer; }
 /* Read the rule (from 9.6): the answer panel's way into the lesson, which opens the section in a sheet over the session (.rulesheet) */
 .fb-rule { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 10px 14px; border-radius: 14px; background: var(--card); color: var(--accent); font-size: 15px; font-weight: 500; line-height: 1.35; text-align: left; }
 .fb-rule b { font-weight: 600; }
+.fb-ctx { display: flex; align-items: flex-start; gap: 10px; padding: 10px 10px 10px 14px; border-radius: 14px; background: var(--card); }
+.fb-ctx > div { flex: 1; min-width: 0; }
+.fb-ctx .it { color: var(--fg); font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
+.fb-ctx .it b { font-weight: 700; }
+.fb-ctx .ctx-en { margin-top: 2px; color: var(--muted); font-size: 14.5px; line-height: 1.4; }
 .fb-continue { width: 100%; min-height: 52px; border-radius: 16px; font-size: 16px; font-weight: 700; text-align: center; }
 .fb.bad .fb-continue { background: var(--bad); color: var(--bad-fg); }
 .fb.ok .fb-continue { background: var(--hero); color: var(--hero-fg); }
@@ -14161,9 +14166,10 @@ function buildContent() { // returns true if it changed progress (records moved 
   if (SEARCH && SEARCH.job) SEARCH.job.cancel();
   SEARCH = null; COUNTS = null;
   if (!same) { // word lists and indexes taken from the content: rebuilt in idle time, or on first use if that comes sooner
-    for (const job of [wordsJob, glossJob, sectionsJob]) if (job) job.cancel();
+    for (const job of [wordsJob, glossJob, sectionsJob, nearJob, answersJob]) if (job) job.cancel();
     KNOWN_WORDS = null; wordsJob = null; GLOSS = null; glossJob = null; TU_FORMS = null; COUNT_PLAN = null; SECTIONS = null; sectionsJob = null;
-    warmKnownWords(); warmGloss(); warmSections();
+    NEAR = null; nearJob = null; ANSWERS = null; answersJob = null; CONTEXT = null;
+    warmKnownWords(); warmGloss(); warmSections(); warmNear(); warmAnswers();
   }
   const firstByKey = {};
   for (const p of all) for (const it of (p.items || [])) {
@@ -14535,6 +14541,8 @@ function normalize(s) {
 function deaccent(s) {
   return s.replace(/([aeiou])'(?=\s|$)/g, "$1").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
+// deaccent(normalize(s)), quicker for the usual plain word in small letters, which both leave as it is
+const foldIt = (s) => /^[a-z]+( [a-z]+)*$/.test(s) ? s : deaccent(normalize(s));
 function lev1(a, b) { // true if edit distance is exactly 1 (sub/ins/del)
   if (a === b) return false;
   if (Math.abs(a.length - b.length) > 1) return false;
@@ -14622,6 +14630,14 @@ function numWords(s) { // digits in an English answer read as words: 24 → twen
   return String(s).replace(/\b\d{1,6}\b/g, (d) => w(Number(d)));
 }
 function foldPhrase(x) { return x.replace(/\b(my|your|his|its|our|their|one's)\b/g, "one's").replace(/\b(me|him|them|us|somebody|someone)\b/g, "someone"); }
+function editWithin(a, b, k) { // edit distance at most k: the common ends set aside, the first letter left must be changed, dropped or added
+  let i = 0, j = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  while (j < a.length - i && j < b.length - i && a[a.length - 1 - j] === b[b.length - 1 - j]) j++;
+  a = a.slice(i, a.length - j); b = b.slice(i, b.length - j);
+  if (!a.length || !b.length) return Math.max(a.length, b.length) <= k;
+  return k > 0 && Math.abs(a.length - b.length) <= k && (editWithin(a.slice(1), b.slice(1), k - 1) || editWithin(a.slice(1), b, k - 1) || editWithin(a, b.slice(1), k - 1));
+}
 function editDist(a, b) { // Levenshtein distance, used to find the closest accepted answer
   const m = a.length, n = b.length; if (!m) return n; if (!n) return m;
   let prev = Array.from({ length: n + 1 }, (_, j) => j);
@@ -14665,7 +14681,10 @@ function pronounFits(p, rest, en) { // en: the English shown (translations joine
     if (/^(lui|lei|loro)$/.test(p) && before.some(w => w === "gli" || w === "le")) return false;
     if (v.ps.size > 1 && before.some(w => DAT_PERSON[w] === SUBJ_PERSON[p])) return false;
   }
-  // the English must have this subject: the first personal pronoun of one of its translations is that subject
+  return enSubject(en, p);
+}
+// The English has this subject (io, tu, lui…): the first personal pronoun of one of its translations (joined by " | ") is that subject.
+function enSubject(en, p) {
   return String(en).split(" | ").some(s => {
     const m = EN_PRONOUN.exec(s); if (!m) return false;
     const w = m[1].toLowerCase();
@@ -14726,18 +14745,38 @@ function checkAnswer(typed, accepted, opts) {
 }
 
 /* ---------- exercise generation ---------- */
+/* Wrong options for a meaning choice (from 9.7): words the learner could mix up with this one. Best first: a word the learner has
+   mixed it up with before (mixedWith), then words with the same part of speech and gender, then look-alikes (the same first two
+   letters, or a letter or two apart), taken from the item's unit; the whole course is searched only when the unit runs short.
+   A word with another part of speech comes in only as a look-alike or a past mix-up. No option is one of the item's own
+   answers, a word with the same Italian, or (Italian options) a word sharing one of its meanings, which would be right too. */
+const WORD_KEY = new WeakMap(); // an item's Italian, folded as distractorsFor compares it
 function distractorsFor(item, field, n) {
-  const same = (content.byUnit[item.unit] || []).filter(i => i.id !== item.id && i.type === item.type && (item.type !== "vocab" || i.pos === item.pos));
-  const other = Object.values(content.items).filter(i => i.id !== item.id && i.type === item.type && !same.includes(i));
-  const vals = [];
-  const own = arr(item[field]).map(normalize);
-  for (const src of [shuffle(same), shuffle(other)]) {
-    for (const i of src) {
-      const v = arr(i[field])[0];
-      if (v && !own.includes(normalize(v)) && !vals.some(x => x.value === v)) vals.push({ value: v, source: i });
-      if (vals.length >= n) return vals;
+  const word = (i) => { let w = WORD_KEY.get(i); if (w == null) WORD_KEY.set(i, w = foldIt(String(arr(i.it)[0] || ""))); return w; };
+  const w0 = word(item), me = pid(item.id), mixed = mixedWith(item);
+  const glosses = (i) => arr(i.en).flatMap(e => enForms(String(e)));
+  const ownIt = new Set(arr(item.it).map(x => deaccent(normalize(x)))), ownEn = new Set(glosses(item).concat(arr(progress.synonyms && progress.synonyms[item.id]).map(normEn)));
+  const alike = new Map(), looksLike = (i) => { // the same first two letters, or a letter or two apart (worked out once per word)
+    if (!alike.has(i)) { const w = word(i); alike.set(i, w.length > 1 && w0.length > 1 && (w.slice(0, 2) === w0.slice(0, 2) || editWithin(w, w0, 2))); }
+    return alike.get(i);
+  };
+  const kin = (i) => i.type === item.type && (item.type !== "vocab" || i.pos === item.pos) && (i.gender || "") === (item.gender || "");
+  const fits = (i) => i.type === item.type && pid(i.id) !== me && (item.type !== "vocab" || i.pos === item.pos || mixed.has(pid(i.id)) || looksLike(i));
+  const score = (i) => (mixed.has(pid(i.id)) ? 4 : 0) + (kin(i) ? 2 : 0) + (looksLike(i) ? 1 : 0);
+  const vals = [], seen = new Set(), words = new Set(); // option texts, and record ids, already offered: one option per word
+  const take = (list) => {
+    for (const [i] of list.map(i => [i, score(i), Math.random()]).sort((a, b) => b[1] - a[1] || a[2] - b[2])) {
+      if (vals.length >= n) return;
+      const v = arr(i[field])[0]; if (!v || ownIt.has(word(i)) || words.has(pid(i.id))) continue;
+      const keys = field === "en" ? enForms(String(v)) : [deaccent(normalize(v))];
+      if (keys.some(k => seen.has(k)) || (field === "en" ? keys : glosses(i)).some(k => ownEn.has(k))) continue;
+      keys.forEach(k => seen.add(k)); words.add(pid(i.id)); vals.push({ value: v, source: i });
     }
-  }
+  };
+  const unit = (content.byUnit[item.unit] || []).filter(fits); // the unit's words, and a word mixed up with this one before, wherever it is
+  const partners = [...mixed.keys()].map(id => content.items[id]).filter(i => i && fits(i) && i.unit !== item.unit);
+  take(unit.concat(partners));
+  if (vals.length < n) take(Object.values(content.items).filter(i => i.unit !== item.unit && fits(i) && !partners.includes(i))); // only when the unit runs short
   return vals;
 }
 function verbTable(it) {
@@ -15094,15 +15133,146 @@ function prepDrill(ex, item) {
     promptHtml: `${esc(item.it)} + ${esc(joinArt(art, word))}<div class="hint">merge the preposition and the article</div>`,
     accepted: [answer], shownAnswer: answer });
 }
+const bareWord = (w) => w.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, ""); // a word of a sentence without the punctuation around it
+const UNIT_WORDS = new WeakMap(); // a unit's item list → the words of its sentences, [word, normalised, sentence id], worked out once
+function unitWords(unitId) {
+  const list = content.byUnit[unitId] || [];
+  if (!UNIT_WORDS.has(list)) UNIT_WORDS.set(list, list.filter(i => i.type === "sentence").flatMap(i => arr(i.it)[0].split(/\s+/).map(bareWord).filter(Boolean).map(w => [w, normalize(w), i.id])));
+  return UNIT_WORDS.get(list);
+}
 function wordBank(ex, item, words) {
   const targetSeqs = arr(item.it).map(x => normalize(x).split(" ").filter(Boolean));
   const targetSet = new Set(targetSeqs.flat());
-  const pool = (content.byUnit[item.unit] || []).filter(i => i.type === "sentence" && i.id !== item.id).flatMap(i => arr(i.it)[0].split(/\s+/)).map(w => w.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, "")).filter(w => w && !targetSet.has(normalize(w)));
-  const distract = shuffle([...new Set(pool.map(w => normalize(w)))]).slice(0, 2).map(n => pool.find(w => normalize(w) === n));
-  const tokens = shuffle(words.map(w => w.replace(/^[^\p{L}\p{N}']+|[^\p{L}\p{N}']+$/gu, "")).filter(Boolean).concat(distract)).map(w => ({ w, n: normalize(w) }));
-  return Object.assign(ex, { type: "Word order", typeKey: "bank", kind: "recognition", mode: "bank", tokens, targetSeqs,
+  const near = pick(nearMisses(item, words)) || null; // one of the two extra words a near-miss, where the data allows (from 9.7)
+  const pool = unitWords(item.unit).filter(([w, n, id]) => id !== item.id && !targetSet.has(n) && !(near && n === normalize(near.w)));
+  const distract = (near ? [near.w] : []).concat(shuffle([...new Set(pool.map(p => p[1]))]).slice(0, near ? 1 : 2).map(n => pool.find(p => p[1] === n)[0]));
+  const tokens = shuffle(words.map(bareWord).filter(Boolean).concat(distract)).map(w => ({ w, n: normalize(w) }));
+  return Object.assign(ex, { type: "Word order", typeKey: "bank", kind: "recognition", mode: "bank", tokens, targetSeqs, nearMiss: near,
     promptHtml: `<span class="en">${esc(arr(item.en)[0])}</span><div class="hint">tap the words in order (two are extra)</div>`,
     accepted: arr(item.it), shownAnswer: arr(item.it)[0] });
+}
+/* Word order traps (from 9.7). Where the data allows, one of the two extra words is a near-miss of a word in the sentence:
+   another person of its verb in the same tense (sei beside sono), the other article of the same number (il / lo, la / l',
+   i / gli, un / uno, una / un'), or another form of an adjective that has forms (stanchi beside stanca). Each is a form the
+   content or VERB_GYM states, never one made up, and never one that makes a sentence the item accepts (nearMissOk).
+   nearMisses lists every one a sentence allows, as { w (the word, as it would be shown), at (the word it stands beside),
+   why (the answer panel's reason, as html) }; wordBank picks one. */
+const SUBJ_WORDS = Object.assign(Object.create(null), { io: 0, tu: 1, lui: 2, lei: 2, noi: 3, voi: 4, loro: 5 });
+const ART_NEAR = Object.assign(Object.create(null), { il: "lo", lo: "il", i: "gli", gli: "i", la: "l'", un: "uno", uno: "un", una: "un'" });
+const SLOT_LABEL = ["masculine singular", "feminine singular", "masculine plural", "feminine plural"];
+const ART_BEFORE = /^(il|lo|la|i|gli|le|un|uno|una|(a|da|de|ne|su)(l|llo|lla|i|gli|lle)|col)$/; // an article, alone or joined to a preposition
+let NEAR = null, nearJob = null; // the indexes the near-misses are found with: built in idle time once the app is on screen, or on first use
+function warmNear() { if (!NEAR && !nearJob) nearJob = idleJob(nearSteps(), (x) => { NEAR = x; nearJob = null; }); }
+function nearIndex() { if (!NEAR) { warmNear(); nearJob.finish(); } return NEAR; }
+function* nearSteps() { // yields after each verb and every 200 items
+  const verbs = {}, forms = new Map(), nouns = new Map(), adjs = new Map(), other = new Set();
+  const push = (m, k, v) => { const list = m.get(k); if (list) list.push(v); else m.set(k, [v]); };
+  const word = (x) => /^[a-zàèéìòù]+$/.test(x) ? x : normalize(x); // normalize(x), quicker for a plain word
+  const table = (inf, t, fs) => { // a verb's tense: its one-word forms indexed by person; commands left out (their persons are tu, Lei…)
+    if (t === "imperativo" || !Array.isArray(fs)) return;
+    const T = verbs[inf] || (verbs[inf] = {}); if (T[t]) return; T[t] = fs;
+    fs.forEach((f, p) => { if (f && f !== "—" && !/\s/.test(String(f).trim())) for (const x of formVariants(String(f))) push(forms, word(x), [inf, t, p]); });
+  };
+  for (const v of VERB_GYM) { VG_TENSES.forEach((t, k) => table(v.it, t, (v.f || [])[k])); yield; }
+  let n = 0;
+  for (const id in content.items) {
+    const it = content.items[id];
+    if (++n % 200 === 0) yield;
+    if (it.type === "verb" && it.forms && !Array.isArray(it.forms)) for (const [t, fs] of Object.entries(it.forms)) table(it.it, t, fs);
+    if (it.type !== "vocab" || isFlashUnit(it.unit)) continue;
+    const w = normalize(arr(it.it)[0]);
+    if (it.pos === "noun" && it.art) { push(nouns, w, { it, pl: false }); if (it.plural && it.plural !== "—") push(nouns, normalize(it.plural), { it, pl: true }); }
+    if (it.pos === "adjective" && Array.isArray(it.forms) && it.forms.length === 4) new Set(it.forms.map(normalize)).forEach(f => f && f !== "—" && !(adjs.get(f) || []).some(a => a.forms.join() === it.forms.join()) && push(adjs, f, it)); // copies in other units once
+    else { other.add(w); if (it.plural) other.add(normalize(it.plural)); }
+  }
+  return { verbs, forms, nouns, adjs, other };
+}
+// The sentence's verb whose person is certain: { at, inf, ts (the tenses it can be in), p } or null. Either the cloze's blank, when
+// its hint names the verb (arrivare, loro, congiuntivo imperfetto), or the sentence's first verb (leadVerb). Its person is the one
+// its form allows, narrowed by the hint, by a subject pronoun just before it, or, for the sentence's first verb only, by the
+// English subject (I, you, she…); the first verb found without the cloze must have its person given one of these ways.
+function nearVerb(item, toks) {
+  const N = nearIndex(), en = arr(item.en).join(" | ");
+  const lead = toks[0] in SUBJ_WORDS ? 1 : 0, lv = leadVerb(toks.slice(lead).join(" ")), leadAt = lv ? lead + lv.i : -1;
+  const enPs = [0, 1, 2, 3, 4, 5].filter(p => (p === 2 ? ["lui", "lei"] : [PERSONS[p]]).some(x => enSubject(en, x)));
+  const before = (at) => { for (let j = at - 1; j >= 0; j--) { if (toks[j] in SUBJ_WORDS) return [SUBJ_WORDS[toks[j]]]; if (!LEAD_SKIP.test(toks[j])) return null; } return null; }; // non and small pronouns may come between
+  const settle = (at, matches, ps, need) => { // matches: [infinitive, tense, person]; ps: the persons the hint allows, or null
+    if (!matches.length || new Set(matches.map(m => m[0])).size !== 1) return null;
+    const given = ps || before(at) || (at === leadAt && enPs.length ? enPs : null);
+    if (need && !given) return null;
+    const cand = [...new Set(matches.map(m => m[2]))].filter(p => !given || given.includes(p));
+    if (cand.length !== 1) return null;
+    return { at, inf: matches[0][0], ts: [...new Set(matches.filter(m => m[2] === cand[0]).map(m => m[1]))], p: cand[0] };
+  };
+  if (item.cloze && item.cloze.text && item.cloze.hint) { // 1. the cloze's blank, named by its hint
+    const cz = parseCloze(item.cloze.text), b = cz.blanks.length === 1 ? normalize(cz.blanks[0][0]) : "";
+    const parts = String(item.cloze.hint).split(",").map(x => normalize(x)), inf = parts[0];
+    const at = b && !/\s/.test(b) ? toks.indexOf(b) : -1;
+    if (at >= 0 && toks.lastIndexOf(b) === at) {
+      const hp = parts.slice(1).flatMap(x => x.split(" ").filter(w => w in SUBJ_WORDS).map(w => SUBJ_WORDS[w]));
+      const ht = Object.keys(TENSE_LABEL).find(t => parts.slice(1).includes(normalize(TENSE_LABEL[t])));
+      const v = settle(at, (N.forms.get(b) || []).filter(m => normalize(m[0]) === inf && (!ht || m[1] === ht)), hp.length ? hp : null, false);
+      if (v) return v;
+    }
+  }
+  // 2. the first verb (not l'ho, and not piacere and its like, whose English subject is not the verb's)
+  if (!lv || /'/.test(lv.words[lv.i]) || PIACERE_LIKE.test(lv.words[lv.i])) return null;
+  return settle(leadAt, N.forms.get(lv.words[lv.i]) || [], null, true);
+}
+function nearMisses(item, words) {
+  const N = nearIndex(), shown = words.map(bareWord), toks = shown.map(normalize), out = [];
+  const asShown = (w, like) => /^\p{Lu}/u.test(like) ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+  let acc = null; // the accepted versions, worked out for the first candidate
+  const add = (at, w, why) => { w = asShown(w, shown[at]); if (!out.some(o => normalize(o.w) === normalize(w)) && nearMissOk(acc || (acc = nearAccepted(item)), toks[at], w)) out.push({ w, at, why }); };
+  // another person of the verb, in the same tense: one that belongs to that person only, in that tense, and to the subject's in none
+  const v = nearVerb(item, toks);
+  if (v) {
+    const T = N.verbs[v.inf], has = (f, inf, t, p) => (N.forms.get(f) || []).some(m => m[0] === inf && m[1] === t && m[2] === p);
+    for (const t of v.ts) for (let q = 0; q < 6; q++) {
+      const f0 = T[t] && T[t][q]; if (q === v.p || !f0 || f0 === "—") continue;
+      const f = formVariants(String(f0))[0], n = normalize(f);
+      if (/\s/.test(n) || deaccent(n) === deaccent(toks[v.at])) continue;
+      if ([0, 1, 2, 3, 4, 5].some(p => p !== q && has(n, v.inf, t, p)) || v.ts.some(t2 => has(n, v.inf, t2, v.p))) continue;
+      add(v.at, f, `${esc(f)} is the ${esc(PERSONS[q])} form; the subject is ${esc(PERSONS[v.p])} (${esc(toks[v.at])}).`);
+    }
+  }
+  toks.forEach((w, i) => {
+    // the other article of the same number, before a noun the content gives that article
+    if (w in ART_NEAR && i + 1 < toks.length) {
+      const indef = /^un/.test(w), hit = (N.nouns.get(toks[i + 1]) || []).find(h => (indef ? !h.pl && h.it.indef : h.pl ? h.it.artPl : h.it.art) === w);
+      if (hit) add(i, ART_NEAR[w], `${esc(ART_NEAR[w])} is the wrong article here: ${esc(toks[i + 1])} takes ${esc(w)} (${esc(joinArt(w, toks[i + 1]))}). ${esc(ART_RULE[w])}`);
+    }
+    // another form of an adjective: the other number; the other gender only where the sentence settles it, after a noun of
+    // the content or with the English marked (m.) or (f.)
+    const nounUse = i > 0 && ART_BEFORE.test(toks[i - 1]) && !N.nouns.has(toks[i + 1] || ""); // il verde, al verde: a noun here
+    const adj = !nounUse && !N.other.has(w) && !N.forms.has(w) && (N.adjs.get(w) || []);
+    if (adj && adj.length === 1) {
+      const f = adj[0].forms, slots = [0, 1, 2, 3].filter(k => normalize(f[k]) === w);
+      const label = (ks) => ks.length === 2 && ks[0] + 1 === ks[1] && ks[0] % 2 === 0 ? (ks[0] ? "plural" : "singular") : ks.map(k => SLOT_LABEL[k]).join(" and ");
+      const prev = i > 0 && (N.nouns.get(toks[i - 1]) || [])[0];
+      const set = slots.length === 1 && (/\((m|f)\.\)/.test(arr(item.en).join(" ")) || (prev && slots[0] === (prev.pl ? 2 : 0) + (prev.it.gender === "f" ? 1 : 0)));
+      const near = new Set(slots.map(k => k ^ 2).concat(set ? [slots[0] ^ 1] : []));
+      for (const k of near) {
+        const g = f[k]; if (!g || g === "—" || slots.includes(k) || normalize(g) === w) continue;
+        const ks = [0, 1, 2, 3].filter(j => normalize(f[j]) === normalize(g));
+        if (ks.some(j => slots.includes(j))) continue;
+        add(i, g, `${esc(g)} is the ${label(ks)} of ${esc(f[0])}; here it is ${esc(w)}, the ${label(slots)}${set && prev && k === (slots[0] ^ 1) ? `, as ${esc(toks[i - 1])} is ${prev.it.gender === "f" ? "feminine" : "masculine"}` : ""}.`);
+      }
+    }
+  });
+  return out;
+}
+// A near-miss never makes a sentence the item accepts: put in place of its word in any accepted version (translationsOf), with or
+// without a subject pronoun, accents ignored, none is accepted; and it is no word of an accepted version either.
+const nearBare = (x) => x.replace(/^(io|tu|lui|lei|noi|voi|loro) /, "");
+function nearAccepted(item) { // the item's accepted versions, accents ignored: as word lists, as a set (with and without a subject pronoun), and their words
+  const all = translationsOf(item).map(x => deaccent(normalize(x)));
+  return { lists: all.map(a => a.split(" ")), set: new Set(all.concat(all.map(nearBare))), words: new Set(all.flatMap(a => a.split(" "))) };
+}
+function nearMissOk(acc, word, w) {
+  const k = deaccent(normalize(w)), was = deaccent(word);
+  if (acc.words.has(k)) return false;
+  return acc.lists.every(ws => ws.every((x, j) => { if (x !== was) return true; const s = ws.slice(0, j).concat(k, ws.slice(j + 1)).join(" "); return !acc.set.has(s) && !acc.set.has(nearBare(s)); }));
 }
 function agreementDrill(ex, item) {
   const pool0 = (content.byUnit[item.unit] || []).filter(i => i.type === "vocab" && i.pos === "noun" && i.art && i.gender && i.plural);
@@ -15462,6 +15632,10 @@ function explainFor(ex, fb) {
       break;
     }
     case "bank": case "translate": {
+      if (ex.nearMiss) { // the word order trap (from 9.7): named whether or not the learner used it
+        const used = !fb.ok && normalize(fb.given || "").split(" ").includes(normalize(ex.nearMiss.w));
+        why.push(`<b>${used ? "You chose " + esc(ex.nearMiss.w) + ":" : "Near miss:"}</b> ${ex.nearMiss.why}`);
+      }
       if (it.explanation) why.push(esc(it.explanation));
       if (it.cloze && it.cloze.text) { const m = it.cloze.text.match(/\{([^}|]+)/); const v = m && findVerbByForm(m[1], it.cloze.hint); if (v) out.table = verbTableHtml(v.verb, v.tense, v.p); }
       if (it.note) why.push(esc(it.note));
@@ -16089,6 +16263,101 @@ function noteType(ex) { // an answered exercise on a grammar item: remembered as
     lsSet(LS_LASTTYPE, [...m]);
   } catch (e) { }
 }
+/* Confusion memory (from 9.7). When a wrong answer is another item's right answer (cosa typed for "house", or the meaning of
+   cosa chosen for casa), the pair is remembered on this device: itapp.confusions.v1, a list of [record id, record id, times]
+   (the two ids in order), the pair mixed up last at the end, at most CONF_CAP pairs. Kept out of progress, like
+   itapp.lasttype.v1, so it never syncs and each device has its own. A meaning choice then offers the other word first
+   (distractorsFor), and from the second time the answer panel says "You've mixed up casa and cosa 2 times". Read once; every
+   read and write is guarded, and a device that refuses to store it simply forgets. */
+const LS_CONFUSIONS = "itapp.confusions.v1", CONF_CAP = 500;
+let CONFUSIONS = null;
+const confKey = (a, b) => a < b ? a + "\n" + b : b + "\n" + a;
+function confusions() {
+  if (CONFUSIONS) return CONFUSIONS;
+  CONFUSIONS = new Map();
+  try {
+    const v = lsGet(LS_CONFUSIONS);
+    if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "string" && p[0] && p[1] && p[0] !== p[1] && Number.isInteger(p[2]) && p[2] > 0) {
+      const k = confKey(p[0], p[1]), was = CONFUSIONS.get(k);
+      CONFUSIONS.delete(k); CONFUSIONS.set(k, k.split("\n").concat(Math.min(9999, p[2] + (was ? was[2] : 0))));
+    }
+    while (CONFUSIONS.size > CONF_CAP) CONFUSIONS.delete(CONFUSIONS.keys().next().value);
+  } catch (e) { CONFUSIONS = new Map(); }
+  return CONFUSIONS;
+}
+function noteConfusion(a, b, d = 1) { // items a and b mixed up once more (d = -1: once less); returns how many times now
+  try {
+    const x = pid(a), y = pid(b); if (!x || !y || x === y) return 0;
+    const m = confusions(), k = confKey(x, y), n = Math.min(9999, ((m.get(k) || [])[2] || 0) + d);
+    m.delete(k); if (n > 0) m.set(k, k.split("\n").concat(n));
+    while (m.size > CONF_CAP) m.delete(m.keys().next().value);
+    lsSet(LS_CONFUSIONS, [...m.values()]);
+    return Math.max(0, n);
+  } catch (e) { return 0; }
+}
+function mixedWith(item) { // record id → times, for every item this one has been mixed up with
+  const out = new Map();
+  try { const me = pid(item.id); for (const [x, y, n] of confusions().values()) if (x === me) out.set(y, n); else if (y === me) out.set(x, n); } catch (e) { }
+  return out;
+}
+// The other item a wrong answer belongs to: the word whose meaning was chosen, or a word whose Italian (or, typed in English,
+// whose meaning) was typed. Words only: a sentence or a grammar question has no item behind its wrong answers.
+let ANSWERS = null, answersJob = null; // every word's Italian, folded (a noun's also with its article) → the words: built in idle time, or on first use
+function warmAnswers() { if (!ANSWERS && !answersJob) answersJob = idleJob(answersSteps(), (x) => { ANSWERS = x; answersJob = null; }); }
+function answerIndex() { if (!ANSWERS) { warmAnswers(); answersJob.finish(); } return ANSWERS; }
+function* answersSteps() { // yields every 200 items
+  const out = new Map(); let n = 0;
+  const add = (k, it) => { k = foldIt(k); if (!k) return; const hits = out.get(k); if (hits) hits.push(it); else out.set(k, [it]); };
+  for (const id in content.items) {
+    const it = content.items[id];
+    if (it.type === "vocab") for (const w of arr(it.it)) { add(w, it); if (it.pos === "noun" && it.art) add(joinArt(it.art, w), it); }
+    if (++n % 200 === 0) yield;
+  }
+  return out;
+}
+function confusedWith(ex, given) {
+  const item = ex.item, me = pid(item.id);
+  if (!given || item.type !== "vocab") return null;
+  if (ex.typeKey === "meaning") return (ex.optionSources && ex.optionSources[given]) || null;
+  if (ex.mode !== "typed") return null;
+  const own = new Set(arr(item.it).map(w => deaccent(normalize(w)))); // the same word in another unit (casa typed without its article) is no mix-up
+  const near = (list) => list.filter(h => pid(h.id) !== me && !arr(h.it).some(w => own.has(deaccent(normalize(w)))) && !arr(ex.alts).some(a => a.word === arr(h.it)[0])) // a word with the same meaning earns a retry, not a mix-up
+    .sort((a, b) => (b.unit === item.unit) - (a.unit === item.unit) || (isFlashUnit(b.unit) === isFlashUnit(item.unit)) - (isFlashUnit(a.unit) === isFlashUnit(item.unit)))[0] || null;
+  if (ex.english) { const k = normEn(given); return near((content.glossIndex[(isFlashUnit(item.unit) ? "fc|" : "gr|") + k] || []).concat(content.glossIndex[(isFlashUnit(item.unit) ? "gr|" : "fc|") + k] || [])); }
+  return near(answerIndex().get(deaccent(normalize(given))) || []);
+}
+/* Flashcards in context (from 9.7): after a card is answered, the answer panel shows a sentence from the grammar units that uses
+   its word, with its English and a speaker. The sentences (every sentence item of a grammar unit, the slang unit's aside, as
+   its register would mislead) are indexed by their words once, when a card first needs one; a card's word, or each word of a
+   phrase in order, must appear as whole words, accents ignored. */
+let CONTEXT = null; // word → [[sentence item, word index, the sentence's words]]
+const ctxWords = (s) => deaccent(normalize(String(s).replace(/\([^)]*\)/g, " "))).split(" ").filter(Boolean);
+function contextIndex() {
+  if (CONTEXT) return CONTEXT;
+  CONTEXT = new Map();
+  for (const u of content.units) {
+    if (isSideUnit(u.id) || u.pack === SLANG_PACK.pack) continue;
+    for (const it of content.byUnit[u.id] || []) {
+      if (it.type !== "sentence" || !arr(it.en).length) continue;
+      const ws = ctxWords(arr(it.it)[0]);
+      ws.forEach((w, i) => { const hits = CONTEXT.get(w); if (hits) hits.push([it, i, ws]); else CONTEXT.set(w, [[it, i, ws]]); });
+    }
+  }
+  return CONTEXT;
+}
+function contextFor(item) { // the sentences that use a card's word: [{ s (the sentence item), at (its first word), len }]
+  const out = [], idx = contextIndex();
+  for (const form of arr(item.it)) {
+    const ws = ctxWords(form); if (!ws.length) continue;
+    for (const [s, i, all] of idx.get(ws[0]) || []) if (ws.every((w, j) => all[i + j] === w) && !out.some(o => o.s === s)) out.push({ s, at: i, len: ws.length });
+  }
+  return out;
+}
+function contextHtml(c) { // the sentence with the card's word in bold, its English, and a speaker
+  const it = String(arr(c.s.it)[0]); let k = 0;
+  const html = it.split(/(\s+)/).map(t => { if (/^\s*$/.test(t)) return esc(t); const n = ctxWords(t).length, hit = n && k < c.at + c.len && k + n > c.at; k += n; return hit ? t.replace(/^([^\p{L}\p{N}']*)(.*?)([^\p{L}\p{N}']*)$/u, (m, x, w, y) => `${esc(x)}<b>${esc(w)}</b>${esc(y)}`) : esc(t); }).join("");
+  return `<div class="fb-ctx"><div><div class="it">${html}</div><div class="ctx-en">${esc(arr(c.s.en)[0])}</div></div>${sayBtn(it, "Listen to the sentence", "solo")}</div>`;
+}
 /* A tricky item (from 9.5): a grammar item with 4 or more lapses, at box 3 or below. Its next exercise in a session is its
    introduction again (the flip card or first exercise, with its explanation), then the usual typed follow-up later in the
    session. An introduction that isn't typed, on an item that has a typed exercise, only teaches: it counts as a repeat, and
@@ -16148,6 +16417,7 @@ function finishAnswer(ok, note, given, closest) {
   const teach = !!q.reintro && ex.kind === "recognition" && itemHasProduction(ex.item); // a tricky item's introduction: its follow-up is the answer that counts
   const out = applyResult(ex.item.id, ok, ex.kind, q.repeat || teach, ex.typeKey);
   noteType(ex);
+  const other = ok ? null : confusedWith(ex, given), mixed = other ? { other, n: noteConfusion(ex.item.id, other.id) } : null;
   session.answered++;
   if (ok) session.correct++;
   if (!q.repeat) { session.xp += out.xp; if (out.promoted) session.promoted++; }
@@ -16159,7 +16429,7 @@ function finishAnswer(ok, note, given, closest) {
     const at = Math.min(session.queue.length, session.pos + 3 + Math.floor(Math.random() * 4));
     session.queue.splice(at, 0, { ex: makeExercise(ex.item, rec(ex.item.id), "production"), repeat: false, followup: true });
   }
-  S.feedback = { ok, note, given, closest, ex, res: out, intro: wasNew || !!q.reintro }; S.answeredAt = Date.now(); S.retry = null; S.flagOpen = false;
+  S.feedback = { ok, note, given, closest, ex, res: out, intro: wasNew || !!q.reintro, mixed }; S.answeredAt = Date.now(); S.retry = null; S.flagOpen = false;
   render();
 }
 function acceptAnswer() {
@@ -16170,6 +16440,7 @@ function acceptAnswer() {
   const list = progress.synonyms[ex.item.id] || (progress.synonyms[ex.item.id] = []);
   if (!list.includes(syn)) list.push(syn);
   undoResult(ex.item.id, fb.res);
+  if (fb.mixed) noteConfusion(ex.item.id, fb.mixed.other.id, -1); // not a mix-up after all
   // remove the repeat queued for this miss and the missed-list entry
   for (let i = session.queue.length - 1; i > session.pos; i--) if (session.queue[i].repeat && session.queue[i].of === ex.item.id) { session.queue.splice(i, 1); break; }
   const mi = session.missed.findIndex(m => m.item.id === ex.item.id); if (mi >= 0) { session.missed.splice(mi, 1); session.missedIds.delete(ex.item.id); }
@@ -16606,6 +16877,7 @@ function renderSession() {
     }
     else if (ex.mode === "flip") title = "Marked as missed";
     else line = "Answer: <b>" + esc(answer) + "</b>";
+    if (ex.typeKey === "flashcard" && ex.ctx === undefined) ex.ctx = pick(contextFor(ex.item)) || null; // one sentence per card shown, kept across redraws
     const anim = S.fbShown !== fb; S.fbShown = fb; // the panel slides up once per answer, not on every redraw
     if (anim) S.fbScroll = true; // …and the page moves down so the answer (and a table's corrections) sit just above it
     const flagged = progress.flags && progress.flags[flagId(ex)] && !progress.flags[flagId(ex)].removed;
@@ -16614,10 +16886,12 @@ function renderSession() {
       <div class="fb-head"><span class="fb-icon" aria-hidden="true">${icon(fb.ok ? "tick" : "cross", 16, 2.6)}</span><h2 class="fb-title" id="fbtitle">${title}</h2>${sayBtn(sayAnswerOf(ex, fb), "Listen to the answer", "solo")}</div>`
       + (line ? `<div class="fb-answer">${line}</div>` : "") + extra
       + (!fb.ok && ex.mode === "typed" && fb.given ? `<div class="extra dim">You typed: ${esc(fb.given)}</div>` : "")
+      + (fb.mixed && fb.mixed.n >= 2 ? `<div class="why mixed">You've mixed up <b>${esc(arr(ex.item.it)[0])}</b> and <b>${esc(arr(fb.mixed.other.it)[0])}</b> ${fb.mixed.n} times.</div>` : "")
       + (!fb.ok && ex.mode !== "table" && ex.answerInContext && ex.answerInContext !== answer ? `<div class="extra">${esc(ex.answerInContext)}</div>` : "")
       + (showWhy ? info.why.map(w => `<div class="why">${w}</div>`).join("") : "")
       + (showWhy && info.table ? info.table : "")
       + (showWhy && info.facts ? `<div class="facts">${info.facts}</div>` : "")
+      + (ex.typeKey === "flashcard" && ex.ctx ? contextHtml(ex.ctx) : "")
       + ruleBtn(ex, fb)
       + (S.flagOpen
         ? (accept ? `<div class="fb-actions">${accept}</div>` : "") + `<div class="flagbox"><label for="flagNote">What looks wrong? (optional)</label><textarea id="flagNote" class="plain" placeholder="e.g. my answer should also be accepted"></textarea><div class="btnrow end"><button type="button" class="quiet" data-act="flagCancel">Cancel</button><button type="button" data-act="flagSave">Save flag</button></div></div>`
@@ -17662,8 +17936,8 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(true); } }); // every document compared, in case a change went unmarked
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.6";
-const CHANGES = "Practice now links to the lessons: after a mistake, or on a new item, Read the rule opens the section that teaches it without leaving the session. Each lesson section can be practised on its own, and new items now arrive in the order the lesson teaches them."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.7";
+const CHANGES = "Wrong options teach more: word order often hides a near miss (sei for sono) and says why, meaning choices offer words you could confuse, and the app notices when you mix up the same two words again. After a flashcard, you see its word in a sentence, with a speaker."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
 const tidied = loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new

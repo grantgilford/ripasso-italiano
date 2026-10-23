@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.5)
+# Exercise types: the catalogue (v9.7)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -12,7 +12,7 @@ Content authors write **items**; the app turns each item into an **exercise** ev
 - **Box 1:** mostly recognition, some production.
 - **Box 2 and up:** production (typing Italian) wherever the item has it; from box 2, only a production answer promotes an item that has one (`itemHasProduction`). Items with no production exercise (grammar questions, sort, match, a spot item with no mistake or an accent-only one) are promoted by their recognition answer.
 
-A wrong answer puts the item back at the end of the session. Every wrong answer gets a reason in the answer panel.
+A wrong answer puts the item back at the end of the session. Every wrong answer gets a reason in the answer panel; from 9.7 the wrong choices themselves are chosen to teach (Wrong options that teach, below).
 
 ### Balanced sessions (from v9.5)
 
@@ -26,6 +26,15 @@ The rules above are each item's own chances. A grammar session (Continue, a unit
 
 Follow-ups, repeats and Can't listen now keep their own rules, and vocab pack and Verbs sessions are built as before. Only items whose type offers a choice (vocab and sentences) can be steered: the more kinds of item a unit has, the more varied its sessions. `tools/test-sessions.js` checks all of this.
 
+### Wrong options that teach (from 9.7)
+
+Where an exercise offers wrong choices, they are built to be mistakes worth making, and the answer panel says why. All of it is built from forms the content or `VERB_GYM` states, never derived; `tools/test-choices.js` checks it over the whole content.
+
+- **Word order traps** (`nearMisses`). One of the two extra words is a near-miss of a word in the sentence where the data allows: another person of its verb in the same tense (*sei* beside *sono*, when the verb's person is certain: the cloze blank named by its hint, or the first verb with a subject pronoun before it or a subject in the English), the other article of the same number before a noun the content gives that article (*il* / *lo*, *la* / *l'*, *i* / *gli*, *un* / *uno*, *una* / *un'*), or another form of an adjective with `forms` (the other number; the other gender only after a noun or with the English marked *(m.)* / *(f.)*). It is never one that, put in place of a word of any accepted version (`translationsOf`, a subject pronoun added or left out, accents ignored), makes a sentence the item accepts; with none, both extra words are the unit's random words as before. The answer panel names it: "You chose *sei*: *sei* is the tu form; the subject is io (sono)", or, when it was left out and explanations are shown, "Near miss: …". About 845 of the 1,208 grammar-unit sentences of three words or more have one (3,163 verb persons, 195 articles, 232 adjective forms in all, as of 9.7).
+- **Meaning choices** (`distractorsFor`). Best first: a word the learner has mixed up with this one before, then words with the same `pos` and `gender`, then look-alikes (the same first two letters, or a letter or two apart); a word with another `pos` comes in only as a look-alike or a past mix-up. They come from the item's unit; the whole course is searched only when the unit runs short. One option per word (progress record), and none is one of the item's answers, a word with the same Italian, or, for Italian options, a word sharing the meaning asked for.
+- **Confusion memory** (`itapp.confusions.v1`, per device, never synced, at most 500 pairs). A wrong answer that is another word's right answer (its meaning chosen, its Italian typed for the English, or for a card another card's meaning typed) is remembered as a pair; that word is offered first in the next meaning choice, and from the second time the answer panel says "You've mixed up *casa* and *cosa* 2 times". Accept my answer takes the mix-up back.
+- **Flashcards in context** (`contextFor`). After a card is answered, right or wrong, the answer panel shows one sentence from a grammar unit (the slang unit aside) that uses the card's word as whole words, accents ignored, with its English and a speaker; the sentences are indexed by their words the first time a card needs one. 661 of the 8,000 cards have one as of 9.7.
+
 ## The types
 
 **R** = recognition (choosing or tapping), **P** = production (typing Italian). The *key* is the `typeKey` the Stats screen groups accuracy by.
@@ -33,14 +42,14 @@ Follow-ups, repeats and Can't listen now keep their own rules, and vocab pack an
 | Shown as | Key | Built from | Kind | When | What the learner does |
 |---|---|---|---|---|---|
 | Flip card (New sentence, New verb, New pattern, New preposition) | `flip`, `intro` | vocab, sentence, verb, transform, prep | R | mostly new items | reads, reveals, grades themself |
-| Meaning | `meaning` | vocab | R | box 0–1 | picks the meaning (IT → EN or EN → IT) from four |
+| Meaning | `meaning` | vocab | R | box 0–1 | picks the meaning (IT → EN or EN → IT) from four: words it could be mixed up with (from 9.7, below) |
 | Typed recall | `recall` | vocab | P | box 1+ | types the Italian for the English (nouns with their article) |
 | Article drill | `article` | vocab (nouns with all four forms) | P | box 1+ | types *il / lo / un / gli…* for the noun |
 | **Make it plural / Make it singular** (new) | `plural` | vocab (nouns with all four forms) | P | box 1+ | types the noun with its article in the other number: *il lago → i laghi* |
 | Adjective agreement | `agreement` | vocab (adjectives with `forms`) | P | box 1+ | types the adjective agreeing with a noun from the content |
 | Conjugation | `conjugation` | verb | P | box 1+ | types one form: *parlare · noi · presente* |
 | Fill in the blank | `cloze` | sentence with `cloze` | R or P | R with `options` at box 0–1, else P | picks or types the missing word(s) |
-| Word order | `bank` | sentence (3+ words) | R | mostly box 1–2 | taps the words in order (two distractors) |
+| Word order | `bank` | sentence (3+ words) | R | mostly box 1–2 | taps the words in order (two extra words, one a near-miss where the data allows, from 9.7) |
 | Translate | `translate` | sentence | P | mostly box 2+ | types the whole sentence from English |
 | **Listen and type** (new) | `listen` | sentence (up to 9 words) | P | box 1+, about one time in five, only with an Italian voice and Read aloud on | hears the sentence (Play, or Slow), types it; Can't listen now swaps it at no cost |
 | Grammar | `grammar` | grammar_mc | R | always | picks the answer to a rule question; each wrong option has a note |
@@ -48,7 +57,7 @@ Follow-ups, repeats and Can't listen now keep their own rules, and vocab pack an
 | Preposition + article | `preparticle` | prep | P | box 1+ | types the merged form: *in + lo zoo → nello zoo* |
 | Number | `number` | number | P | always | digits → words or words → digits |
 | Clock | `clock` | clock | P | always | time in digits → words, or words → digits |
-| Flashcard | `flashcard` | vocab in a flashcard unit | P | always | types the English (or Italian) for the card |
+| Flashcard | `flashcard` | vocab in a flashcard unit | P | always | types the English (or Italian) for the card; the answer panel then shows the word in a grammar-unit sentence (from 9.7) |
 | **Spot the mistake** (new) | `spot` | spot | R, then P | R at box 0–1; from box 2 (and in the follow-up) the learner also types the fix | taps the one wrong word, or **No mistake**; then types the right word |
 | **Complete the endings** (new) | `endings` | endings | P | always | types the missing endings in boxes inside the sentence: *Le ragazz[e] sono stanc[he]* |
 | **Choose the reply / Write the reply** (new) | `reply` | reply | R, then P | choice at box 0–1 (when it has two or more options), typed after | answers someone's line in a short exchange, from an English cue |
@@ -78,9 +87,9 @@ Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all
 | sort | u05 (*essere* or *avere* in the *passato prossimo*), u08 (adjective or adverb), u10 (*di* or *da*), u11 (conjunctions that take the subjunctive or not), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
 | match | u07 (digits ↔ words), u09 (question word ↔ meaning), u11 (conjunction ↔ meaning), u15 (clock times), u16 (sentence halves joined by *che / cui*), u18 (slang ↔ plain Italian) |
 
-## Measured mix (9.5)
+## Measured mix (9.7)
 
-What `node tools/variety.js --markdown` printed for version 9.5: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
+What `node tools/variety.js --markdown` printed for version 9.7: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
 
 | Unit | Items | Kinds | Most common | Second | Flag |
 |---|---:|---:|---|---|---|
@@ -89,19 +98,19 @@ What `node tools/variety.js --markdown` printed for version 9.5: the app's own `
 | u03 Present tense: regular -are verbs | 299 | 13 | `conjugation` 36% | `grammar` 15% | conjugation above 35% |
 | u04 Irregular verbs: present tense | 271 | 7 | `grammar` 23% | `conjugation` 21% | fewer than 10 kinds |
 | u05 Verb tenses: present, past, future and conditional | 329 | 7 | `conjugation` 31% | `grammar` 19% | fewer than 10 kinds |
-| u06 Adjectives | 268 | 11 | `recall` 29% | `agreement` 25% |  |
+| u06 Adjectives | 268 | 11 | `recall` 29% | `agreement` 26% |  |
 | u19 Possessives | 248 | 14 | `transform` 16% | `spot` 12% |  |
 | u07 Numbers | 159 | 12 | `number` 48% | `recall` 17% | number above 35% |
 | u08 Adverbs | 196 | 8 | `recall` 54% | `grammar` 16% | fewer than 10 kinds; recall above 35% |
 | u09 Questions | 192 | 9 | `recall` 38% | `cloze` 18% | fewer than 10 kinds; recall above 35% |
 | u10 Prepositions | 200 | 11 | `recall` 42% | `cloze` 15% | recall above 35% |
 | u11 Conjunctions | 140 | 8 | `recall` 44% | `grammar` 17% | fewer than 10 kinds; recall above 35% |
-| u12 The subjunctive (congiuntivo) | 202 | 10 | `recall` 21% | `cloze` 17% |  |
+| u12 The subjunctive (congiuntivo) | 202 | 10 | `recall` 21% | `cloze` 16% |  |
 | u13 Object pronouns, reflexives, ne & ci | 158 | 10 | `transform` 34% | `recall` 20% |  |
-| u14 Formal & informal: register and the imperative | 284 | 12 | `transform` 26% | `recall` 26% |  |
+| u14 Formal & informal: register and the imperative | 284 | 12 | `transform` 26% | `recall` 25% |  |
 | u15 Time: days, months, dates, clock, duration | 268 | 14 | `recall` 48% | `clock` 9% | recall above 35% |
 | u16 Building longer sentences: relative pronouns, gerund, impersonal si | 101 | 10 | `transform` 25% | `recall` 24% |  |
-| u18 Colloquial Italian & slang | 218 | 13 | `recall` 32% | `cloze` 14% |  |
+| u18 Colloquial Italian & slang | 218 | 13 | `recall` 32% | `cloze` 15% |  |
 | u17 Wild card | 98 | 16 | `transform` 22% | `grammar` 16% |  |
 
 Over all 19 units (4260 items):

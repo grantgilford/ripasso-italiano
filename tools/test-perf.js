@@ -27,6 +27,7 @@
     - typing "andare" into the Verbs filter, and "casa" into the 1,000-card glossary's filter, each
       all at once;
     - buildSession for every kind of session (the mean of 5, as each takes only milliseconds);
+    - the first lookup of a flashcard's sentence (9.7 on), which indexes the grammar units' sentences by their words;
     - with a stand-in for the cloud database: one pushProgress with every document compared and
       written; one answer and the pushProgress after it; a snapshot from the cloud that is only the echo
       of those writes, and the pushProgress after it; and another device's newer copy merged in, as
@@ -83,12 +84,12 @@ const BUDGETS = {
   "Look up: casa": 89,
   "Look up: ca, a moment after opening": 73,
   "buildSession continue": 16,
-  "buildSession unit": 13,
+  "buildSession unit": 8,
   "buildSession review": 111,
   "buildSession flashcards": 76,
   "buildSession verbs": 54,
   "buildSession wild": 81,
-  "buildSession hard": 55,
+  "buildSession hard": 28,
   "buildSession mistakes": 31,
   // the sync figures, set at 9.4 (dirty tracking and the record-by-record merge) in the same way; the push after an echo
   // takes well under a millisecond, so its budget leaves room for the timer's own granularity
@@ -98,11 +99,16 @@ const BUDGETS = {
   "Snapshot: the echo of own writes": 43,
   "pushProgress after the echo": 3,
   "Snapshot: another device's changes": 160,
+  // 9.7: meaning choices no longer list the whole course for every choice, so "buildSession unit" and "buildSession hard"
+  // took about 60% and 50% of 9.6's time on the same computer; their budgets were lowered in the same proportion. The first
+  // lookup of a flashcard's sentence indexes the grammar units' sentences while the answer panel is drawn, so it is held to
+  // the same limit as a slice of idle work (about 25–31 ms on that computer)
+  "Flashcard sentence, first lookup": 50,
 };
 
-// Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work may keep
-// a tap waiting longer than this (the usual threshold for a "long task").
-const FIXED = { "Idle work: longest slice": 50 };
+// Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work, and no
+// index built while an answer is shown, may keep a tap waiting longer than this (the usual threshold for a "long task").
+const FIXED = { "Idle work: longest slice": 50, "Flashcard sentence, first lookup": 50 };
 
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
@@ -136,6 +142,7 @@ async function measure(runs) {
     ["Draw a 1,000-card glossary", { screen: "reference", refUnit: fc, refTab: "glossary", refFilter: "" }],
   ];
   const kinds = [["continue"], ["unit", vt], ["review"], ["flashcards"], ["verbs"], ["wild"], ["hard"], ["mistakes"]];
+  const card = typeof contextFor === "function" && (content.byUnit[fc] || []).find(c => contextFor(c).length); // a card with a sentence (9.7 on)
   // A stand-in for window.claude.use("db") that keeps what is written.
   const store = {};
   const cloudDocs = () => Object.fromEntries(Object.entries(store).filter(([k]) => k.startsWith("progress2/")).map(([k, v]) => [k.slice("progress2/".length), v]));
@@ -175,6 +182,7 @@ async function measure(runs) {
     add("Look up: ca, a moment after opening", time(() => type("lookupBox", "ca")));
     draw({ screen: "home", lookup: "" });
     for (const [kind, unit] of kinds) add("buildSession " + kind, time(() => { for (let k = 0; k < 5; k++) if (!buildSession(kind, unit).queue.length) throw new Error("an empty " + kind + " session"); }) / 5); // quick, so the mean of 5
+    if (card) { CONTEXT = null; add("Flashcard sentence, first lookup", time(() => contextFor(card))); } // 9.7 on: the sentences indexed when a card first needs one
     lastPushed = {}; writing = {}; pendingWrite = {}; // so every document is written
     if (typeof DIRTY !== "undefined") DIRTY = null; // 9.4 on: and every one compared
     add("pushProgress (fake db)", time(() => pushProgress()));
