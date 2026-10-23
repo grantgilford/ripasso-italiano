@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.7)
+# Exercise types: the catalogue (v9.8)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -77,70 +77,70 @@ Where an exercise offers wrong choices, they are built to be mistakes worth maki
 
 ## Where the new types could go next
 
-Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all five, and so does the possessives unit (u19, v8.8), which shows how well they suit a single grammar point: sort for article or no article, *mio / mia / miei / mie* and *tuo / Suo / vostro*; match for *my book* ↔ *il mio libro*; spot for *lo mio zaino*; endings for *i mie{i} fratelli*; reply for *Di chi è?* Ideas for the other units:
+Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all five, and so do the possessives unit (u19, v8.8), which shows how well they suit a single grammar point: sort for article or no article, *mio / mia / miei / mie* and *tuo / Suo / vostro*; match for *my book* ↔ *il mio libro*; spot for *lo mio zaino*; endings for *i mie{i} fratelli*; reply for *Di chi è?* From v9.8 the irregular verbs and verb tenses units (u04, u05) use all five too, for verb forms rather than agreement: spot for *Loro fano*, *Ho andato*, *Domani venirò* (a few right, to test judgement: *Usciamo stasera*, *Ho vissuto a Roma per due anni*); endings for *riman{go}*, *cerc{heremo}*, *andre{mo}* beside *andre{mmo}*; reply for *Hai fame? Sì, ho molta fame* and *Che cosa hai fatto ieri sera?*; sort for *sapere* or *conoscere*, *vado* or *vengo*, *essere* or *avere*, *ho giocato* or *giocavo*; match for *venire → vengo*, *prendere → preso*, *sarò → sarei*. Ideas for the other units:
 
 | Type | Fits |
 |---|---|
-| spot | u03–u05 (a wrong person or tense: *Noi parlate*), u06 (agreement, *bello / buono* forms), u10 (*di / da / a* with towns and countries), u12 (indicative for subjunctive after *penso che*), u13 (*lo / la / li* agreement), u14 (*tu* forms in a formal sentence) |
-| endings | u03–u05 (verb endings: *parl{iamo}*, *finisc{ono}*), u06 (adjective chains), u12 (subjunctive endings), u07 (ordinals: *second{a}*) |
-| reply | u04 (*Hai fame? Sì, ho fame*), u09 (answering question words), u14 (formal exchanges, commands), u15 (*Che ore sono?*), u18 (reactions and slang replies) |
-| sort | u05 (*essere* or *avere* in the *passato prossimo*), u08 (adjective or adverb), u10 (*di* or *da*), u11 (conjunctions that take the subjunctive or not), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
+| spot | u03 (a wrong person: *Noi parlate*), u06 (agreement, *bello / buono* forms), u10 (*di / da / a* with towns and countries), u12 (indicative for subjunctive after *penso che*), u13 (*lo / la / li* agreement), u14 (*tu* forms in a formal sentence) |
+| endings | u03 (verb endings: *parl{iamo}*, *cerc{hi}*), u06 (adjective chains), u12 (subjunctive endings), u07 (ordinals: *second{a}*) |
+| reply | u03 (*Parli italiano? Sì, un po'*), u09 (answering question words), u14 (formal exchanges, commands), u15 (*Che ore sono?*), u18 (reactions and slang replies) |
+| sort | u03 (*-care* or *-ciare*: *cerchi* or *cominci*), u08 (adjective or adverb), u10 (*di* or *da*), u11 (conjunctions that take the subjunctive or not), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
 | match | u07 (digits ↔ words), u09 (question word ↔ meaning), u11 (conjunction ↔ meaning), u15 (clock times), u16 (sentence halves joined by *che / cui*), u18 (slang ↔ plain Italian) |
 
-## Measured mix (9.7)
+## Measured mix (9.8)
 
-What `node tools/variety.js --markdown` printed for version 9.7: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
+What `node tools/variety.js --markdown` printed for version 9.8: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
 
 | Unit | Items | Kinds | Most common | Second | Flag |
 |---|---:|---:|---|---|---|
 | u01 Essere, subject pronouns & basics | 304 | 18 | `recall` 26% | `grammar` 12% |  |
 | u02 Nouns, gender & articles | 325 | 16 | `recall` 17% | `article` 15% |  |
-| u03 Present tense: regular -are verbs | 299 | 13 | `conjugation` 36% | `grammar` 15% | conjugation above 35% |
-| u04 Irregular verbs: present tense | 271 | 7 | `grammar` 23% | `conjugation` 21% | fewer than 10 kinds |
-| u05 Verb tenses: present, past, future and conditional | 329 | 7 | `conjugation` 31% | `grammar` 19% | fewer than 10 kinds |
-| u06 Adjectives | 268 | 11 | `recall` 29% | `agreement` 26% |  |
-| u19 Possessives | 248 | 14 | `transform` 16% | `spot` 12% |  |
-| u07 Numbers | 159 | 12 | `number` 48% | `recall` 17% | number above 35% |
-| u08 Adverbs | 196 | 8 | `recall` 54% | `grammar` 16% | fewer than 10 kinds; recall above 35% |
+| u03 Present tense: regular -are verbs | 298 | 13 | `conjugation` 36% | `grammar` 15% | conjugation above 35% |
+| u04 Irregular verbs: present tense | 335 | 12 | `grammar` 17% | `conjugation` 17% |  |
+| u05 Verb tenses: present, past, future and conditional | 390 | 12 | `conjugation` 26% | `grammar` 15% |  |
+| u06 Adjectives | 266 | 11 | `recall` 29% | `agreement` 26% |  |
+| u19 Possessives | 246 | 14 | `transform` 16% | `spot` 12% |  |
+| u07 Numbers | 157 | 12 | `number` 48% | `recall` 17% | number above 35% |
+| u08 Adverbs | 192 | 8 | `recall` 55% | `grammar` 13% | fewer than 10 kinds; recall above 35% |
 | u09 Questions | 192 | 9 | `recall` 38% | `cloze` 18% | fewer than 10 kinds; recall above 35% |
-| u10 Prepositions | 200 | 11 | `recall` 42% | `cloze` 15% | recall above 35% |
-| u11 Conjunctions | 140 | 8 | `recall` 44% | `grammar` 17% | fewer than 10 kinds; recall above 35% |
+| u10 Prepositions | 199 | 11 | `recall` 43% | `cloze` 15% | recall above 35% |
+| u11 Conjunctions | 139 | 8 | `recall` 44% | `grammar` 17% | fewer than 10 kinds; recall above 35% |
 | u12 The subjunctive (congiuntivo) | 202 | 10 | `recall` 21% | `cloze` 16% |  |
 | u13 Object pronouns, reflexives, ne & ci | 158 | 10 | `transform` 34% | `recall` 20% |  |
 | u14 Formal & informal: register and the imperative | 284 | 12 | `transform` 26% | `recall` 25% |  |
 | u15 Time: days, months, dates, clock, duration | 268 | 14 | `recall` 48% | `clock` 9% | recall above 35% |
 | u16 Building longer sentences: relative pronouns, gerund, impersonal si | 101 | 10 | `transform` 25% | `recall` 24% |  |
 | u18 Colloquial Italian & slang | 218 | 13 | `recall` 32% | `cloze` 15% |  |
-| u17 Wild card | 98 | 16 | `transform` 22% | `grammar` 16% |  |
+| u17 Wild card | 98 | 16 | `transform` 22% | `grammar` 15% |  |
 
-Over all 19 units (4260 items):
+Over all 19 units (4372 items):
 
 | Kind | Share | Units using it |
 |---|---:|---:|
-| `recall` | 23% | 17 |
-| `grammar` | 14% | 19 |
+| `recall` | 22% | 17 |
+| `grammar` | 13% | 19 |
 | `cloze` | 12% | 19 |
 | `conjugation` | 9% | 12 |
-| `transform` | 9% | 13 |
+| `transform` | 8% | 13 |
 | `translate` | 7% | 19 |
 | `listen` | 6% | 19 |
 | `bank` | 5% | 19 |
+| `spot` | 3% | 5 |
 | `agreement` | 2% | 6 |
 | `article` | 2% | 10 |
 | `number` | 2% | 2 |
+| `endings` | 2% | 5 |
 | `plural` | 2% | 10 |
-| `spot` | 2% | 3 |
-| `endings` | 1% | 3 |
-| `reply` | 1% | 3 |
+| `reply` | 1% | 5 |
+| `match` | 1% | 5 |
+| `sort` | 1% | 5 |
 | `meaning` | 1% | 17 |
-| `match` | 1% | 3 |
-| `sort` | 1% | 3 |
 | `clock` | 1% | 2 |
 | `flip` | 1% | 17 |
 | `preparticle` | <1% | 2 |
 | `intro` | <1% | 1 |
 
-Flagged: 9 of 19 units.
+Flagged: 7 of 19 units.
 
 ## Ideas not yet built
 

@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v3.7)
+# Italian Practice App: Content Pack Guide (v3.8)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v9.7, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v9.8, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
@@ -103,6 +103,7 @@ Sentences generate three exercises: **fill in the blank** (from `cloze`), **word
   "explanation": "amico → amici: the plural is -ci, unlike most -co words. Masculine l' becomes gli.",
   "distractorNotes": { "gli amichi": "amico is one of the -co nouns that do NOT add h.", "i amici": "Before a vowel the masculine plural article is gli.", "le amiche": "That is the feminine plural (amica)." } }
 ```
+A grammar question asks about a rule, a meaning or a choice between whole sentences. One that is really an Italian sentence with a gap (*Complete: Non ___ Roma.*) belongs in a **sentence** with a `cloze` instead: its wrong options become `cloze.options`, each note goes in `cloze.notes`, and the sentence then also gives word order, translation and listening. Where the unit already has the same sentence, give that one the options rather than adding a copy. v9.8 turned the 35 such questions into sentences this way, mapping each old id to its sentence in `ID_ALIASES`.
 
 **transform** (rewrite a sentence by an instruction)
 ```json
@@ -125,7 +126,7 @@ Drilled both ways: digits → words (any entry in `it` is accepted) and words �
 
 ### The practice types added in v8.6
 
-Five item types turn a rule into something to do rather than a question to answer. Each is described, with what it looks like and where it fits, in `docs/exercise-types.md`; units 1 and 2 and the possessives unit (u19) use all five. Like every item, each needs an `explanation`, and every wrong choice it offers needs a reason.
+Five item types turn a rule into something to do rather than a question to answer. Each is described, with what it looks like and where it fits, in `docs/exercise-types.md`; units 1, 2, 4 and 5 and the possessives unit (u19) use all five. Like every item, each needs an `explanation`, and every wrong choice it offers needs a reason.
 
 **spot** (Spot the mistake: tap the wrong word, then type it right)
 ```json
