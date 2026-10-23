@@ -50,7 +50,7 @@ const srcTags = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]
 for (const s of srcTags) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(s)) problem("Structure", `script loaded from outside cdnjs: ${s}`);
 
 /* ---------- 2. load the content (and a few of the app's own helpers) ---------- */
-const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, getContent: () => content";
+const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, sectionTarget, getContent: () => content, ITEM_SECTIONS: typeof ITEM_SECTIONS === 'undefined' ? null : ITEM_SECTIONS";
 const appVersion = (code.match(/const APP_VERSION = "([^"]+)"/) || [])[1];
 let app;
 try { app = loadApp(exportsExpr, { html }); } // stops with a message if the boot section is missing
@@ -301,6 +301,40 @@ for (const uid of Object.keys(units)) {
       if (w > 5) problem("Tables wider than a label column plus four", `${uid} lesson §${i + 1}: ${w} columns`);
     }
   }));
+}
+
+/* ---------- 7b. the lesson section that teaches each item (ITEM_SECTIONS) ---------- */
+// Every item of a unit with a lesson names the section that teaches it, by a unique start of its heading (another unit's
+// as "u13#Where the pronouns"), or is listed with null, unlinked on purpose. tools/link-sections.js proposes links.
+{
+  const links = app.ITEM_SECTIONS;
+  const plainH = (h) => String(h).replace(/\[\[[^\]|]*\|?([^\]]*)\]\]/g, "$1").replace(/\*+/g, "").trim();
+  if (!links || typeof links !== "object") problem("Item links", "no const ITEM_SECTIONS = {…}; after LESSONS");
+  else {
+    for (const [uid, map] of Object.entries(links)) {
+      if (!units[uid]) { problem("Item links", `ITEM_SECTIONS has a line for “${uid}”, which is not a unit`); continue; }
+      if (!lessonOf(uid)) problem("Item links", `ITEM_SECTIONS has a line for ${uid}, which has no lesson`);
+      for (const [id, link] of Object.entries(map || {})) {
+        if (!content.items[id]) { problem("Item links", `${uid}: ${id} is not an item (removed or renamed? drop its link)`); continue; }
+        if (content.items[id].unit !== uid) problem("Item links", `${id} is listed under ${uid} but belongs to ${content.items[id].unit}`);
+        if (link === null) { count("items left unlinked"); continue; }
+        count("item links");
+        if (typeof link !== "string" || !link.trim()) { problem("Item links", `${id}: ${JSON.stringify(link)} is not a heading (or null)`); continue; }
+        if (/^(\w+#)?\d+$/.test(link)) { problem("Item links", `${id}: “${link}” is a section number; name the section by the start of its heading`); continue; }
+        if (app.sectionTarget(uid, link)) continue;
+        const m = link.match(/^(?:(\w+)#)?(.+)$/), tu = m[1] || uid;
+        if (m[1] && !units[tu]) { problem("Item links", `${id}: “${link}” names unit ${tu}, which does not exist`); continue; }
+        const L = lessonOf(tu), hits = L ? (L.sections || []).filter(x => plainH(x.h).startsWith(m[2])).length : 0;
+        problem("Item links", `${id}: “${link}” ${!L ? `points into ${tu}, which has no lesson` : hits ? `starts ${hits} headings in ${tu}; give more of the heading` : `starts no heading in ${tu}`}`);
+      }
+    }
+    for (const u of Object.values(units)) {
+      if (u.mode || !lessonOf(u.id)) continue;
+      const map = links[u.id] || {};
+      for (const it of content.byUnit[u.id] || []) if (!Object.prototype.hasOwnProperty.call(map, it.id)) problem("Items without a lesson link", `${it.id} (${u.id}): link it to the section that teaches it in ITEM_SECTIONS (node tools/link-sections.js ${u.id} --missing proposes one), or list it with null`);
+    }
+  }
+  for (const it of allItems) if (it.section !== undefined) problem("Item links", `${it.id}: a built-in item keeps its link in ITEM_SECTIONS, not in a "section" field`);
 }
 
 /* ---------- 8. British spelling ---------- */

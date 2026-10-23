@@ -19,8 +19,10 @@
        two months on, and after an answer, an undo, a setting, a sync merge, a backup loaded and a
        reset; and the numbers drawn on those screens.
     4. Word lists and indexes built in idle time (the words the typo rule knows, the English glosses
-       altWords uses) against building them at once; kept when the content is built again unchanged,
-       built again when a pack changes it.
+       altWords uses, and from 9.6 each item's lesson section and each section's items) against building
+       them at once (the sections by a plain reading of ITEM_SECTIONS and the headings); kept when the
+       content is built again unchanged, built again when a pack changes it (with the links its own
+       items name).
     5. Start-up: progress already saved in order isn't written again; progress tidied while loading is.
     6. The sync merge (from 9.4): adoptRemote, which merges record by record in place, against 9.3's, which
        merged into a new copy (mergeProgress, as it was then) and built the content again: the same progress
@@ -388,28 +390,49 @@ async function openApp(browser, origin, { seed = false, init = null } = {}) {
     section("4. Word lists and indexes built in idle time");
     {
       const { page, context } = await openApp(browser, origin);
-      await page.waitForFunction("KNOWN_WORDS && GLOSS", null, { timeout: 60000 });
+      await page.waitForFunction("KNOWN_WORDS && GLOSS && SECTIONS", null, { timeout: 60000 });
+      // each item's lesson section, read plainly: its link (ITEM_SECTIONS, or an imported item's own "section") against every heading
+      await page.evaluate(() => {
+        REF.sections = () => {
+          const strip = (h) => String(h).replace(/\[\[[^\]|]*\|?([^\]]*)\]\]/g, "$1").replace(/\*+/g, "").trim(), of = [], items = {};
+          for (const u of content.units) for (const it of content.byUnit[u.id] || []) {
+            const link = typeof it.section === "string" ? it.section : (ITEM_SECTIONS[u.id] || {})[it.id];
+            if (typeof link !== "string") continue;
+            const m = link.match(/^(?:(\w+)#)?(.+)$/), tu = m[1] || u.id, L = content.unitById[tu] && (content.unitById[tu].lesson || LESSONS[tu]);
+            const hits = L ? L.sections.map((x, i) => strip(x.h).startsWith(m[2]) ? i : -1).filter(i => i >= 0) : [];
+            if (hits.length !== 1) continue;
+            of.push(it.id + "→" + tu + "#" + hits[0]); (items[tu + "#" + hits[0]] = items[tu + "#" + hits[0]] || []).push(it.id);
+          }
+          return { of: of.sort().join(), items: JSON.stringify(Object.keys(items).sort().map(k => [k, items[k]])) };
+        };
+        REF.sameSections = () => { const x = sections(), r = REF.sections(); return [...x.of].map(([id, at]) => id + "→" + at.unit + "#" + at.index).sort().join() === r.of && JSON.stringify([...x.items.keys()].sort().map(k => [k, x.items.get(k)])) === r.items; };
+      });
+      check(`each item's lesson section, worked out in idle time, is the one read plainly (${await page.evaluate("SECTIONS.of.size")} items)`, await page.evaluate(() => REF.sameSections() && SECTIONS.of.size > 4000));
       const built = await page.evaluate(() => { const k = REF.knownWords(); return { it: REF.sameSet(KNOWN_WORDS.it, k.it), en: REF.sameSet(KNOWN_WORDS.en, k.en), gloss: REF.sameIndex(content.glossIndex, REF.glossIndex()), n: KNOWN_WORDS.it.size + KNOWN_WORDS.en.size }; });
       check(`the word lists built in idle time are those built at once (${built.n} words)`, built.it && built.en, JSON.stringify(built));
       check("altWords' index of English glosses, built in idle time, is the one built at once", built.gloss);
       const again = await page.evaluate(() => {
         for (const i of Object.values(content.items)) { tuHint(i); if (TU_FORMS) break; }
-        lookupHits("casa"); const k = KNOWN_WORDS, g = GLOSS, tu = TU_FORMS, had = !!SEARCH;
+        lookupHits("casa"); const k = KNOWN_WORDS, g = GLOSS, tu = TU_FORMS, sc = SECTIONS, had = !!SEARCH;
         buildContent();
-        return { kept: !!(k && g && tu) && KNOWN_WORDS === k && GLOSS === g && TU_FORMS === tu, search: had && SEARCH === null };
+        return { kept: !!(k && g && tu && sc) && KNOWN_WORDS === k && GLOSS === g && TU_FORMS === tu && SECTIONS === sc, search: had && SEARCH === null };
       });
       check("building the content again unchanged keeps them (as when the packs are read from the cloud again)", again.kept, JSON.stringify(again));
       check("…and drops the search index", again.search);
-      const cold = await page.evaluate(() => { KNOWN_WORDS = null; GLOSS = null; const k = REF.knownWords(); return REF.sameSet(knownWords(), k.it) && REF.sameSet(knownWords(true), k.en) && REF.sameIndex(content.glossIndex, REF.glossIndex()); });
+      const cold = await page.evaluate(() => { KNOWN_WORDS = null; GLOSS = null; SECTIONS = null; const k = REF.knownWords(); return REF.sameSet(knownWords(), k.it) && REF.sameSet(knownWords(true), k.en) && REF.sameIndex(content.glossIndex, REF.glossIndex()) && REF.sameSections(); });
       check("needed before idle time comes, they are built at once, the same", cold);
       await page.evaluate(() => {
         S.screen = "data"; S.packsOpen = true; render();
-        document.getElementById("packText").value = JSON.stringify({ pack: "speedtest", version: 1, units: [{ id: "zz1", title: "Zeta words", order: 999 }], items: [{ id: "v-zz-zumzum", unit: "zz1", type: "vocab", it: "zumzum", en: ["buzzbuzz"], pos: "noun", gender: "m", art: "lo", indef: "uno", plural: "zumzum", artPl: "gli" }] });
+        document.getElementById("packText").value = JSON.stringify({ pack: "speedtest", version: 1, units: [{ id: "zz1", title: "Zeta words", order: 999, lesson: { sections: [{ h: "The *zum* words", b: ["Zum."] }, { h: "More words", b: ["Buzz."] }] } }],
+          items: [{ id: "v-zz-zumzum", unit: "zz1", type: "vocab", it: "zumzum", en: ["buzzbuzz"], pos: "noun", gender: "m", art: "lo", indef: "uno", plural: "zumzum", artPl: "gli", section: "More" },
+            { id: "v-zz-zimzim", unit: "zz1", type: "vocab", it: "zimzim", en: ["bzzbzz"], pos: "noun", gender: "m", art: "lo", indef: "uno", plural: "zimzim", artPl: "gli", section: "u05#The tenses at" }] });
         action("importPack");
       });
-      const fresh = await page.evaluate(() => ({ dropped: KNOWN_WORDS === null && GLOSS === null, report: S.report }));
+      const fresh = await page.evaluate(() => ({ dropped: KNOWN_WORDS === null && GLOSS === null && SECTIONS === null, report: S.report }));
       check("a new pack drops them", fresh.dropped, JSON.stringify(fresh));
-      await page.waitForFunction("KNOWN_WORDS && GLOSS", null, { timeout: 60000 });
+      await page.waitForFunction("KNOWN_WORDS && GLOSS && SECTIONS", null, { timeout: 60000 });
+      const packLinks = await page.evaluate(() => ({ own: JSON.stringify(itemSection("v-zz-zumzum")), other: JSON.stringify(itemSection("v-zz-zimzim")), same: REF.sameSections() }));
+      check("…and the lesson sections are worked out again in idle time, with the links the pack's items name", packLinks.own === '{"unit":"zz1","index":1}' && packLinks.other === '{"unit":"u05","index":0}' && packLinks.same, JSON.stringify(packLinks));
       const withPack = await page.evaluate(() => ({ it: knownWords().has("zumzum"), en: knownWords(true).has("buzzbuzz"), gloss: !!content.glossIndex["gr|buzzbuzz"], same: REF.sameIndex(content.glossIndex, REF.glossIndex()) && REF.sameSet(knownWords(), REF.knownWords().it) }));
       check("…and they are built again in idle time, with the pack's words", withPack.it && withPack.en && withPack.gloss && withPack.same, JSON.stringify(withPack));
       check("word lists: no script errors", !page.errors.length, page.errors.join("\n"));

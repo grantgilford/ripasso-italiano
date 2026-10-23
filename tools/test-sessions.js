@@ -29,9 +29,16 @@
        and verbs, are exactly what dueIds(), flashDueIds() and dueIds("vb") gain from the end of the day
        before to the end of that day; the numbers drawn on Stats are those.
     6. Another round: after a session of every kind (Continue, a grammar unit, Review, Wild card, Mistakes,
-       most-missed, Flashcards from Today and from a pack, Verbs from Today and from Units), started by
-       tapping, the summary offers Another round beside Back to Today, which starts a session of the same
-       kind and unit; it is disabled when nothing is left to practise.
+       most-missed, Flashcards from Today and from a pack, Verbs from Today and from Units, a lesson section),
+       started by tapping, the summary offers Another round beside Back to Today, which starts a session of
+       the same kind and unit; it is disabled when nothing is left to practise.
+    7. The lesson's order (from 9.6): Continue and a unit's sessions take new items section by section in the
+       order of the unit's lesson (ITEM_SECTIONS), the items of one section in a different order from session
+       to session, and the items linked to another unit's lesson or to none only after those; on a device with
+       no progress and with the seeded one, for every grammar unit. Practise this section: for every section
+       with linked items, its session takes only those items, up to the lesson length: the due ones first
+       (soonest due first), then new ones, no more than today's new items allow, then the rest, least known
+       first; with today's new items used up it takes no new ones.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -346,9 +353,10 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         ["Continue", "home", '.hero[data-start="continue"]'], ["a grammar unit", "units", '.ucard [data-unit]'], ["Review", "home", '[data-start="review"]'],
         ["Wild card", "home", '[data-start="wild"]'], ["Mistakes", "home", '[data-start="mistakes"]'], ["the most-missed items", "stats", '[data-start="hard"]'],
         ["Flashcards", "home", '[data-start="flashcards"]'], ["a vocab pack", "units:vocab:fc01", '.ucard [data-unit]'], ["Verbs", "home", '[data-start="verbs"]'], ["the Verbs section from Units", "units:verbs:vb", '.ucard [data-unit]'],
+        ["a lesson section", "reference:lesson:u06", '[data-practise]:not([disabled])'],
       ];
       for (const [label, where, sel] of ways) {
-        await page.evaluate((w) => { session = null; S.feedback = null; const [scr, seg, pickU] = w.split(":"); S.screen = scr; if (seg) S.unitSeg = seg; render(); S.unitPick = pickU || null; render(); }, where);
+        await page.evaluate((w) => { session = null; S.feedback = null; const [scr, seg, pickU] = w.split(":"); S.screen = scr; if (scr === "reference") { S.refTab = seg; S.refUnit = pickU; render(); return; } if (seg) S.unitSeg = seg; render(); S.unitPick = pickU || null; render(); }, where);
         await page.click(sel);
         const started = await page.evaluate(() => S.screen === "session" && { kind: session.kind, unit: session.unitId });
         const end = await page.evaluate(FINISH);
@@ -381,6 +389,68 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       }
       check("no script errors", !p2.errors.length, p2.errors.slice(0, 3).join("\n"));
       await c2.close();
+    }
+
+    /* 7. The lesson's order, and Practise this section */
+    for (const seeded of [false, true]) {
+      const { page, context } = await open(browser, origin, { seed: seeded });
+      if (!seeded) section("7. The lesson's order, and Practise this section");
+      const who = seeded ? "with the seeded progress" : "on a new device";
+      const ord = await page.evaluate(() => {
+        progress.settings.lessonLength = 12;
+        const out = { units: 0, sessions: 0, bad: [], varied: 0, boundary: 0, last: [] };
+        const rank = (u, id) => { const at = itemSection(id); return at && at.unit === u ? at.index : Infinity; };
+        for (const u of content.units.filter(x => !isSideUnit(x.id) && lessonOf(x)).map(x => x.id)) {
+          const fresh = newIds(u); if (!fresh.length) continue;
+          out.units++;
+          const sets = new Set();
+          for (const kind of ["unit", "continue"]) for (let rep = 0; rep < 6; rep++) {
+            if (kind === "continue") progress.currentUnit = u;
+            const chosen = sessionIds(kind, u).filter(id => rec(id).box === 0), set = new Set(chosen), left = fresh.filter(id => !set.has(id));
+            out.sessions++;
+            const top = Math.max(-1, ...chosen.map(id => rank(u, id))), low = Math.min(Infinity, ...left.map(id => rank(u, id)));
+            if (top > low) out.bad.push(`${kind} ${u}: takes a new item of section ${top + 1} while one of section ${low + 1} waits`);
+            if (chosen.length) sets.add(chosen.slice().sort().join());
+            if (chosen.some(id => rank(u, id) === Infinity) && left.some(id => rank(u, id) !== Infinity)) out.last.push(`${kind} ${u}: an unlinked item before a linked one`);
+          }
+          // the section at the edge of what a session takes: its items come in a different order from session to session
+          const ranks = fresh.map(id => rank(u, id)).sort((a, b) => a - b), k = Math.min(fresh.length, Math.max(3, Math.round(12 / 2.4)), newLeftToday());
+          if (k < fresh.length && ranks[k - 1] === ranks[k]) { out.boundary++; if (sets.size > 1) out.varied++; }
+        }
+        return out;
+      });
+      check(`${who}: Continue and a unit's sessions take new items in the order of the lesson's sections, linked ones before the rest (${ord.sessions} sessions in ${ord.units} units)`, ord.units >= 15 && !ord.bad.length && !ord.last.length, ord.bad.concat(ord.last).slice(0, 5).join("\n"));
+      check(`${who}: …and the items of one section in a different order from session to session (${ord.varied} of ${ord.boundary} units where a section is cut short)`, ord.boundary > 3 && ord.varied >= ord.boundary - 1, JSON.stringify(ord));
+      const sec = await page.evaluate(() => {
+        progress.settings.lessonLength = 12;
+        const out = { sections: 0, bad: [], due: 0, fresh: 0, rest: 0, full: 0 }, t = now();
+        const kind = (id) => isDue(id, t) ? 0 : rec(id).box === 0 ? 1 : 2;
+        for (const [key, list] of sections().items) {
+          const all = uniqueByPid(list), ids = sessionIds("section", key), where = (id) => itemSection(id) && itemSection(id).unit + "#" + itemSection(id).index;
+          out.sections++;
+          const ks = ids.map(kind), avail = all.filter(id => kind(id) !== 1).length + Math.min(all.filter(id => kind(id) === 1).length, newLeftToday());
+          if (ids.some(id => where(id) !== key)) out.bad.push(`${key}: takes an item of another section`);
+          if (ids.length !== Math.min(12, avail)) out.bad.push(`${key}: ${ids.length} items, expected ${Math.min(12, avail)}`);
+          if (ks.some((k, i) => i && k < ks[i - 1])) out.bad.push(`${key}: not due, then new, then the rest: ${ks.join("")}`);
+          if (ks.filter(k => k === 1).length > newLeftToday()) out.bad.push(`${key}: more new items than today allows`);
+          const due = ids.filter(id => kind(id) === 0), rest = ids.filter(id => kind(id) === 2);
+          if (due.some((id, i) => i && rec(id).due < rec(due[i - 1]).due)) out.bad.push(`${key}: the due items not soonest first`);
+          if (rest.some((id, i) => i && rec(id).box < rec(rest[i - 1]).box)) out.bad.push(`${key}: the rest not least known first`);
+          if (rest.length && (all.filter(id => kind(id) === 0).length > due.length || ids.filter(id => kind(id) === 1).length < Math.min(newLeftToday(), all.filter(id => kind(id) === 1).length))) out.bad.push(`${key}: the rest taken before all the due and new items`);
+          const q = buildSession("section", key).queue;
+          if (!q.every(x => where(x.ex.item.id) === key) || q.length !== ids.length) out.bad.push(`${key}: its session's exercises aren't its items`);
+          out.due += due.length; out.fresh += ks.filter(k => k === 1).length; out.rest += rest.length; if (ids.length === 12) out.full++;
+        }
+        // today's new items used up: no new ones
+        const day = today(), was = day.new; day.new = progress.settings.newPerDay;
+        const none = [...sections().items.keys()].every(key => sessionIds("section", key).every(id => rec(id).box !== 0));
+        day.new = was;
+        return Object.assign(out, { none });
+      });
+      check(`${who}: Practise this section takes only the section's items, due first, then new (within today's limit), then the rest, least known first, up to the lesson length (${sec.sections} sections: ${sec.due} due, ${sec.fresh} new, ${sec.rest} others)`, sec.sections > 250 && !sec.bad.length && (seeded ? sec.due > 0 && sec.rest > 0 : sec.fresh > 0), sec.bad.slice(0, 5).join("\n"));
+      check(`${who}: with today's new items used up, Practise this section takes no new ones`, sec.none);
+      check(`${who}: no script errors`, !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
     }
   } catch (e) {
     results.stopped(e);
