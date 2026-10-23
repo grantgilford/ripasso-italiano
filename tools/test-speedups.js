@@ -336,6 +336,15 @@ async function openApp(browser, origin, { seed = false, init = null } = {}) {
         return { bad };
       });
       check("the same counts through the next 25 moments time changes one: the cache is kept until each moment and worked out again at it", !steps.bad.length, steps.bad.slice(0, 5).join("\n"));
+      // midnight is one of those moments, whatever the time of day the test runs at (from 9.11)
+      const night = await page.evaluate(() => {
+        const keep = window.__t, d = new Date(keep), m = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+        window.__t = m - 6e4; const c = counts(), r = { untilByMidnight: c.until <= m };
+        window.__t = m; r.renewed = counts() !== c; r.diff = REF.sameCounts();
+        window.__t = keep;
+        return r;
+      });
+      check("a minute before midnight the cache lasts no later than midnight, and at midnight it is worked out again, the same counts", night.untilByMidnight && night.renewed && !night.diff, JSON.stringify(night));
       for (const [label, days] of [["a day later", 1], ["a week and a day later", 8], ["two months later", 60]]) {
         await page.evaluate((d) => { window.__t += d * 864e5; }, days);
         await same(label);
