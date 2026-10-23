@@ -21,7 +21,9 @@
     3. nothing is hidden behind the tab bar, nothing scrolls sideways, and every
        button, menu and text field is at least 44 × 44 px;
     4. a practice session hides the tab bar, and after Check the answer panel
-       shows "Correct" or "Not quite" with its Continue button on screen;
+       shows "Correct" or "Not quite" with its Continue button on screen; the
+       summary that ends it has Another round beside Back to Today (from 9.5),
+       and Stats its 7-day forecast;
     5. Appearance (Light / Dark / Auto) sets the colours, survives a reload and
        leaves saved progress untouched;
     6. the "Lo sapevi?" card keeps its tidbit across redraws, picks afresh on
@@ -178,6 +180,7 @@ async function tour(page, label, opts = {}) {
   await layout(page, L("You"), opts);
   await tap(page, '.statcard[data-go="stats"]');
   check(L("the Stats card opens Stats, with You still the current tab"), (await screen(page)) === "stats" && await page.$('.tab[data-go="you"][aria-current="page"]'));
+  check(L("Stats shows the next 7 days: seven columns and a table by kind"), (await page.$$(".fc-plot .fc-col")).length === 7 && (await page.$$(".fc-table tbody tr")).length === 7);
   await layout(page, L("Stats"), opts);
   await tap(page, '.hdr .back[data-go="you"]');
   await tap(page, '.srow[data-go="settings"]:not([data-to])');
@@ -212,6 +215,14 @@ async function tour(page, label, opts = {}) {
   if ((await screen(page)) === "session") { await tap(page, '[data-go="quit"]'); }
   else await tap(page, '[data-go="home"]');
   check(L("leaving a session returns to Today with the tab bar"), (await screen(page)) === "home" && await page.$(".tabbar"));
+  // the summary at the end of a session: Another round beside Back to Today
+  await tap(page, '.hero[data-start="continue"]');
+  await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } render(); });
+  const sb = await page.evaluate(() => { const a = document.querySelector('.sumbtns [data-act="again"]'), h = document.querySelector('.sumbtns [data-go="home"]'); if (!a || !h) return null; const ra = a.getBoundingClientRect(), rh = h.getBoundingClientRect(); return { level: Math.abs(ra.top - rh.top) < 1, order: ra.right <= rh.left, tabbar: !!document.querySelector(".tabbar") }; });
+  check(L("the summary has Another round and Back to Today side by side, and no tab bar"), sb && sb.level && sb.order && !sb.tabbar, JSON.stringify(sb));
+  await layout(page, L("Summary"), opts);
+  await tap(page, '[data-go="home"]');
+  check(L("Back to Today returns to Today"), (await screen(page)) === "home");
 }
 
 /* ---------- the exercise types added in v8.6 ---------- */

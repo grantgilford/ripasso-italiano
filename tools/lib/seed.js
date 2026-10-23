@@ -1,5 +1,5 @@
 /*
-  Saved practice on a well-used device, for the browser tests that need a lot of it (test-perf, test-speedups):
+  Saved practice on a well-used device, for the browser tests that need a lot of it (test-perf, test-speedups, test-sessions):
   ~3,000 grammar records spread evenly over every grammar unit, all of Vocab pack 1, most of pack 2 and half of
   pack 3 (cards arrive in order), the first 1,200 Verbs section tenses, and 45 days of log, about 6,600 records in
   all. Built from a fixed seed, so every run saves the same progress (relative to the moment it runs).

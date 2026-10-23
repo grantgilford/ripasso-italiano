@@ -341,7 +341,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 - A title, "Session complete".
 - A card with three big numbers: accuracy, XP earned, items promoted. Below them, today's XP against the goal as a bar.
 - The missed items as a card list (Italian in DM Sans 500, English muted).
-- A primary "Back to Today" button (`data-go="home"`).
+- A primary "Back to Today" button (`data-go="home"`), and beside it, as wide, a secondary **Another round** (`data-act="again"`, from 9.5) that starts another session of the same kind and unit. When nothing is left to practise it is disabled, with a muted line under the row saying so.
 
 ### 8.7 Rules (`renderRules`) and Look up (`renderLookup`)
 
@@ -375,7 +375,10 @@ A new `S.screen = "you"` with its own render function and a `data-go="you"` tab.
    - *The Data screen* keeps its current contents and order, restyled. "Reset all progress" stays at the bottom, in danger style.
 5. **About** (card): the logo, **"Ripasso Italiano"**, and "Version {APP_VERSION} · About and credits". Expanding it (a `details` element is fine) shows a line on the app and the font credits (Bricolage Grotesque and DM Sans, SIL Open Font Licence).
 
-The Stats screen keeps all its current tables and the "Practise the most-missed items" button, restyled into cards with big numbers at the top.
+The Stats screen keeps all its current tables and the "Practise the most-missed items" button, restyled into cards with big numbers at the top. From 9.5 it also has:
+
+- **Due in the next 7 days**, after the figures: one card with a column per day, tomorrow first, as tall as the number of items falling due that day (grammar, cards and verbs together), the number on top in `--fg`, columns at most 24 px wide in `--accent` with 4 px rounded tops on a hairline `--line` baseline, and the weekday and date beneath in Small; one series, so no legend. Under it, a table of the same days by kind (Grammar, Cards, Verbs), numbers right-aligned in tabular figures, which also gives screen readers the figures (the chart itself is one `role="img"` with a spoken summary).
+- **Tricky items**, between Most missed and the button: up to 15 items with 4 or more lapses at box 3 or below, as a table like Most missed, with a muted line saying they start again with their introduction.
 
 ---
 
