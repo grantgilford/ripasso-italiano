@@ -16766,8 +16766,7 @@ function sections() { if (!SECTIONS) { warmSections(); sectionsJob.finish(); } r
 function* sectionsSteps() { // yields after each unit
   const of = new Map(), items = new Map(), heads = new Map();
   for (const u of content.units) {
-    const links = ITEM_SECTIONS[u.id];
-    if (!links && !u.lesson) continue; // only the units with links, and imported ones whose items may name their own
+    const links = ITEM_SECTIONS[u.id]; // a unit without a line can still hold imported items that name their own
     const seen = new Map(); // each of the unit's links resolved once: { at, list } (the section's items), or null
     for (const it of content.byUnit[u.id] || []) {
       const link = typeof it.section === "string" ? it.section : links && links[it.id];
@@ -17663,8 +17662,8 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(true); } }); // every document compared, in case a change went unmarked
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.5";
-const CHANGES = "Sessions mix their exercises: never the same kind three times running, each item gets a different kind from last time, and items you keep missing start again from their introduction. Stats shows what falls due over the next week, and a finished session offers Another round."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.6";
+const CHANGES = "Practice now links to the lessons: after a mistake, or on a new item, Read the rule opens the section that teaches it without leaving the session. Each lesson section can be practised on its own, and new items now arrive in the order the lesson teaches them."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
 const tidied = loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new

@@ -220,6 +220,9 @@ The open unit card (the current unit's, or the one just tapped) has a 2 px `--ac
 - *Right:* the same layout in `--ok-bg`, with a `--ok` circle and ✓, the heading "Correct" in `--ok-title`, and a Continue button in `--hero`.
 - Keep the current wording (the head text comes from `renderSession`). Split it into heading plus answer line where the code allows: "Not quite. Answer: X" becomes heading "Not quite" with "Answer: X" beneath.
 - Long explanations make the panel scroll, never the page behind it.
+- **Read the rule** (from 9.6): after a wrong answer, and on a new item's first exercise, when the item is linked to a lesson section, a full-width row above the actions: a `--card` fill on the panel, 14 px radius, 44 px or taller, the `book` icon and "Read the rule: **N · heading**" in `--accent` (`.fb-rule`, `data-act="rule"`). It opens the rule sheet below.
+
+**Rule sheet** (from 9.6, `.rulesheet` in `#ruleBg`). The lesson section an item is linked to, over the practice session, which stays exactly as it was underneath. It uses the leave-session sheet's frame (a `--card` sheet at the bottom of a dimmed screen, at most 480 px wide) with no padding of its own and three parts: a head (the unit's eyebrow and title, "Unit 5 · Verb tenses…", then the section number in `--muted` and its heading in Title S), the section's blocks drawn by the lesson's own renderer in the Body style, scrolling inside the sheet (never the page, never sideways), and a foot with a full-width primary **Close**, the head and foot set off by `--line` rules; at most 88% of the screen's height. The focus moves into it and the session behind can't be reached (`inert`) until it closes: Close, a tap beside it, Escape and the back button each close it and put the focus back on Read the rule. A link to another section opens that section in the same sheet; a link to a whole unit is plain text there, as following it would leave the session. Speakers work as in the lesson.
 
 **Settings rows** (You screen). These sit in a card with dividers. Each row: a 36 px `--tint` icon well with a 20 px `--accent` icon, the label (16 px 500), the value (`--muted`, right-aligned), then a chevron. 56 px minimum height.
 
@@ -250,7 +253,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 | **Look up** | `lookup` | |
 | **You** | **new** `you`, then `stats`, `settings`, `data` as sub-screens with a back arrow to You | Replaces the old Stats / Settings / Data buttons on Home. |
 
-`session` and `summary` show no tab bar. Back buttons that today say "Home" become a back arrow to the screen's parent (Units for a unit screen, You for Stats, Settings and Data). Keep the existing scroll-position memory in `render()`.
+`session` and `summary` show no tab bar. Back buttons that today say "Home" become a back arrow to the screen's parent (Units for a unit screen, You for Stats, Settings and Data). Keep the existing scroll-position memory in `render()`. In a session the phone's back button first closes the rule sheet if it is open (from 9.6), then asks before leaving.
 
 ### 8.2 Today (`renderHome`), see `mockups/home-*.html`
 
@@ -314,6 +317,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
   - `.xref` links in `--accent`.
 - **Glossary tab:** the filter field as an input (section 7), then the existing groups (Verbs, Nouns, …) each in a card. The box tags (`box 3`, `box 5 ✓`) become small `--tint` pills. Typing in the filter redraws only the groups under it, once typing pauses (from 9.3), so the field keeps its cursor and the keyboard stays up.
 - **Practise this unit:** a primary button at the end of both tabs (`data-unit`).
+- **Practise this section (N items)** (from 9.6): a full-width secondary button at the end of each lesson section with items linked to it (`.secgo`, `data-practise="u05#6"`, the unit and the section's index from 0), starting a session of those items. When they are all new and today's new items are used up it is disabled, with a muted line under it saying so.
 - **Verbs reference:** the same frame. Each verb is a row (`details.vref`) that opens to its tables; the tables are drawn when the row is opened (from 9.3), and a filter opens, and draws, the rows it leaves.
 
 ### 8.5 Practice session (`renderSession`), see `mockups/exercise-wrong-*.html`
