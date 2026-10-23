@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v3.10)
+# Italian Practice App: Content Pack Guide (v3.11)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v9.10, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v9.11, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
@@ -126,7 +126,7 @@ Drilled both ways: digits → words (any entry in `it` is accepted) and words �
 
 ### The practice types added in v8.6
 
-Five item types turn a rule into something to do rather than a question to answer. Each is described, with what it looks like and where it fits, in `docs/exercise-types.md`; units 1, 2, 4 and 5, the possessives unit (u19), and the adverbs, questions, prepositions and conjunctions units (u08 to u11) use all five. Like every item, each needs an `explanation`, and every wrong choice it offers needs a reason.
+Five item types turn a rule into something to do rather than a question to answer. Each is described, with what it looks like and where it fits, in `docs/exercise-types.md`; units 1, 2, 4 and 5, the possessives unit (u19), and the units from adverbs to object pronouns (u08 to u13) use all five. Like every item, each needs an `explanation`, and every wrong choice it offers needs a reason.
 
 **spot** (Spot the mistake: tap the wrong word, then type it right)
 ```json
