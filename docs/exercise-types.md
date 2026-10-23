@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.9)
+# Exercise types: the catalogue (v9.10)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -77,19 +77,19 @@ Where an exercise offers wrong choices, they are built to be mistakes worth maki
 
 ## Where the new types could go next
 
-Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all five, and so do the possessives unit (u19, v8.8), which shows how well they suit a single grammar point: sort for article or no article, *mio / mia / miei / mie* and *tuo / Suo / vostro*; match for *my book* ↔ *il mio libro*; spot for *lo mio zaino*; endings for *i mie{i} fratelli*; reply for *Di chi è?* From v9.8 the irregular verbs and verb tenses units (u04, u05) use all five too, for verb forms rather than agreement: spot for *Loro fano*, *Ho andato*, *Domani venirò* (a few right, to test judgement: *Usciamo stasera*, *Ho vissuto a Roma per due anni*); endings for *riman{go}*, *cerc{heremo}*, *andre{mo}* beside *andre{mmo}*; reply for *Hai fame? Sì, ho molta fame* and *Che cosa hai fatto ieri sera?*; sort for *sapere* or *conoscere*, *vado* or *vengo*, *essere* or *avere*, *ho giocato* or *giocavo*; match for *venire → vengo*, *prendere → preso*, *sarò → sarei*. From v9.9 the adverbs and conjunctions units (u08, u11) use all five as well: spot for *lentomente*, *Sono molte stanche*, *Non fumo ancora*, *Resto a casa siccome piove*, *Anche se sia caro*; endings for *Ho molt{e} amiche e poch{i} soldi*, *prima {di} partire* beside *prima {che} tu parta*; reply for *Fumi ancora? No, non fumo più* and *Non mi piace. Neanche a me*; sort for *meglio* or *migliore*, where an adverb goes in the *passato prossimo*, *anzi* or *invece*, indicative or subjunctive; match for *lento → lentamente*, *non … più → no longer*, *sia … sia* halves. The adverbs unit, whose 111 words made typed recall 55% of what it gave, also gained transforms (*Parla in modo lento → Parla lentamente*; *Ho già mangiato → Non ho ancora mangiato*) and 29 sentences. Ideas for the other units:
+Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all five, and so do the possessives unit (u19, v8.8), which shows how well they suit a single grammar point: sort for article or no article, *mio / mia / miei / mie* and *tuo / Suo / vostro*; match for *my book* ↔ *il mio libro*; spot for *lo mio zaino*; endings for *i mie{i} fratelli*; reply for *Di chi è?* From v9.8 the irregular verbs and verb tenses units (u04, u05) use all five too, for verb forms rather than agreement: spot for *Loro fano*, *Ho andato*, *Domani venirò* (a few right, to test judgement: *Usciamo stasera*, *Ho vissuto a Roma per due anni*); endings for *riman{go}*, *cerc{heremo}*, *andre{mo}* beside *andre{mmo}*; reply for *Hai fame? Sì, ho molta fame* and *Che cosa hai fatto ieri sera?*; sort for *sapere* or *conoscere*, *vado* or *vengo*, *essere* or *avere*, *ho giocato* or *giocavo*; match for *venire → vengo*, *prendere → preso*, *sarò → sarei*. From v9.9 the adverbs and conjunctions units (u08, u11) use all five as well: spot for *lentomente*, *Sono molte stanche*, *Non fumo ancora*, *Resto a casa siccome piove*, *Anche se sia caro*; endings for *Ho molt{e} amiche e poch{i} soldi*, *prima {di} partire* beside *prima {che} tu parta*; reply for *Fumi ancora? No, non fumo più* and *Non mi piace. Neanche a me*; sort for *meglio* or *migliore*, where an adverb goes in the *passato prossimo*, *anzi* or *invece*, indicative or subjunctive; match for *lento → lentamente*, *non … più → no longer*, *sia … sia* halves. The adverbs unit, whose 111 words made typed recall 55% of what it gave, also gained transforms (*Parla in modo lento → Parla lentamente*; *Ho già mangiato → Non ho ancora mangiato*) and 29 sentences. From v9.10 the questions and prepositions units (u09, u10) use all five: spot for *Qual'è*, *Quanti persone*, *Puoi aiutarmi, signora?*, *Non so che viene*, *Vado in Roma*, *Stasera ceniamo a Paolo*, *Hai qualcosa di bere?* (and right ones such as *Cerco le chiavi* and *Ci vediamo lunedì*, where a learner expects a preposition); endings for *Quant{i} anni hai e quant{e} sorelle hai?*, *Vado {a} Roma e poi {in} Francia*, *qualcosa {da} bere o qualcosa {di} caldo*; reply for *Da quanto tempo studi l'italiano? Da un anno*, *Quando parti? Tra due giorni*, *Come vai al lavoro? A piedi*; sort for *quanto / quanta / quanti / quante*, *tu* or *Lei*, *a* or *in*, *da* or *per*, *al / allo / alla / all'*, *a* or *di* before an infinitive; match for question words, direct and indirect questions, merged forms and phrases to learn whole. Ideas for the other units:
 
 | Type | Fits |
 |---|---|
-| spot | u03 (a wrong person: *Noi parlate*), u06 (agreement, *bello / buono* forms), u10 (*di / da / a* with towns and countries), u12 (indicative for subjunctive after *penso che*), u13 (*lo / la / li* agreement), u14 (*tu* forms in a formal sentence) |
+| spot | u03 (a wrong person: *Noi parlate*), u06 (agreement, *bello / buono* forms), u12 (indicative for subjunctive after *penso che*), u13 (*lo / la / li* agreement), u14 (*tu* forms in a formal sentence) |
 | endings | u03 (verb endings: *parl{iamo}*, *cerc{hi}*), u06 (adjective chains), u12 (subjunctive endings), u07 (ordinals: *second{a}*) |
-| reply | u03 (*Parli italiano? Sì, un po'*), u09 (answering question words), u14 (formal exchanges, commands), u15 (*Che ore sono?*), u18 (reactions and slang replies) |
-| sort | u03 (*-care* or *-ciare*: *cerchi* or *cominci*), u10 (*di* or *da*), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
-| match | u07 (digits ↔ words), u09 (question word ↔ meaning), u15 (clock times), u16 (sentence halves joined by *che / cui*), u18 (slang ↔ plain Italian) |
+| reply | u03 (*Parli italiano? Sì, un po'*), u14 (formal exchanges, commands), u15 (*Che ore sono?*), u18 (reactions and slang replies) |
+| sort | u03 (*-care* or *-ciare*: *cerchi* or *cominci*), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
+| match | u07 (digits ↔ words), u15 (clock times), u16 (sentence halves joined by *che / cui*), u18 (slang ↔ plain Italian) |
 
-## Measured mix (9.9)
+## Measured mix (9.10)
 
-What `node tools/variety.js --markdown` printed for version 9.9: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
+What `node tools/variety.js --markdown` printed for version 9.10: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
 
 | Unit | Items | Kinds | Most common | Second | Flag |
 |---|---:|---:|---|---|---|
@@ -102,8 +102,8 @@ What `node tools/variety.js --markdown` printed for version 9.9: the app's own `
 | u19 Possessives | 246 | 14 | `transform` 16% | `spot` 12% |  |
 | u07 Numbers | 157 | 12 | `number` 48% | `recall` 17% | number above 35% |
 | u08 Adverbs | 320 | 14 | `recall` 33% | `cloze` 11% |  |
-| u09 Questions | 192 | 9 | `recall` 38% | `cloze` 18% | fewer than 10 kinds; recall above 35% |
-| u10 Prepositions | 199 | 11 | `recall` 43% | `cloze` 15% | recall above 35% |
+| u09 Questions | 257 | 14 | `recall` 28% | `cloze` 14% |  |
+| u10 Prepositions | 270 | 16 | `recall` 31% | `cloze` 11% |  |
 | u11 Conjunctions | 202 | 13 | `recall` 30% | `grammar` 11% |  |
 | u12 The subjunctive (congiuntivo) | 202 | 10 | `recall` 21% | `cloze` 16% |  |
 | u13 Object pronouns, reflexives, ne & ci | 158 | 10 | `transform` 34% | `recall` 20% |  |
@@ -113,34 +113,34 @@ What `node tools/variety.js --markdown` printed for version 9.9: the app's own `
 | u18 Colloquial Italian & slang | 218 | 13 | `recall` 32% | `cloze` 15% |  |
 | u17 Wild card | 98 | 16 | `transform` 22% | `grammar` 15% |  |
 
-Over all 19 units (4563 items):
+Over all 19 units (4699 items):
 
 | Kind | Share | Units using it |
 |---|---:|---:|
-| `recall` | 21% | 17 |
+| `recall` | 20% | 17 |
 | `grammar` | 12% | 19 |
 | `cloze` | 12% | 19 |
-| `transform` | 9% | 14 |
+| `transform` | 8% | 14 |
 | `conjugation` | 8% | 12 |
 | `translate` | 6% | 19 |
 | `listen` | 6% | 19 |
 | `bank` | 5% | 19 |
-| `spot` | 4% | 7 |
-| `endings` | 2% | 7 |
+| `spot` | 4% | 9 |
+| `endings` | 3% | 9 |
+| `reply` | 3% | 9 |
 | `agreement` | 2% | 6 |
 | `article` | 2% | 10 |
-| `reply` | 2% | 7 |
 | `number` | 2% | 2 |
+| `match` | 2% | 9 |
+| `sort` | 2% | 9 |
 | `plural` | 1% | 10 |
-| `match` | 1% | 7 |
-| `sort` | 1% | 7 |
 | `meaning` | 1% | 17 |
 | `clock` | 1% | 2 |
 | `flip` | 1% | 17 |
 | `preparticle` | <1% | 2 |
 | `intro` | <1% | 1 |
 
-Flagged: 5 of 19 units.
+Flagged: 3 of 19 units.
 
 ## Ideas not yet built
 
