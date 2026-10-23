@@ -49,7 +49,7 @@ All units are open. The home screen suggests the next unit in order, but nothing
 | **Mistakes** | Items answered wrong in the last 7 days |
 | **Unit practice** | Any unit chosen from the unit list, new and review items mixed. Practising a grammar unit makes it the current unit, so Continue picks it up from then on |
 
-Within any session, a missed exercise is repeated at the end of the session until it's answered correctly. The repeat doesn't earn a promotion (see section 8). A session ends with a text summary: accuracy, XP earned, items promoted, and a list of missed items with correct answers.
+Within any session, a missed exercise is repeated at the end of the session until it's answered correctly. The repeat doesn't earn a promotion (see section 8). A session ends with a text summary: accuracy, XP earned, items promoted, and a list of missed items with correct answers. From v9.5 the summary also offers **Another round** of the same kind, and a grammar session chooses its exercises with the whole session in view (no kind three times in a row, a different kind for each item from last time, tricky items introduced again): see `docs/exercise-types.md`.
 
 ## 6. Exercise types
 
@@ -97,11 +97,13 @@ Leitner-style boxes, tracked **per item**.
 | 0 | New, not yet seen |
 | 1 | Later in the same session / 10 minutes |
 | 2 | 1 day |
-| 3 | 3 days |
-| 4 | 7 days |
-| 5 | 14 days |
-| 6 | 30 days |
-| 7 | 60 days |
+| 3 | 3 days, ± up to 10% |
+| 4 | 7 days, ± up to 10% |
+| 5 | 14 days, ± up to 10% |
+| 6 | 30 days, ± up to 10% |
+| 7 | 60 days, ± up to 10% |
+
+From v9.5, a correct answer that sets the next review at box 3 or above moves it by a random amount, up to 10% of the interval either way (a 7-day review comes back between 6.3 and 7.7 days later), so items learned together drift apart instead of all falling due on the same day. Boxes 1 and 2, and the 10 minutes after a wrong answer, are exact.
 
 A correct answer moves the item up one box. A wrong answer moves it down two boxes, to a minimum of box 1, and logs a lapse. A self-graded "Missed" on a flip card counts as wrong. An item in box 5 or higher counts as **learned** for stats and unit progress.
 

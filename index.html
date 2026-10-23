@@ -103,6 +103,7 @@ button:active:not(:disabled) { opacity: .8; }
 .btnrow > button.primary { flex-grow: 1.5; }
 .btnrow.wrap > button { flex: 1 1 auto; }
 .btnrow.end { justify-content: flex-end; }
+.btnrow.sumbtns > button { flex: 1 1 0; padding-left: 12px; padding-right: 12px; } /* the summary: Another round beside Back to Today, as wide */
 .iconbtn { flex: none; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; color: var(--fg); }
 /* ---------- read aloud: a speaker beside Italian text. Its icon is a mask on the button, so the thousands of verb tables stay light. ---------- */
 :root {
@@ -468,6 +469,14 @@ details > summary { cursor: pointer; }
 .about-t { flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .about-b { padding: 0 16px 16px; font-size: 15px; }
 .about-b p { margin: 0 0 8px; }
+.fcast { display: flex; flex-direction: column; gap: 10px; padding: 14px 16px 8px; }
+.fc-plot { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; height: 96px; border-bottom: 1px solid var(--line); }
+.fc-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; min-width: 0; }
+.fc-n { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.fc-bar { width: 100%; max-width: 24px; border-radius: 4px 4px 0 0; background: var(--accent); }
+.fc-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 4px; font-size: 13px; line-height: 1.25; text-align: center; }
+.fc-days > span { display: flex; flex-direction: column; min-width: 0; }
+.fc-table td:not(:first-child), .fc-table th:not(:first-child) { text-align: right; font-variant-numeric: tabular-nums; }
 .stat { display: flex; justify-content: space-between; gap: 12px; padding: 12px 16px; }
 .stat > span:last-child { text-align: right; font-weight: 500; }
 .setrow { padding: 12px 14px; }
@@ -14338,7 +14347,8 @@ function newIds(unitId) {
    lapse on a new day and at the next moment time alone changes one: an item falling due (or due within a day or a week,
    for Stats), or a mistake turning a week old. Each is the number the functions above would give at that moment
    (tools/test-speedups.js checks it): per unit, its items, learned (box 5+), started, % learned, due (dueIds) and new
-   (newIds); the Review, Verbs, Flashcards and Mistakes tiles; and the figures on Units, Stats and You.
+   (newIds); the Review, Verbs, Flashcards and Mistakes tiles; and the figures on Units, Stats and You, with (from 9.5) the
+   tricky items and the 7-day forecast on Stats.
    Items that are the same exercise share one record (pid), and dueIds and newIds count each record once, so what the
    counts need from the content is worked out once (countPlan): each unit's records, with how many of its items use
    each one, the records Review and the course take in, and for each verb tense the record that unlocks it. */
@@ -14387,7 +14397,7 @@ function counts() {
   for (const v of plan.verbs) { const b = (recs[v.p] || none).box; if (b >= 1) verbsStarted.add(v.verb); if (b === 0 && (!v.before || (recs[v.before] || none).box >= unlockBox)) verbsNew++; }
   const vb = unit.vb || { learned: 0, total: 0, due: 0 }, flash = flashUnits().map(u => unit[u.id] || { due: 0, fresh: 0 });
   let learned = 0, started = 0, dueToday = 0, dueWeek = 0, mistakes = 0, anyLapses = false;
-  const lapsed = [];
+  const lapsed = [], tricky = [];
   for (const id of Object.keys(recs)) { // the records Stats and You count (those of items in the content), as rec(id) sees them
     if (!content.items[id]) continue;
     const r = rec(id);
@@ -14398,20 +14408,33 @@ function counts() {
       if (r.due <= t + 7 * 864e5) dueWeek++; else soon(r.due - 7 * 864e5);
     }
     if (r.lapses > 0) lapsed.push([id, r.lapses]);
+    if (r.lapses >= TRICKY_LAPSES && isTricky(id)) tricky.push([id, r.lapses, r.box]);
     if (isRecentMistake(id, t)) { mistakes++; soon(recs[id].lastWrong + 7 * 864e5 + 1); }
     if (recs[id].lapses >= 1) anyLapses = true;
   }
+  // the forecast on Stats: for each of the next 7 days, tomorrow first, the records that fall due that day, counted as dueIds
+  // counts them (Review's grammar records, each vocab pack's, the Verbs section's); it changes only with progress or the day
+  const d0 = new Date(t), edges = Array.from({ length: 8 }, (_, k) => new Date(d0.getFullYear(), d0.getMonth(), d0.getDate() + 1 + k).getTime());
+  const forecast = edges.slice(0, 7).map(e => ({ day: dayKey(e), at: e, grammar: 0, cards: 0, verbs: 0 }));
+  const falls = (ps, field) => { for (const p of ps) { const r = recs[p]; if (!r || r.box < 1 || r.due < edges[0] || r.due >= edges[7]) continue; let k = 0; while (r.due >= edges[k + 1]) k++; forecast[k][field]++; } };
+  falls(plan.review, "grammar"); flashUnits().forEach(u => falls((plan.units[u.id] || { ids: [] }).ids, "cards")); falls((plan.units.vb || { ids: [] }).ids, "verbs");
   return COUNTS = { progress, content, day, until, unit, due: plan.review.filter(p => isDueNow(recs[p] || none)).length, mistakes,
     coursePct: course ? Math.round(100 * courseLearned / course) : 0,
     verbs: { verbs: verbsStarted.size, totalVerbs: VERB_GYM.length, learned: vb.learned, total: vb.total, due: vb.due, fresh: verbsNew },
     flashDue: flash.reduce((n, c) => n + c.due, 0), flashNew: (flash.find(c => c.fresh) || { fresh: 0 }).fresh,
-    learned, started, dueToday, dueWeek, items: plan.items, lapsed: lapsed.sort((a, b) => b[1] - a[1]).slice(0, 10), anyLapses };
+    learned, started, dueToday, dueWeek, items: plan.items, lapsed: lapsed.sort((a, b) => b[1] - a[1]).slice(0, 10), anyLapses,
+    tricky: tricky.sort((a, b) => b[1] - a[1] || a[2] - b[2]).slice(0, 15), forecast };
 }
 function bumpStat(key, correct, delta) {
   const d = today(); d.t = d.t || {};
   const k = d.t[key] || (d.t[key] = [0, 0]);
   k[0] += correct ? delta : 0; k[1] += delta;
 }
+/* From 9.5, a correct answer that sets the next review at box 3 or above moves it by a random amount, up to 10% of the
+   interval either way (a 7-day review comes back between 6.3 and 7.7 days later), so items learned together drift apart
+   instead of all falling due on the same day. Boxes 1 and 2 keep exactly 10 minutes and 1 day. */
+const SPREAD = 0.1;
+function spreadInterval(ms, box) { return box >= 3 ? Math.round(ms * (1 + SPREAD * (2 * Math.random() - 1))) : ms; }
 function applyResult(itemId, correct, kind, repeat, typeKey) {
   const id = pid(itemId), item = content.items[itemId];
   const before = progress.items[id] ? Object.assign({}, progress.items[id]) : null;
@@ -14428,7 +14451,7 @@ function applyResult(itemId, correct, kind, repeat, typeKey) {
       const wasDue = r.box <= 1 || r.due <= t;
       const canPromote = wasDue && !(r.box >= 2 && kind === "recognition" && itemHasProduction(item));
       if (canPromote && r.box < 7) { r.box++; promoted = true; }
-      if (wasDue) r.due = t + INTERVALS[Math.max(1, r.box)];
+      if (wasDue) r.due = t + spreadInterval(INTERVALS[Math.max(1, r.box)], r.box);
       r.lastRight = t;
       xp = kind === "production" ? 2 : 1;
     } else {
@@ -14716,10 +14739,25 @@ function clockDigits(item) {
   const [a, b] = h < alt ? [fmt(h)[0], fmt(alt)[0]] : [fmt(alt)[0], fmt(h)[0]];
   return { accepted: fmt(h).concat(fmt(alt)), shown: a + " or " + b };
 }
-function makeExercise(item, r, force, opt) { // opt.noListen: never a listening exercise (the learner can't listen now)
+/* The hint a session gives makeExercise (from 9.5): opt.avoid and opt.prefer list typeKeys. Where an item can be given more
+   than one exercise at its box (a word: flip card, meaning, article, plural, agreement, recall; a sentence: word order,
+   fill in the blank, translate, listen), the usual chances (table: key → [chance, kind]) pick one as before; if it is
+   avoided, or another exercise of the same kind (typed or not) is preferred, the choice moves, by the same chances, to one
+   of that kind that is preferred, or at least not avoided. So a hint changes how an item is drilled, never how often it is
+   typed or what can promote it. opt.anyKind lets it move to the other kind as well (a session short of variety). */
+function pickKey(table, opt) {
+  const keys = Object.keys(table).filter(k => table[k][0] > 0);
+  const draw = (ks) => { let x = Math.random() * ks.reduce((n, k) => n + table[k][0], 0); for (const k of ks) if ((x -= table[k][0]) < 0) return k; return ks[ks.length - 1]; };
+  const k0 = draw(keys);
+  if (!opt || !(opt.avoid || opt.prefer)) return k0;
+  const kin = opt.anyKind ? keys : keys.filter(k => table[k][1] === table[k0][1]);
+  const ok = kin.filter(k => !arr(opt.avoid).includes(k)), pool0 = ok.length ? ok : kin;
+  const pref = pool0.filter(k => arr(opt.prefer).includes(k)), pool = pref.length ? pref : pool0;
+  return pool.includes(k0) ? k0 : draw(pool);
+}
+function makeExercise(item, r, force, opt) { // opt.noListen: never a listening exercise (the learner can't listen now); opt.avoid, opt.prefer, opt.anyKind: a hint (pickKey)
   const box = r.box;
   const introduce = box === 0 && force !== "production";
-  const preferProd = force === "production" || (!introduce && (box >= 2 || Math.random() < 0.8));
   const ex = { item, note: item.note || "" };
   if (isFlashUnit(item.unit) && item.type === "vocab") {
     const it = arr(item.it)[0];
@@ -14739,17 +14777,18 @@ function makeExercise(item, r, force, opt) { // opt.noListen: never a listening 
     case "vocab": {
       const it = arr(item.it)[0], en = arr(item.en)[0];
       const isNoun = item.pos === "noun" && item.art;
-      if (introduce) {
-        if (Math.random() < 0.5) return flipCard(ex, item);
-        return mcMeaning(ex, item, true);
-      }
-      if (!preferProd) {
-        return Math.random() < 0.6 ? mcMeaning(ex, item, Math.random() < 0.5) : flipCard(ex, item);
-      }
-      const rn = Math.random();
-      if (isNoun && rn < 0.35) return articleDrill(ex, item, box);
-      if (isNoun && rn < 0.6 && item.plural && item.plural !== "—" && item.artPl) return pluralDrill(ex, item);
-      if (item.pos === "adjective" && Array.isArray(item.forms) && Math.random() < 0.55) { const a = agreementDrill(ex, item); if (a) return a; }
+      // new: a flip card or the meaning, half and half; at box 1, one time in five the same (meaning 60%), otherwise typed:
+      // a noun's article 35% (chosen from four at box 1), its plural 25%, recall the rest; an adjective's agreement 55%
+      const R = "recognition", P = "production", canPlural = isNoun && item.plural && item.plural !== "—" && item.artPl, canAgree = item.pos === "adjective" && Array.isArray(item.forms);
+      const recog = force === "production" || box >= 2 ? 0 : 0.2, prod = 1 - recog;
+      const key = pickKey(introduce ? { flip: [0.5, R], meaning: [0.5, R] } : {
+        meaning: [recog * 0.6, R], flip: [recog * 0.4, R], article: [isNoun ? prod * 0.35 : 0, box <= 1 ? R : P], plural: [canPlural ? prod * 0.25 : 0, P],
+        agreement: [canAgree ? prod * 0.55 : 0, P], recall: [prod * (isNoun ? (canPlural ? 0.4 : 0.65) : canAgree ? 0.45 : 1), P] }, opt);
+      if (key === "flip") return flipCard(ex, item);
+      if (key === "meaning") return mcMeaning(ex, item, introduce || Math.random() < 0.5);
+      if (key === "article") return articleDrill(ex, item, box);
+      if (key === "plural") return pluralDrill(ex, item);
+      if (key === "agreement") { const a = agreementDrill(ex, item); if (a) return a; }
       Object.assign(ex, { type: "Typed recall", typeKey: "recall", kind: "production", mode: "typed", typos: true,
         promptHtml: `<span class="en">${esc(en)}</span>` + (isNoun ? `<div class="hint">type the noun with its definite article</div>` : ""),
         accepted: isNoun ? arr(item.it).map(w => joinArt(item.art, w)) : arr(item.it), shownAnswer: isNoun ? joinArt(item.art, it) : it, alts: altWords(item, "gr") });
@@ -14783,13 +14822,21 @@ function makeExercise(item, r, force, opt) { // opt.noListen: never a listening 
       }
       const words = it.split(/\s+/).filter(Boolean);
       const canBank = words.length >= 3, hasCloze = !!(item.cloze && item.cloze.text);
-      let choice = "cloze";
-      const rnd = Math.random();
-      if (force === "production") choice = hasCloze && (box < 3 || rnd < 0.6) ? "cloze" : "translate";
-      else if (box <= 1) choice = canBank && (!hasCloze || rnd < 0.4) ? "bank" : hasCloze ? "cloze" : "translate";
-      else if (box === 2) choice = hasCloze && rnd < 0.5 ? "cloze" : canBank && rnd < 0.75 ? "bank" : "translate";
-      else choice = hasCloze && rnd < 0.45 ? "cloze" : rnd < 0.85 ? "translate" : canBank ? "bank" : "translate";
-      if (words.length <= 9 && Math.random() < 0.2 && canListen() && !(opt && opt.noListen) && !(session && session.noListen)) return listenDrill(ex, item);
+      const cz = hasCloze ? parseCloze(item.cloze.text) : null, multi = !!cz && cz.blanks.length > 1;
+      const sameWord = !!cz && cz.blanks.every(b => normalize(b[0]) === normalize(cz.blanks[0][0]));
+      const clozeOpts = hasCloze && Array.isArray(item.cloze.options) && item.cloze.options.length >= 2 && box <= 1 && force !== "production" && (!multi || sameWord);
+      // the usual chances: the follow-up to a new sentence types the blank (at box 3 and up 60%, else the translation); at box 1
+      // word order 40%, else the blank (chosen from options where it has them); at box 2 the blank 50%, word order 25%, translate
+      // 25%; then the blank 45%, translate 40%, word order 15%; and a sentence of up to nine words is Listen and type one time in five
+      const w = { cloze: 0, bank: 0, translate: 0 };
+      if (force === "production") { if (hasCloze) { w.cloze = box < 3 ? 1 : 0.6; w.translate = 1 - w.cloze; } else w.translate = 1; }
+      else if (box <= 1) { if (canBank) w.bank = hasCloze ? 0.4 : 1; if (hasCloze) w.cloze = 1 - w.bank; else if (!canBank) w.translate = 1; }
+      else if (box === 2) { w.cloze = hasCloze ? 0.5 : 0; w.bank = canBank ? 0.75 - w.cloze : 0; w.translate = 1 - w.cloze - w.bank; }
+      else { w.cloze = hasCloze ? 0.45 : 0; w.translate = 0.85 - w.cloze + (canBank ? 0 : 0.15); w.bank = canBank ? 0.15 : 0; }
+      const listen = words.length <= 9 && canListen() && !(opt && opt.noListen) && !(session && session.noListen) ? 0.2 : 0;
+      const choice = pickKey({ cloze: [w.cloze * (1 - listen), clozeOpts ? "recognition" : "production"], bank: [w.bank * (1 - listen), "recognition"],
+        translate: [w.translate * (1 - listen), "production"], listen: [listen, "production"] }, opt);
+      if (choice === "listen") return listenDrill(ex, item);
       if (choice === "bank") return wordBank(ex, item, words);
       if (choice === "translate") {
         Object.assign(ex, { type: "Translate", typeKey: "translate", kind: "production", mode: "typed", typos: true,
@@ -14797,16 +14844,13 @@ function makeExercise(item, r, force, opt) { // opt.noListen: never a listening 
           accepted: translationsOf(item), shownAnswer: it });
         return ex;
       }
-      const cz = parseCloze(item.cloze.text);
-      const multi = cz.blanks.length > 1;
       const accepted = multi ? cz.blanks.reduce((acc, b) => acc.flatMap(x => b.map(y => (x ? x + " " : "") + y)), [""]) : cz.blanks[0];
-      const sameWord = cz.blanks.every(b => normalize(b[0]) === normalize(cz.blanks[0][0]));
       const promptHtml = cz.parts.map((p, i) => esc(p) + (i < cz.blanks.length ? `<span class="blank">&nbsp;</span>` : "")).join("")
         + (item.cloze.hint ? `<div class="hint">(${esc(item.cloze.hint)})</div>` : "")
         + (multi && !sameWord ? `<div class="hint">type the ${cz.blanks.length} missing words in order</div>` : "")
         + `<div class="hint sans">${esc(en)}</div>`;
       const answerInContext = cz.parts.map((p, i) => p + (i < cz.blanks.length ? cz.blanks[i][0] : "")).join("");
-      if (Array.isArray(item.cloze.options) && item.cloze.options.length >= 2 && box <= 1 && force !== "production" && (!multi || sameWord)) {
+      if (clozeOpts) {
         const first = cz.blanks[0];
         const opts = shuffle([first[0]].concat(item.cloze.options.filter(o => !first.map(normalize).includes(normalize(o))).slice(0, 3)));
         Object.assign(ex, { type: "Fill in the blank", typeKey: "cloze", kind: "recognition", mode: "options", afterBlank: cz.parts[1], options: opts, correct: first[0], accepted: first,
@@ -15875,7 +15919,7 @@ document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this l
 let S = { screen: "home" }; // ui state
 let session = null;
 
-function buildSession(kind, unitId) {
+function sessionIds(kind, unitId) { // the items a session of this kind takes (buildSession then shuffles them); none: nothing to practise
   let ids = [];
   const target = kind === "review" ? 15 : (progress.settings.lessonLength || 12);
   if (kind === "continue" || kind === "unit") {
@@ -15909,10 +15953,98 @@ function buildSession(kind, unitId) {
   } else if (kind === "mistakes") {
     ids = Object.keys(progress.items).filter(id => isRecentMistake(id)).sort((a, b) => progress.items[b].lastWrong - progress.items[a].lastWrong).slice(0, 15);
   }
-  ids = shuffle(uniqueByPid(ids));
-  const queue = ids.map(id => ({ ex: makeExercise(content.items[id], rec(id)), repeat: false })).filter(q => q.ex);
+  return ids;
+}
+const BALANCED = new Set(["continue", "unit", "review", "wild", "hard", "mistakes"]); // grammar sessions: planSession chooses their exercises
+function buildSession(kind, unitId) {
+  const ids = shuffle(uniqueByPid(sessionIds(kind, unitId)));
+  const queue = BALANCED.has(kind) && !(kind === "unit" && isSideUnit(unitId)) ? planSession(ids)
+    : ids.map(id => ({ ex: makeExercise(content.items[id], rec(id)), repeat: false })).filter(q => q.ex); // a vocab pack or the Verbs section, as before
   return { kind, unitId: kind === "continue" ? progress.currentUnit : unitId, queue, pos: 0, done: 0, total: queue.length, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
 }
+/* Balanced sessions (from 9.5). Once a grammar session's items are picked and shuffled, each one's exercise is chosen with
+   the session in view, through makeExercise's hint (pickKey): avoid the kind of exercise (typeKey) the item was last shown
+   with on this device (lastTypes), and the kind of the two exercises before it when they match; prefer kinds the session
+   hasn't used yet. A hint keeps an exercise's kind (typed or not), so a session is typed as often as before. If the session
+   still has fewer kinds than it should (four in 12 exercises; a third of the number in a shorter one), the items whose kinds
+   come most often are asked once more, for a kind it lacks, typed or not. Then noTriples puts the exercises in order. A
+   tricky item is introduced again instead (isTricky). Follow-ups and repeats, added as the session runs, keep their rules. */
+const HINT_KEYS = ["flip", "meaning", "article", "plural", "agreement", "recall", "cloze", "bank", "translate", "listen"]; // the kinds a hint chooses between
+function planSession(ids) {
+  const last = lastTypes(), out = [], used = new Map(), key = (q) => q.ex.typeKey;
+  const count = (k, d) => used.set(k, (used.get(k) || 0) + d);
+  const unused = () => HINT_KEYS.filter(k => !used.get(k));
+  for (const id of ids) {
+    const item = content.items[id], r = rec(id);
+    let q = null;
+    if (isTricky(id)) { const ex = makeExercise(item, Object.assign({}, r, { box: 0 })); if (ex) q = { ex: Object.assign(ex, { showWhy: true }), repeat: false, reintro: true }; }
+    if (!q) {
+      const n = out.length, run = n >= 2 && key(out[n - 1]) === key(out[n - 2]) ? key(out[n - 1]) : null;
+      const ex = makeExercise(item, r, undefined, isSideUnit(item.unit) ? undefined : { avoid: [last.get(pid(id)), run].filter(Boolean), prefer: unused() });
+      if (ex) q = { ex, repeat: false };
+    }
+    if (q) { out.push(q); count(key(q), 1); }
+  }
+  const kinds = () => [...used.values()].filter(Boolean).length, want = Math.min(4, Math.ceil(out.length / 3));
+  for (const q of out.slice().sort((a, b) => used.get(key(b)) - used.get(key(a)))) {
+    if (kinds() >= want) break;
+    if (q.reintro || isSideUnit(q.ex.item.unit) || used.get(key(q)) < 2) continue; // a kind used once would only be swapped for another
+    const ex = makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: unused(), avoid: [key(q)], anyKind: true });
+    if (ex && !used.get(ex.typeKey)) { count(key(q), -1); q.ex = ex; count(key(q), 1); }
+  }
+  return noTriples(out, key);
+}
+/* A session's exercises in order: as they come, except that no kind (key) comes three times in a row, wherever the mix
+   allows. Each step takes the first exercise that neither makes a third in a row nor leaves the rest impossible to order:
+   with m left, a kind with c of them needs c ≤ 2(m − c) + 2, or 2(m − c) + 2 − r when the order so far ends in a run of r
+   of that kind. When no order can avoid it (every exercise the same kind), they keep the order they came in. */
+function noTriples(list, key) {
+  const rest = list.slice(), out = [], left = new Map();
+  for (const q of rest) left.set(key(q), (left.get(key(q)) || 0) + 1);
+  while (rest.length) {
+    const n = out.length, a = n ? key(out[n - 1]) : null, run = !n ? 0 : n >= 2 && key(out[n - 2]) === a ? 2 : 1, m = rest.length - 1;
+    const ok = (k) => {
+      const r = k === a ? run + 1 : 1; if (r > 2) return false;
+      for (const [j, c0] of left) { const c = j === k ? c0 - 1 : c0; if (c > 0 && c > 2 * (m - c) + 2 - (j === k ? r : 0)) return false; }
+      return true;
+    };
+    let i = rest.findIndex(q => ok(key(q)));
+    if (i < 0) i = Math.max(0, rest.findIndex(q => !(run === 2 && key(q) === a)));
+    const [q] = rest.splice(i, 1);
+    out.push(q); left.set(key(q), left.get(key(q)) - 1);
+  }
+  return out;
+}
+/* The kind of exercise (typeKey) each grammar item was last answered with on this device (from 9.5), so that its next
+   exercise can be another kind where it has one: itapp.lasttype.v1, a list of [record id, typeKey] pairs, oldest first,
+   at most LAST_CAP of them. Kept out of progress, like itapp.theme.v1, so it never syncs and each device has its own.
+   Read once; every read and write is guarded, and a device that refuses to store it simply forgets. */
+const LS_LASTTYPE = "itapp.lasttype.v1", LAST_CAP = 2000;
+let LAST_TYPES = null;
+function lastTypes() {
+  if (LAST_TYPES) return LAST_TYPES;
+  LAST_TYPES = new Map();
+  try {
+    const v = lsGet(LS_LASTTYPE);
+    if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "string") { LAST_TYPES.delete(p[0]); LAST_TYPES.set(p[0], p[1]); }
+  } catch (e) { LAST_TYPES = new Map(); }
+  return LAST_TYPES;
+}
+function noteType(ex) { // an answered exercise on a grammar item: remembered as the item's last kind
+  try {
+    if (!ex || !ex.typeKey || isSideUnit(ex.item.unit)) return;
+    const m = lastTypes(), id = pid(ex.item.id);
+    m.delete(id); m.set(id, ex.typeKey);
+    while (m.size > LAST_CAP) m.delete(m.keys().next().value);
+    lsSet(LS_LASTTYPE, [...m]);
+  } catch (e) { }
+}
+/* A tricky item (from 9.5): a grammar item with 4 or more lapses, at box 3 or below. Its next exercise in a session is its
+   introduction again (the flip card or first exercise, with its explanation), then the usual typed follow-up later in the
+   session. An introduction that isn't typed, on an item that has a typed exercise, only teaches: it counts as a repeat, and
+   the follow-up is the answer that moves the item. Stats lists up to 15 (counts().tricky). */
+const TRICKY_LAPSES = 4, TRICKY_BOX = 3;
+function isTricky(id) { const it = content.items[id], r = progress.items[pid(id)]; return !!(it && r && !isSideUnit(it.unit) && r.lapses >= TRICKY_LAPSES && r.box >= 1 && r.box <= TRICKY_BOX); }
 function startSession(kind, unitId) {
   const s = buildSession(kind, unitId);
   if (!s.queue.length) { S.flash = "Nothing to practise right now."; S.scrollTo = S.screen === "home" ? null : "flash"; render(); return; }
@@ -15963,15 +16095,17 @@ function sayAnswerOf(ex, fb) { // the Italian the answer panel's speaker reads; 
 function finishAnswer(ok, note, given, closest) {
   const q = current(), ex = q.ex;
   const wasNew = rec(ex.item.id).box === 0;
-  const out = applyResult(ex.item.id, ok, ex.kind, q.repeat, ex.typeKey);
+  const teach = !!q.reintro && ex.kind === "recognition" && itemHasProduction(ex.item); // a tricky item's introduction: its follow-up is the answer that counts
+  const out = applyResult(ex.item.id, ok, ex.kind, q.repeat || teach, ex.typeKey);
+  noteType(ex);
   session.answered++;
   if (ok) session.correct++;
   if (!q.repeat) { session.xp += out.xp; if (out.promoted) session.promoted++; }
   if (!ok) {
     session.queue.push({ ex: makeExercise(ex.item, rec(ex.item.id), ex.repeatForce), repeat: true, of: ex.item.id });
     if (!session.missedIds.has(ex.item.id)) { session.missedIds.add(ex.item.id); session.missed.push({ item: ex.item, answer: ex.shownAnswer || ex.correct || "", it: missedItalian(ex), context: ex.answerInContext, why: explainFor(ex, { ok: false, given }).why }); }
-  } else if (wasNew && !q.repeat && !q.followup && ex.kind === "recognition" && itemHasProduction(ex.item) && session.kind !== "flashcards") {
-    // second pass in the same session: a production exercise for the item just introduced
+  } else if ((wasNew || q.reintro) && !q.repeat && !q.followup && ex.kind === "recognition" && itemHasProduction(ex.item) && session.kind !== "flashcards") {
+    // second pass in the same session: a production exercise for the item just introduced (or introduced again, if tricky)
     const at = Math.min(session.queue.length, session.pos + 3 + Math.floor(Math.random() * 4));
     session.queue.splice(at, 0, { ex: makeExercise(ex.item, rec(ex.item.id), "production"), repeat: false, followup: true });
   }
@@ -16010,6 +16144,7 @@ function continueSession() {
       if (next) progress.currentUnit = next.id;
     }
     saveProgress();
+    session.again = sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length > 0; // the summary's Another round
     S.screen = "summary";
   }
   render();
@@ -16506,7 +16641,8 @@ function renderSummary() {
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
   ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}${m.item.type === "grammar_mc" ? "" : sayBtn(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" || m.item.type === "sort" || m.item.type === "match" ? `<div class="small muted">${esc(m.item.prompt || "")}</div>` : m.item.type === "reply" ? `<div class="small muted">${esc(m.item.line)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
-  <button type="button" class="primary wide" data-go="home">Back to Today</button>`;
+  <div class="btnrow sumbtns"><button type="button" data-act="again"${s.again ? "" : ` disabled aria-describedby="again-none"`}>Another round</button><button type="button" class="primary" data-go="home">Back to Today</button></div>
+  ${s.again ? "" : `<p class="small muted" id="again-none">Nothing left to practise in this kind of session right now.</p>`}`;
 }
 function boxTag(id) { const r = rec(id); return r.box === 0 ? "" : ` <span class="box">box ${r.box}${r.box >= 5 ? " ✓" : ""}</span>`; }
 /* ---------- lessons ---------- */
@@ -16733,7 +16869,7 @@ function renderRules() {
     + units.map(u => `<section class="card rule" id="rules-${esc(u.id)}"><div class="eyebrow">${esc(unitEyebrow(u))}</div><h2 class="title-s">${esc(u.title)}</h2><div class="notes">${u.notes.map(n => `<p>${esc(n)}</p>`).join("")}</div><div class="btnrow wrap">${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">Lesson</button><button type="button" data-ref="${esc(u.id)}" data-tab="glossary">Glossary</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}<button type="button" data-unit="${esc(u.id)}">Practise</button><button type="button" class="quiet" data-rjump="top">Units ↑</button></div></section>`).join("");
 }
 function renderStats() {
-  const t = now(), { learned, started, dueToday, dueWeek, lapsed, anyLapses, items } = counts();
+  const t = now(), { learned, started, dueToday, dueWeek, lapsed, anyLapses, items, tricky, forecast } = counts();
   const days = Object.keys(progress.days).sort().slice(-14).reverse();
   const acc = (n) => { const a = accuracy(n); return a[1] ? pctOf(a) + " (" + a[0] + "/" + a[1] + ")" : "–"; };
   const byType = (() => { const cut = dayKey(t - 29 * 864e5), m = {}; for (const [d, v] of Object.entries(progress.days)) if (d >= cut && v.t) for (const [k, x] of Object.entries(v.t)) if (k !== "all") { m[k] = m[k] || [0, 0]; m[k][0] += x[0]; m[k][1] += x[1]; } return Object.entries(m).filter(e => e[1][1] > 0).sort((a, b) => (a[1][0] / a[1][1]) - (b[1][0] / b[1][1])); })();
@@ -16743,10 +16879,27 @@ function renderStats() {
   return screenHead("Stats", { back: "you", backLabel: "You" }) + `
   <div class="card"><div class="bigs"><div><span class="big">${streak()}</span><span class="small muted">day streak</span></div><div><span class="big">${fmtN(learned)}</span><span class="small muted">items learned</span></div><div><span class="big">${pctOf(accuracy(30))}</span><span class="small muted">accuracy</span></div></div></div>
   <div class="card rows">${stat("Accuracy, last 7 days", acc(7))}${stat("Accuracy, last 30 days", acc(30))}${stat("Items started", `${started} of ${items}`)}${stat("Learned (box 5+)", learned)}${stat("Due today", dueToday)}${stat("Due this week", dueWeek)}${stat("Streak", `${streak()} day${streak() === 1 ? "" : "s"}`)}</div>
+  ${forecastHtml(forecast)}
   ${lapsed.length ? table("Most missed", lapsed.map(([id, n]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapse${n === 1 ? "" : "s"}</td><td class="muted">box ${rec(id).box}</td></tr>`).join("")) : ""}
+  ${tricky.length ? table("Tricky items", tricky.map(([id, n, box]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapses</td><td class="muted">box ${box}</td></tr>`).join(""), `<p class="small muted" id="tricky-note">Missed ${TRICKY_LAPSES} times or more and not yet past box ${TRICKY_BOX}: each one starts again with its introduction and explanation the next time it comes up, then a typed follow-up.</p>`) : ""}
   ${anyLapses ? `<button type="button" class="wide" data-start="hard">Practise the most-missed items<small>the 15 items you have got wrong most often, across all units</small></button>` : ""}
   ${days.length ? table("Recent days", days.map(d => `<tr><td>${d}</td><td>${progress.days[d].xp || 0} XP</td><td class="muted">${progress.days[d].new || 0} new</td></tr>`).join("")) : ""}
   ${byType.length ? table("Accuracy by exercise type, 30 days", byType.map(([k, v]) => `<tr><td>${esc(typeName[k] || k)}</td><td>${Math.round(100 * v[0] / v[1])}%</td><td class="muted">${v[0]}/${v[1]}</td></tr>`).join(""), `<p class="small muted">Weakest types first.</p>`) : ""}`;
+}
+/* The forecast on Stats (from 9.5): a column for each of the next 7 days, tomorrow first, as tall as the number of items
+   that fall due that day (the number on top), then the same days by kind in a table. One series in the accent colour, so
+   no legend: the heading names it, and the table carries the split and reads out the figures. */
+let WEEKDAY = null; // Mon, Tue…: one formatter, made once (making one is slow on a phone)
+function forecastHtml(fc) {
+  const sum = (d) => d.grammar + d.cards + d.verbs, top = Math.max(1, ...fc.map(sum)), PLOT = 72;
+  const wk = (d) => (WEEKDAY || (WEEKDAY = new Intl.DateTimeFormat("en-GB", { weekday: "short" }))).format(d.at), dd = (d) => new Date(d.at).getDate();
+  const name = (d, k) => k === 0 ? "Tomorrow" : wk(d) + " " + dd(d);
+  const cols = fc.map(d => { const n = sum(d), h = n ? Math.max(2, Math.round(PLOT * n / top)) : 0; return `<div class="fc-col"><span class="fc-n${n ? "" : " muted"}">${fmtN(n)}</span>${h ? `<span class="fc-bar" style="height:${h}px"></span>` : ""}</div>`; }).join("");
+  const days = fc.map(d => `<span>${esc(wk(d))}<span class="muted">${dd(d)}</span></span>`).join("");
+  const label = "Items due on each of the next 7 days: " + fc.map((d, k) => `${name(d, k)}, ${sum(d)}`).join("; ");
+  const rows = fc.map((d, k) => `<tr><td>${esc(name(d, k))}</td><td>${fmtN(d.grammar)}</td><td>${fmtN(d.cards)}</td><td>${fmtN(d.verbs)}</td></tr>`).join("");
+  return groupHtml("Due in the next 7 days", `<div class="card fcast"><div class="fc" role="img" aria-label="${esc(label)}"><div class="fc-plot">${cols}</div><div class="fc-days" aria-hidden="true">${days}</div></div>
+    <div class="tablewrap"><table class="fc-table"><thead><tr><th>Day</th><th>Grammar</th><th>Cards</th><th>Verbs</th></tr></thead><tbody>${rows}</tbody></table></div></div>`);
 }
 function renderSettings() {
   const s = progress.settings;
@@ -16924,6 +17077,7 @@ function action(a) {
     case "backupLater": setBackupInfo({ snooze: now() + 3 * 864e5 }); render(); break;
     case "welcomeDone": setBackupInfo({ welcomed: true }); render(); break;
     case "newSeen": markSeen(); render(); break;
+    case "again": if (session && session.finished) { S.flash = null; startSession(session.kind, session.kind === "continue" ? undefined : session.unitId); } break; // the summary's Another round: the same kind (and unit)
     case "stay": S.leaveAsk = false; render(); break;
     case "applyUpdate": applyUpdate(); break;
     case "updateLater": S.updateLater = true; render(); break;
@@ -17362,8 +17516,8 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(true); } }); // every document compared, in case a change went unmarked
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.4";
-const CHANGES = "Syncing with your Claude account now does far less work after each answer, so the app stays quick, and a damaged progress record (in a broken backup file, say) is now repaired or skipped instead of causing trouble; loading a backup tells you if it found any."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.5";
+const CHANGES = "Sessions mix their exercises: never the same kind three times running, each item gets a different kind from last time, and items you keep missing start again from their introduction. Stats shows what falls due over the next week, and a finished session offers Another round."; // this version's changes in one or two plain sentences, for What's new on Today
 applyTheme(themePref());
 const tidied = loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new

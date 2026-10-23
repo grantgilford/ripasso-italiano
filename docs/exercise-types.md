@@ -1,8 +1,8 @@
-# Exercise types: the catalogue (v8.6)
+# Exercise types: the catalogue (v9.5)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
-To see which types a unit already uses, run `node tools/unit-items.js --counts`; to read a unit's items, `node tools/unit-items.js u01` (add `--type spot` for one type). To see the mix of exercises a unit actually gives (how many kinds, and how much the commonest takes), run `node tools/variety.js`; its figures for the current version are under Measured mix below.
+To see which types a unit already uses, run `node tools/unit-items.js --counts`; to read a unit's items, `node tools/unit-items.js u01` (add `--type spot` for one type). To see the mix of exercises a unit's items give (how many kinds, and how much the commonest takes), run `node tools/variety.js`; its figures for the current version are under Measured mix below. They are each item's own chances: from v9.5 a session also balances its exercises (Balanced sessions, below).
 
 ## How an exercise is chosen
 
@@ -13,6 +13,18 @@ Content authors write **items**; the app turns each item into an **exercise** ev
 - **Box 2 and up:** production (typing Italian) wherever the item has it; from box 2, only a production answer promotes an item that has one (`itemHasProduction`). Items with no production exercise (grammar questions, sort, match, a spot item with no mistake or an accent-only one) are promoted by their recognition answer.
 
 A wrong answer puts the item back at the end of the session. Every wrong answer gets a reason in the answer panel.
+
+### Balanced sessions (from v9.5)
+
+The rules above are each item's own chances. A grammar session (Continue, a unit, Review, Wild card, Mistakes, most-missed) then chooses each item's exercise with the whole session in view (`planSession`), through a hint to `makeExercise` (`opt.avoid`, `opt.prefer`; `pickKey` applies it):
+
+- **Rotation.** Each device remembers the kind (`typeKey`) each grammar item was last answered with, in `itapp.lasttype.v1` (never synced, at most 2,000 items), and the hint avoids it, so a noun typed as *recall* last time gets its article or plural this time.
+- **Variety.** The hint prefers kinds the session hasn't used yet, and if a session still has fewer than four kinds in 12 exercises (a third of the number in a shorter one) while its items can give more, the items whose kinds come most often are asked again.
+- **No three in a row.** The exercises are ordered as shuffled, except that no kind comes three times running wherever the mix allows (`noTriples`).
+- **The same share of typed exercises.** A hint only moves between exercises of the same kind, typed or not (`kind`), so how often an item is typed, and so what can promote it, is as before; only the last pass for variety may cross over, and over many sessions the share stays within a point or so.
+- **Tricky items.** An item with 4 or more lapses, at box 3 or below, starts again with its introduction (the box-0 exercise, its explanation shown), which only teaches when a typed follow-up will come; the usual typed follow-up later in the session is the answer that counts.
+
+Follow-ups, repeats and Can't listen now keep their own rules, and vocab pack and Verbs sessions are built as before. Only items whose type offers a choice (vocab and sentences) can be steered: the more kinds of item a unit has, the more varied its sessions. `tools/test-sessions.js` checks all of this.
 
 ## The types
 
@@ -66,9 +78,9 @@ Each new type is ordinary content, so any unit can use it. Units 1 and 2 use all
 | sort | u05 (*essere* or *avere* in the *passato prossimo*), u08 (adjective or adverb), u10 (*di* or *da*), u11 (conjunctions that take the subjunctive or not), u12 (subjunctive or indicative triggers), u15 (masculine or feminine time words) |
 | match | u07 (digits ↔ words), u09 (question word ↔ meaning), u11 (conjunction ↔ meaning), u15 (clock times), u16 (sentence halves joined by *che / cui*), u18 (slang ↔ plain Italian) |
 
-## Measured mix (9.2)
+## Measured mix (9.5)
 
-What `node tools/variety.js --markdown` printed for version 9.2: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
+What `node tools/variety.js --markdown` printed for version 9.5: the app's own `makeExercise`, with a seeded random generator, on every item at boxes 1, 2, 3 and 4, 8 times each, with listening on, so every item and box counts the same. **Kinds** is how many different exercises (by key) a unit gives; a unit is flagged with fewer than 10 kinds or one kind above 35%. Run it again after changing a unit's items (or `makeExercise`) and replace this section with what it prints.
 
 | Unit | Items | Kinds | Most common | Second | Flag |
 |---|---:|---:|---|---|---|
@@ -77,7 +89,7 @@ What `node tools/variety.js --markdown` printed for version 9.2: the app's own `
 | u03 Present tense: regular -are verbs | 299 | 13 | `conjugation` 36% | `grammar` 15% | conjugation above 35% |
 | u04 Irregular verbs: present tense | 271 | 7 | `grammar` 23% | `conjugation` 21% | fewer than 10 kinds |
 | u05 Verb tenses: present, past, future and conditional | 329 | 7 | `conjugation` 31% | `grammar` 19% | fewer than 10 kinds |
-| u06 Adjectives | 268 | 11 | `recall` 29% | `agreement` 26% |  |
+| u06 Adjectives | 268 | 11 | `recall` 29% | `agreement` 25% |  |
 | u19 Possessives | 248 | 14 | `transform` 16% | `spot` 12% |  |
 | u07 Numbers | 159 | 12 | `number` 48% | `recall` 17% | number above 35% |
 | u08 Adverbs | 196 | 8 | `recall` 54% | `grammar` 16% | fewer than 10 kinds; recall above 35% |
@@ -86,7 +98,7 @@ What `node tools/variety.js --markdown` printed for version 9.2: the app's own `
 | u11 Conjunctions | 140 | 8 | `recall` 44% | `grammar` 17% | fewer than 10 kinds; recall above 35% |
 | u12 The subjunctive (congiuntivo) | 202 | 10 | `recall` 21% | `cloze` 17% |  |
 | u13 Object pronouns, reflexives, ne & ci | 158 | 10 | `transform` 34% | `recall` 20% |  |
-| u14 Formal & informal: register and the imperative | 284 | 12 | `transform` 26% | `recall` 25% |  |
+| u14 Formal & informal: register and the imperative | 284 | 12 | `transform` 26% | `recall` 26% |  |
 | u15 Time: days, months, dates, clock, duration | 268 | 14 | `recall` 48% | `clock` 9% | recall above 35% |
 | u16 Building longer sentences: relative pronouns, gerund, impersonal si | 101 | 10 | `transform` 25% | `recall` 24% |  |
 | u18 Colloquial Italian & slang | 218 | 13 | `recall` 32% | `cloze` 14% |  |
@@ -98,7 +110,7 @@ Over all 19 units (4260 items):
 |---|---:|---:|
 | `recall` | 23% | 17 |
 | `grammar` | 14% | 19 |
-| `cloze` | 13% | 19 |
+| `cloze` | 12% | 19 |
 | `conjugation` | 9% | 12 |
 | `transform` | 9% | 13 |
 | `translate` | 7% | 19 |
@@ -137,7 +149,7 @@ Every new item type touches the same places. In `index.html`:
 1. `validatePack`: what the item needs, so an imported pack is refused if it is broken.
 2. `sameItemKey`: the key that lets identical items in two units share one progress record.
 3. `itemHasProduction`: whether it has a typed exercise (this decides promotion from box 2).
-4. `makeExercise`: the exercise itself: `type` (the name shown), `typeKey`, `kind`, `mode`, `promptHtml`, `accepted` / `correct`, `shownAnswer`; `showWhy: introduce` so a new item explains itself; `say` only for Italian the prompt shows; `sayAnswer`, `missedText` and `answerLine` / `okLine` when the defaults don't fit.
+4. `makeExercise`: the exercise itself (where an item can be given more than one exercise at a box, list them in a `pickKey` table with their chances and kinds, so a session's hint can choose between them): `type` (the name shown), `typeKey`, `kind`, `mode`, `promptHtml`, `accepted` / `correct`, `shownAnswer`; `showWhy: introduce` so a new item explains itself; `say` only for Italian the prompt shows; `sayAnswer`, `missedText` and `answerLine` / `okLine` when the defaults don't fit.
 5. `renderSession`: the markup for a new `mode`, with a Don't know button (`data-act="giveup"`) so the tests and the learner can always move on; `action()`, the `keydown` handler and `wire()` for its taps and keys; `resetExState()` for any state it keeps in `S`.
 6. `explainFor`: the reasons in the answer panel, every wrong choice named.
 7. The glossary (`PRACTICE_TYPES`, `rowHtml`), Look up and the glossary filter (`itemFields`), the summary line, `itemLabel`, the Stats names (`typeName`) and `knownWords` (what the typo rule treats as real words; leave out text that is wrong on purpose).
