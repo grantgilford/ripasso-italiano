@@ -13,18 +13,21 @@
       moves to a unit of another pack. Prints what changed in each item (--dry-run also prints
       the old and new lines), and says when a change stops an item sharing progress with its
       copies in other units (the same exercise shares one record; see sameItemKey in the app).
+      An item may carry "section", its lesson link as add-items.js takes it: it replaces the
+      item's line in ITEM_SECTIONS (and is not stored on the item). Without one the link stays,
+      unless the item moves to another unit, where one with a lesson needs a "section".
 
   --remove ID --to NEWID
       Deletes item ID and adds ID_ALIASES[ID] = NEWID, so the progress saved for ID (on every
       device) moves to NEWID. Refused if ID is not an item of a pack written in index.html, or if
       NEWID is not an item that stays in the app. An alias that pointed at ID is pointed at NEWID
-      too, since aliases must lead straight to a live item. Warns if ID's id appears anywhere
-      else in index.html or the tests.
+      too, since aliases must lead straight to a live item. ID's lesson link in ITEM_SECTIONS goes
+      with it. Warns if ID's id appears anywhere else in index.html or the tests.
 
   Both run the app's own pack check (validatePack) on every pack they change and refuse, with
   nothing written, what it rejects; then load the changed app to make sure it still builds.
-  The packs and ID_ALIASES are written back in the layout tools/format-content.js sets: one
-  item, and one alias, per line. --dry-run checks and reports but writes nothing.
+  The packs, ID_ALIASES and ITEM_SECTIONS are written back in the layout tools/format-content.js
+  sets: one item, and one alias, per line, and one unit's links per line. --dry-run checks and reports but writes nothing.
   Afterwards run node tools/check-content.js, node tools/test-items.js on the units changed,
   and node tools/test-progress.js.
 */
@@ -46,11 +49,12 @@ if (removes.length !== tos.length || removes.concat(tos).some(x => !x || x.start
 const ROOT = path.join(__dirname, "..");
 const index = path.join(ROOT, "index.html");
 const html = fs.readFileSync(index, "utf8");
-const app = loadApp("buildContent, validatePack, getContent: () => content, pid", { html });
+const app = loadApp("buildContent, validatePack, sectionTarget, lessonOf, getContent: () => content, pid", { html });
 app.buildContent();
 const content = app.getContent();
 const packs = src.literalPacks(html);
 const aliases = src.parseLiteral(html, "ID_ALIASES");
+const links = src.parseLiteral(html, "ITEM_SECTIONS"), linksChanged = new Set(); // the units whose links change
 // where an item is written: { name, pack, at } (its index in pack.items), or null
 const locate = id => { for (const p of packs) { const at = p.pack.items.findIndex(i => i.id === id); if (at >= 0) return Object.assign({ at }, p); } return null; };
 const notWritten = (id, otherwise) => content.items[id] ? `${id} is a Verbs item, built from VERB_GYM: change the verb there instead.` : `${id} is not an item; ${otherwise}.`;
@@ -72,10 +76,22 @@ if (replaceFile) {
     const where = locate(it.id);
     if (!where) { problems.push(notWritten(it.id, "--replace only changes items that exist (add new ones with add-items.js)")); continue; }
     if (it.unit !== where.pack.items[where.at].unit && !where.pack.units.some(u => u.id === it.unit)) problems.push(`${it.id}: unit "${it.unit}" is not in ${where.name}, where the item is; an item can only move to a unit of its own pack.`);
-    replaced.push({ old: where.pack.items[where.at], neu: it, where });
+    const has = Object.prototype.hasOwnProperty.call(it, "section"), { section, ...neu } = it, oldUnit = where.pack.items[where.at].unit;
+    const lesson = app.lessonOf(content.unitById[neu.unit]);
+    if (has && !lesson) problems.push(`${it.id}: unit "${neu.unit}" has no lesson, so the item takes no "section".`);
+    else if (has && /^(\w+#)?\d+$/.test(String(section))) problems.push(`${it.id}: "section" names a section by its heading, not its number.`);
+    else if (has && section !== null && !app.sectionTarget(neu.unit, section)) problems.push(`${it.id}: "section": ${JSON.stringify(section)} doesn't name exactly one section.`);
+    else if (!has && lesson && neu.unit !== oldUnit) problems.push(`${it.id}: moves to ${neu.unit}, which has a lesson: give it a "section".`);
+    replaced.push({ old: where.pack.items[where.at], neu, where, section: has ? section : undefined, oldUnit });
   }
   if (!problems.length) {
-    for (const r of replaced) { r.where.pack.items[r.where.at] = r.neu; changed.add(r.where.name); }
+    for (const r of replaced) {
+      r.where.pack.items[r.where.at] = r.neu; changed.add(r.where.name);
+      const before = links[r.oldUnit] && Object.prototype.hasOwnProperty.call(links[r.oldUnit], r.neu.id) ? links[r.oldUnit][r.neu.id] : undefined;
+      if (r.neu.unit !== r.oldUnit && before !== undefined) { delete links[r.oldUnit][r.neu.id]; linksChanged.add(r.oldUnit); }
+      if (r.section !== undefined) { (links[r.neu.unit] = links[r.neu.unit] || {})[r.neu.id] = r.section; linksChanged.add(r.neu.unit); }
+      if (r.section !== undefined ? r.section !== before || r.neu.unit !== r.oldUnit : r.neu.unit !== r.oldUnit && before !== undefined) report.push(`${r.neu.id}: lesson link ${before === undefined ? "none" : JSON.stringify(before)} → ${r.section === undefined ? "none" : JSON.stringify(r.section)}`);
+    }
   }
 } else {
   const gone = new Set(removes);
@@ -95,6 +111,7 @@ if (replaceFile) {
   });
   if (!problems.length) {
     for (const r of removed) { r.where.pack.items = r.where.pack.items.filter(i => i.id !== r.id); changed.add(r.where.name); }
+    for (const r of removed) if (links[r.old.unit] && Object.prototype.hasOwnProperty.call(links[r.old.unit], r.id)) { delete links[r.old.unit][r.id]; linksChanged.add(r.old.unit); }
     for (const r of removed) {
       for (const [k, v] of Object.entries(aliases)) if (v === r.id) { aliases[k] = r.to; report.push(`ID_ALIASES: ${k} → ${r.id} now points at ${r.to}.`); }
       aliases[r.id] = r.to;
@@ -108,6 +125,14 @@ if (problems.length) { console.error("Nothing written. Problems:\n- " + problems
 let out = html;
 for (const { name, pack } of packs) if (changed.has(name)) out = src.writeConstant(out, name, pack);
 if (removed.length) out = src.writeConstant(out, "ID_ALIASES", aliases);
+if (linksChanged.size) { // each changed unit's links in the order of its items
+  for (const u of linksChanged) {
+    const order = packs.flatMap(p => p.pack.items).filter(i => i.unit === u).map(i => i.id), m = links[u] || {}, o = {};
+    order.forEach(id => { if (Object.prototype.hasOwnProperty.call(m, id)) o[id] = m[id]; });
+    links[u] = o;
+  }
+  out = src.writeConstant(out, "ITEM_SECTIONS", links);
+}
 let after;
 try {
   after = loadApp("buildContent, getContent: () => content, pid", { html: out });

@@ -10,11 +10,21 @@
   flashcard unit), straight after the last item of its unit, in the order
   given (a new unit's first items go after the items of the unit listed before
   it). The pack is written back in the layout tools/format-content.js sets, so
-  each new item is one line. Refused, with nothing written, if:
+  each new item is one line.
+
+  An item of a unit with a lesson needs a "section": the lesson section that
+  teaches it, by a unique start of its heading ("Subject pronouns"), or another
+  unit's as "u13#Where the pronouns", or null to leave it unlinked on purpose
+  (node tools/link-sections.js proposes one once the item is in). The field is
+  not stored on the item: it becomes the item's line in ITEM_SECTIONS.
+
+  Refused, with nothing written, if:
     - an id already exists anywhere in the app, or appears twice in the file;
     - an item's unit is not a unit of a pack written in index.html (the Verbs
       section is built from VERB_GYM, so its items can't be added here);
-    - the app's own pack check (validatePack) reports a problem.
+    - the app's own pack check (validatePack) reports a problem;
+    - an item of a unit with a lesson has no "section", or one that doesn't
+      name exactly one section, or an item of a unit without one has one.
   To change or remove existing items, use tools/edit-items.js.
   Afterwards run node tools/check-content.js, and node tools/test-progress.js
   --update-ids to add the new ids to tools/item-ids.txt.
@@ -37,7 +47,7 @@ if (!Array.isArray(items)) items = items.items;
 if (!Array.isArray(items) || !items.length) { console.error("No items found."); process.exit(1); }
 
 // the app's own checks
-const app = loadApp("buildContent, validatePack, getContent: () => content", { html });
+const app = loadApp("buildContent, validatePack, sectionTarget, lessonOf, getContent: () => content", { html });
 app.buildContent();
 const content = app.getContent();
 const packs = src.literalPacks(html);
@@ -45,6 +55,21 @@ const packOfUnit = u => packs.find(p => p.pack.units.some(x => x.id === u));
 
 const problems = [];
 const seen = new Set();
+// each item's lesson link, taken off the item: it is stored in ITEM_SECTIONS
+const links = {};
+items = items.map(it => {
+  if (!it || typeof it !== "object" || !Object.prototype.hasOwnProperty.call(it, "section")) return it;
+  const { section, ...rest } = it;
+  links[it.id] = section;
+  return rest;
+});
+for (const it of items) {
+  const lesson = app.lessonOf(content.unitById[it.unit]);
+  if (!lesson) { if (it.id in links) problems.push(`${it.id}: unit "${it.unit}" has no lesson, so the item takes no "section".`); continue; }
+  if (!(it.id in links)) problems.push(`${it.id}: needs a "section", the start of the heading of the ${it.unit} lesson section that teaches it (or null to leave it unlinked).`);
+  else if (/^(\w+#)?\d+$/.test(String(links[it.id]))) problems.push(`${it.id}: "section" names a section by its heading, not its number.`);
+  else if (links[it.id] !== null && !app.sectionTarget(it.unit, links[it.id])) problems.push(`${it.id}: "section": ${JSON.stringify(links[it.id])} doesn't name exactly one section of the ${String(links[it.id]).includes("#") ? "unit it names" : it.unit + " lesson"}.`);
+}
 for (const it of items) {
   if (content.items[it.id]) problems.push(`${it.id}: this id already exists (unit ${content.items[it.id].unit}).`);
   if (seen.has(it.id)) problems.push(`${it.id}: appears twice in ${file}.`);
@@ -75,7 +100,12 @@ for (const [unit, list] of Object.entries(byUnit)) {
 }
 let out = html;
 for (const { name, pack } of packs) if (changed.has(name)) out = src.writeConstant(out, name, pack);
+if (Object.keys(links).length) { // the links, after the unit's others (the items' own order)
+  const map = src.parseLiteral(out, "ITEM_SECTIONS");
+  for (const it of items) if (it.id in links) (map[it.unit] = map[it.unit] || {})[it.id] = links[it.id];
+  out = src.writeConstant(out, "ITEM_SECTIONS", map);
+}
 const where = p => `${p.unit}: ${p.n} item(s) in ${p.name}, ` + (p.anchor ? `after ${p.anchor}${p.after !== p.unit ? ` (the last of ${p.after})` : ""}` : "at the start of its items") + `, from line ${src.lineOf(out, `{"id":${JSON.stringify(p.first)},`)}`;
 if (DRY) { console.log("Dry run, nothing written. Would add:\n  " + placed.map(where).join("\n  ")); process.exit(0); }
 fs.writeFileSync(index, out);
-console.log("Added:\n  " + placed.map(where).join("\n  ") + "\nNow run node tools/check-content.js and node tools/test-progress.js --update-ids.");
+console.log("Added:\n  " + placed.map(where).join("\n  ") + (Object.keys(links).length ? `\n  and ${Object.keys(links).length} lesson link(s) in ITEM_SECTIONS` : "") + "\nNow run node tools/check-content.js and node tools/test-progress.js --update-ids.");

@@ -53,7 +53,25 @@
        the version changes Today shows "What's new in <version>" with CHANGES,
        as its only notice, in the layout rules, until Got it is tapped, which is
        remembered per device in itapp.seen.v1 (never in progress); a device with
-       progress from before 9.1 gets it too, and so does the copy in claude.ai.
+       progress from before 9.1 gets it too, and so does the copy in claude.ai;
+   11. Read the rule and Practise this section (from 9.6), in light and dark at
+       390 and 360 px and at 120% text: the answer panel shows "Read the rule:
+       N · heading" after a wrong answer and on a new item's first exercise
+       (right or wrong), never for a learned item answered right, an item left
+       unlinked or a vocab card; tapping it opens that lesson section in a sheet
+       over the session, drawn as the lesson draws it, within the screen, its
+       text scrolling inside it (never the page, never sideways), with the
+       focus inside, the session behind out of reach and Enter not moving on;
+       Close, a tap beside the sheet, Escape and the back button each close it,
+       with the session, its answer and saved progress exactly as before and
+       the focus back on Read the rule (and back then still asks before
+       leaving the session); a link in the sheet to a lesson section opens that
+       section in the sheet, a link to a whole unit is plain text, and its
+       speakers read their Italian; every lesson section with items linked to
+       it ends with "Practise this section (N items)", which starts a session
+       of those items only (Another round at the end gives another), and is
+       disabled, saying why, when its items are all new and today's new items
+       are used up.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -223,6 +241,153 @@ async function tour(page, label, opts = {}) {
   await layout(page, L("Summary"), opts);
   await tap(page, '[data-go="home"]');
   check(L("Back to Today returns to Today"), (await screen(page)) === "home");
+}
+
+/* ---------- Read the rule and Practise this section (from 9.6) ---------- */
+async function readTheRule(browser, origin) {
+  const said = (page) => page.evaluate(() => window.__said.slice());
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Read the rule, ${label}: ${t}`;
+    const { page, context } = await openApp(browser, origin, { width, height, scheme, init: fakeSpeech(VOICES) });
+    // the items: new and learned ones with a link, one left unlinked, one linked to a long section, one whose section links to another unit's
+    const ids = await page.evaluate(() => {
+      const linked = (u) => (content.byUnit[u] || []).filter(i => itemSection(i.id) && itemSection(i.id).unit === u);
+      const textOf = (at) => JSON.stringify(lessonOf(content.unitById[at.unit]).sections[at.index].b).length;
+      const unlinked = Object.entries(ITEM_SECTIONS).flatMap(([u, m]) => Object.keys(m).filter(id => m[id] === null))[0];
+      return {
+        fresh: linked("u05").find(i => !progress.items[pid(i.id)]).id,
+        learned: linked("u05").find(i => (progress.items[pid(i.id)] || {}).box >= 3).id,
+        unlinked, card: content.byUnit.fc01[0].id,
+        long: linked("u05").sort((a, b) => textOf(itemSection(b.id)) - textOf(itemSection(a.id)))[0].id,
+        xref: Object.values(content.items).find(i => { const at = itemSection(i.id); return at && /\[\[\w+#\d+\|/.test(JSON.stringify(lessonOf(content.unitById[at.unit]).sections[at.index].b)) && /\[\[\w+\|/.test(JSON.stringify(lessonOf(content.unitById[at.unit]).sections[at.index].b)); }) || null,
+      };
+    });
+    if (ids.xref) ids.xref = ids.xref.id;
+    // a session of two exercises, the first for id with its record as saved; then answered right or wrong
+    const start = (id) => page.evaluate((id) => {
+      const other = content.byUnit.u05.find(i => i.id !== id && itemSection(i.id)), mk = (it) => ({ ex: makeExercise(it, rec(it.id)), repeat: false });
+      session = { kind: "unit", unitId: "u05", queue: [mk(content.items[id]), mk(other)], pos: 0, done: 0, total: 2, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+      S.screen = "session"; S.feedback = null; S.rule = null; S.leaveAsk = false; S.retry = null; resetExState(); render(); window.scrollTo(0, 0);
+    }, id);
+    const answer = async (ok) => { await page.evaluate((ok) => finishAnswer(ok, "", ok ? "" : "zzz"), ok); await page.waitForTimeout(450); };
+    const ruleText = () => page.evaluate(() => { const b = document.querySelector('.fb [data-act="rule"]'); return b ? b.textContent.replace(/\u2011/g, "-").trim() : null; }); // a word ending's hyphen is drawn unbreakable
+    const expect = (id) => page.evaluate((id) => { const at = itemSection(id), L = lessonOf(content.unitById[at.unit]); return `Read the rule: ${at.index + 1} · ${plainText(L.sections[at.index].h)}`; }, id);
+    const snap = () => page.evaluate(() => JSON.stringify({ pos: session.pos, done: session.done, answered: session.answered, correct: session.correct, xp: session.xp, queue: session.queue.map(q => q.ex.item.id + ":" + q.ex.typeKey + ":" + !!q.repeat), fb: [S.feedback.ok, S.feedback.given, S.feedback.intro], screen: S.screen, saved: localStorage.getItem("itapp.progress.v1") }));
+    const sheet = () => page.evaluate(() => {
+      const bg = document.getElementById("ruleBg"), k = bg && bg.querySelector(".rulesheet"), body = k && k.querySelector(".rs-body");
+      if (!k) return null;
+      const r = k.getBoundingClientRect(), small = [...k.querySelectorAll("button")].filter(b => b.offsetParent !== null).map(b => b.getBoundingClientRect()).filter(c => c.width < 43.5 || c.height < 43.5).length;
+      return { title: k.querySelector("#rule-t").textContent.replace(/\u2011/g, "-").replace(/\s+/g, " ").trim(), eyebrow: k.querySelector(".eyebrow").textContent, inside: r.top >= -0.5 && r.bottom <= window.innerHeight + 0.5 && r.left >= -0.5 && r.right <= window.innerWidth + 0.5,
+        focus: k.contains(document.activeElement), behind: [...app.children].filter(c => c !== bg).every(c => c.inert), small, sideways: body.scrollWidth > body.clientWidth + 1 || document.documentElement.scrollWidth > window.innerWidth + 1,
+        bodyText: body.textContent.replace(/\u2011/g, "-").replace(/\s+/g, " ").trim(), close: !!k.querySelector('[data-act="ruleClose"]'), bg: getComputedStyle(k).backgroundColor };
+    });
+    const lessonText = (id) => page.evaluate((id) => { // the section as the lesson screen draws it, without its heading and its Practise button
+      const at = itemSection(id), was = [S.screen, S.refUnit, S.refTab], box = document.createElement("div");
+      box.innerHTML = lessonHtml(content.unitById[at.unit], lessonOf(content.unitById[at.unit]));
+      const sec = box.querySelector("#lsec-" + at.index); sec.querySelector("h2").remove(); const go = sec.querySelector(".secgo"); if (go) go.remove();
+      return sec.textContent.replace(/\u2011/g, "-").replace(/\s+/g, " ").trim();
+    }, id);
+
+    // when the panel offers it
+    await start(ids.fresh); await answer(true);
+    check(L("a new item's first exercise, answered right, offers Read the rule: N · heading"), (await ruleText()) === (await expect(ids.fresh)), `${await ruleText()} / ${await expect(ids.fresh)}`);
+    await start(ids.learned); await answer(true);
+    check(L("a learned item answered right does not offer it"), (await ruleText()) === null);
+    await start(ids.learned); await answer(false);
+    check(L("a wrong answer offers it"), (await ruleText()) === (await expect(ids.learned)));
+    await layout(page, L("the answer panel with Read the rule"), { zoomOnly: true });
+    check(L("Read the rule is at least 44 px tall, on the panel's card colour"), await page.$eval('.fb [data-act="rule"]', b => { const r = b.getBoundingClientRect(); return r.height >= 43.5 && r.width >= 43.5 && getComputedStyle(b).backgroundColor !== getComputedStyle(b.closest(".fb")).backgroundColor; }));
+    check(L("…and a wrong answer leaves Continue on screen"), await page.$eval('.fb [data-act="continue"]', c => { const r = c.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight + 0.5; }));
+    await start(ids.unlinked); await answer(false);
+    check(L("an item left unlinked on purpose does not offer it"), (await ruleText()) === null);
+    await start(ids.card); await answer(false);
+    check(L("a vocab card (no lesson) does not offer it"), (await ruleText()) === null);
+
+    // the sheet
+    await start(ids.long); await answer(false);
+    const before = await snap();
+    await tap(page, '.fb [data-act="rule"]');
+    let k = await sheet();
+    const want = await page.evaluate((id) => { const at = itemSection(id), u = content.unitById[at.unit]; return { title: `${at.index + 1} ${plainText(lessonOf(u).sections[at.index].h)}`, eyebrow: `${unitEyebrow(u)} · ${u.title}` }; }, ids.long);
+    check(L("tapping it opens the section in a sheet over the session, with its number, heading and unit"), k && k.title === want.title && k.eyebrow === want.eyebrow && (await screen(page)) === "session", JSON.stringify(k && [k.title, k.eyebrow]) + " / " + JSON.stringify(want));
+    check(L("the sheet shows the section as the lesson draws it"), k && k.bodyText === (await lessonText(ids.long)) && k.bodyText.length > 200);
+    check(L("the sheet sits within the screen, nothing scrolls sideways, and its buttons are at least 44 px"), k && k.inside && !k.sideways && !k.small, JSON.stringify(k && { inside: k.inside, sideways: k.sideways, small: k.small }));
+    check(L("the sheet has Close, on a card that isn't see-through"), k && k.close && !/rgba\(.*, 0\)|transparent/.test(k.bg), k && k.bg);
+    check(L("the focus moves into the sheet, and the session behind is out of reach"), k && k.focus && k.behind);
+    const scroll = await page.evaluate(() => { const b = document.querySelector(".rs-body"), y = window.scrollY; b.scrollTop = 300; return { scrolls: b.scrollHeight > b.clientHeight && b.scrollTop > 0, page: window.scrollY === y }; });
+    check(L("a long section scrolls inside the sheet, not the page behind"), scroll.scrolls && scroll.page, JSON.stringify(scroll));
+    await page.keyboard.press("Enter"); await page.waitForTimeout(60);
+    check(L("Enter in the sheet doesn't move the session on"), !!(await sheet()) && (await page.evaluate("session.pos")) === 0);
+    await tap(page, '[data-act="ruleClose"]');
+    check(L("Close closes it, leaving the session, its answer and saved progress as they were"), !(await sheet()) && (await snap()) === before && !(await page.evaluate("S.rule")));
+    check(L("…with the focus back on Read the rule, and the session reachable again"), await page.evaluate(() => document.activeElement && document.activeElement.dataset.act === "rule" && ![...app.children].some(c => c.inert)));
+    await tap(page, '.fb [data-act="rule"]');
+    await page.mouse.click(4, 4); await page.waitForTimeout(60);
+    check(L("a tap beside the sheet closes it"), !(await sheet()) && (await snap()) === before);
+    await tap(page, '.fb [data-act="rule"]');
+    await page.keyboard.press("Escape"); await page.waitForTimeout(60);
+    check(L("Escape closes it"), !(await sheet()) && (await snap()) === before);
+    await tap(page, '.fb [data-act="rule"]');
+    await page.goBack(); await page.waitForTimeout(150);
+    check(L("the back button closes it, staying in the session"), !(await sheet()) && (await screen(page)) === "session" && (await snap()) === before && !(await page.evaluate("S.leaveAsk")));
+    await page.goBack(); await page.waitForTimeout(150);
+    check(L("…and back again still asks before leaving the session"), (await page.evaluate("S.leaveAsk")) && !!(await page.$("#sheetBg")));
+    await tap(page, '[data-act="stay"]');
+    await tap(page, '[data-act="continue"]');
+    check(L("Continue then moves the session on as usual"), (await page.evaluate("session.pos")) === 1 && (await screen(page)) === "session");
+
+    // links and speakers in the sheet
+    if (ids.xref) {
+      await start(ids.xref); await answer(false);
+      await tap(page, '.fb [data-act="rule"]');
+      const links = await page.evaluate(() => ({ jump: [...document.querySelectorAll(".rs-body a[data-jump]")].map(a => [a.dataset.ref, Number(a.dataset.jump)]), whole: document.querySelectorAll(".rs-body a[data-ref]:not([data-jump])").length }));
+      check(L("in the sheet a link to a whole unit is plain text"), links.whole === 0 && links.jump.length > 0, JSON.stringify(links));
+      const [ref, jump] = links.jump[0];
+      await page.locator(".rs-body a[data-jump]").first().scrollIntoViewIfNeeded();
+      await tap(page, ".rs-body a[data-jump]");
+      const moved = await page.evaluate(() => ({ rule: S.rule, title: document.querySelector("#rule-t") && document.querySelector("#rule-t").textContent.replace(/\u2011/g, "-").replace(/\s+/g, " ").trim(), screen: S.screen }));
+      const t2 = await page.evaluate(([u, i]) => `${i + 1} ${plainText(lessonOf(content.unitById[u]).sections[i].h)}`, [ref, jump]);
+      check(L("a link to a lesson section opens that section in the sheet, still in the session"), moved.rule && moved.rule.unit === ref && moved.rule.index === jump && moved.title === t2 && moved.screen === "session", JSON.stringify(moved) + " / " + t2);
+    } else check(L("an item whose section links to other lessons exists, to try links in the sheet"), false);
+    await page.evaluate(() => { window.__said.length = 0; });
+    const spk = await page.$(".rs-body [data-say]");
+    if (spk) { await spk.scrollIntoViewIfNeeded(); await spk.click(); await page.waitForTimeout(60); }
+    const heard = await said(page), wantSay = spk ? await spk.evaluate(b => b.dataset.say) : null;
+    check(L("a speaker in the sheet reads its Italian with the Italian voice"), !!spk && heard.length >= 1 && heard[0].text === wantSay && heard[0].lang === "it-IT", JSON.stringify(heard));
+    await tap(page, '[data-act="ruleClose"]');
+    await tap(page, '[data-go="quit"]');
+
+    // Practise this section, at the end of each section with linked items
+    await page.evaluate(() => { session = null; S.screen = "reference"; S.refUnit = "u05"; S.refTab = "lesson"; render(); });
+    const secs = await page.evaluate(() => [...document.querySelectorAll(".lsec")].map((el, i) => {
+      const b = el.querySelector(".secgo button"), key = "u05#" + i, n = i < lessonOf(content.unitById.u05).sections.length ? uniqueByPid(sectionItems(key)).length : 0;
+      return { i, n, text: b ? b.textContent : null, last: !b || el.lastElementChild === b.closest(".secgo"), key: b ? b.dataset.practise : null };
+    }));
+    check(L("every lesson section with linked items ends with Practise this section (N items), and only those"), secs.every(x => x.n ? x.text === `Practise this section (${x.n} item${x.n === 1 ? "" : "s"})` && x.last && x.key === "u05#" + x.i : x.text === null) && secs.filter(x => x.n).length >= 10, JSON.stringify(secs.filter(x => x.n ? x.text !== `Practise this section (${x.n} item${x.n === 1 ? "" : "s"})` || !x.last : x.text !== null)));
+    await layout(page, L("the lesson with Practise this section"), { zoomOnly: true });
+    const pick = secs.filter(x => x.n >= 4).sort((a, b) => b.n - a.n)[0];
+    await page.locator(`[data-practise="${pick.key}"]`).scrollIntoViewIfNeeded();
+    await tap(page, `[data-practise="${pick.key}"]`);
+    const ses = await page.evaluate((key) => ({ screen: S.screen, kind: session && session.kind, unitId: session && session.unitId, all: session && session.queue.every(q => { const at = itemSection(q.ex.item.id); return at && at.unit + "#" + at.index === key; }), n: session && session.queue.length }), pick.key);
+    check(L("Practise this section starts a session of that section's items only"), ses.screen === "session" && ses.kind === "section" && ses.unitId === pick.key && ses.all && ses.n > 0, JSON.stringify(ses));
+    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } render(); });
+    await tap(page, '[data-act="again"]');
+    check(L("Another round gives another session of the same section"), (await page.evaluate((key) => S.screen === "session" && session.kind === "section" && session.unitId === key && session.queue.every(q => { const at = itemSection(q.ex.item.id); return at && at.unit + "#" + at.index === key; }), pick.key)));
+    await tap(page, '[data-go="quit"]');
+    // a lesson whose items are all new, with today's new items used up
+    const shut = await page.evaluate(() => {
+      const u = content.units.find(x => !isSideUnit(x.id) && lessonOf(x) && content.byUnit[x.id].every(i => !progress.items[pid(i.id)]));
+      progress.days[dayKey(now())] = Object.assign(progress.days[dayKey(now())] || { xp: 0 }, { new: progress.settings.newPerDay }); saveProgress();
+      S.screen = "reference"; S.refUnit = u.id; S.refTab = "lesson"; render();
+      const bs = [...document.querySelectorAll(".secgo button")], fresh = (b) => uniqueByPid(sectionItems(b.dataset.practise)).every(id => rec(id).box === 0);
+      const why = (b) => b.getAttribute("aria-describedby") && /all new/.test(document.getElementById(b.getAttribute("aria-describedby")).textContent);
+      return { unit: u.id, shut: bs.filter(fresh).length, disabled: bs.filter(fresh).every(b => b.disabled && why(b) && !sessionIds("section", b.dataset.practise).length), open: bs.filter(b => !fresh(b)).every(b => !b.disabled && !why(b) && sessionIds("section", b.dataset.practise).length) };
+    });
+    check(L("when a section's items are all new and today's new items are used up, its button is disabled and says why (the others stay open)"), shut.shut > 0 && shut.disabled && shut.open, JSON.stringify(shut));
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+  }
+  console.log("  Read the rule and Practise this section checked");
 }
 
 /* ---------- the exercise types added in v8.6 ---------- */
@@ -750,6 +915,9 @@ async function readAloud(browser, origin) {
       await context.close();
       console.log("  What's new checked");
     }
+
+    /* Read the rule and Practise this section (from 9.6) */
+    await readTheRule(browser, origin);
 
     /* The exercise types added in v8.6 */
     await newTypes(browser, origin);
