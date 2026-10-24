@@ -169,11 +169,16 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         startSession("flashcards"); for (let n = 0; S.screen === "session" && n < 8; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); }
         out.cardsLeftOut = localStorage.getItem("itapp.lasttype.v1") === before;
         session = null; S.screen = "home";
-        // the next sessions: where an item's exercise has another of the same kind (typed or not), it is another kind
+        // the next sessions: where an item's exercise has another of the same kind (typed or not), it is another kind.
+        // Review 40 times brings back the same most-overdue items each time, so (from 9.13) every grammar unit's session
+        // is built 6 times too, and the sample doesn't hang on which few items the seeded progress makes most overdue.
         const kindsAt = (item, r) => { const m = {}; for (const k of HINT_KEYS) { const ex = makeExercise(item, r, undefined, { prefer: [k], anyKind: true }); if (ex && ex.typeKey === k) m[k] = ex.kind; } return m; };
         let could = 0, same = 0, plainSame = 0;
-        for (let rep = 0; rep < 40; rep++) {
-          const s = buildSession("review");
+        const plan = [];
+        for (let rep = 0; rep < 40; rep++) plan.push(["review"]);
+        for (let rep = 0; rep < 6; rep++) for (const u of content.units.filter(u => !isSideUnit(u.id) && !u.mode && u.id !== "vb")) plan.push(["unit", u.id]);
+        for (const [kind, unit] of plan) {
+          const s = buildSession(kind, unit);
           for (const q of s.queue) {
             if (q.reintro || isSideUnit(q.ex.item.unit)) continue;
             const id = pid(q.ex.item.id), was = lastTypes().get(id), r = rec(q.ex.item.id);
