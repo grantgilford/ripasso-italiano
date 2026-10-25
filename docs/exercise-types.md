@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.15)
+# Exercise types: the catalogue (v9.16)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -34,6 +34,23 @@ Where an exercise offers wrong choices, they are built to be mistakes worth maki
 - **Meaning choices** (`distractorsFor`). Best first: a word the learner has mixed up with this one before, then words with the same `pos` and `gender`, then look-alikes (the same first two letters, or a letter or two apart); a word with another `pos` comes in only as a look-alike or a past mix-up. They come from the item's unit; the whole course is searched only when the unit runs short. One option per word (progress record), and none is one of the item's answers, a word with the same Italian, or, for Italian options, a word sharing the meaning asked for.
 - **Confusion memory** (`itapp.confusions.v1`, per device, never synced, at most 500 pairs). A wrong answer that is another word's right answer (its meaning chosen, its Italian typed for the English, or for a card another card's meaning typed) is remembered as a pair; that word is offered first in the next meaning choice, and from the second time the answer panel says "You've mixed up *casa* and *cosa* 2 times". Accept my answer takes the mix-up back.
 - **Flashcards in context** (`contextFor`). After a card is answered, right or wrong, the answer panel shows one sentence from a grammar unit (the slang unit aside) that uses the card's word as whole words, accents ignored, with its English and a speaker; the sentences are indexed by their words the first time a card needs one. 661 of the 8,000 cards have one as of 9.7.
+
+### Meanings in the answer panel (from 9.16)
+
+Wherever an exercise shows Italian without its English, and the English isn't what it asks for, the answer panel gives it after the answer, right or wrong, whatever the explanations setting (`ex.meaning`, drawn as `.mean` straight after the answer line and "You typed"). Shown only after answering, it is never a hint; in the prompt it would be for some (Which verb?, a transform), so it stays out of every prompt.
+
+| Exercise | The meaning shown |
+|---|---|
+| Conjugation | the verb: **sognare:** to dream (all its glosses, as the glossary lists them) |
+| Article, Make it plural / singular | the noun, singular: **zaino:** backpack, rucksack |
+| Agreement | the adjective and the noun: **stanco:** tired · **scuola:** school |
+| Preposition + article | the preposition and the noun: **di:** of, from, 's · **stazione:** station |
+| Which verb?, Which person?, Which tense?, Change the tense (Verbs section) | the verb: **andare:** to go |
+| Listen and type | **In English:** the sentence's first English (before 9.16 only after a mistake, as "It means") |
+| Transform (and its New pattern card) | **In English:** the English of the first answer (`en`, from 9.16) |
+| Choose / Write the reply | **Luca:** “the other person's line in English” (`lineEn`, from 9.16) |
+
+Everything else either shows the English already (typed recall, the sentence types, spot the mistake, endings, the other Verbs drills, every flip card) or asks for it (meaning, flashcards); rule questions, sort, match, numbers and clock times have no single English to give. `tools/test-choices.js` builds every exercise of every item and checks that each one is in one of these groups, and that each meaning is the item's own English.
 
 ## The types
 
@@ -154,7 +171,7 @@ Every new item type touches the same places. In `index.html`:
 1. `validatePack`: what the item needs, so an imported pack is refused if it is broken.
 2. `sameItemKey`: the key that lets identical items in two units share one progress record.
 3. `itemHasProduction`: whether it has a typed exercise (this decides promotion from box 2).
-4. `makeExercise`: the exercise itself (where an item can be given more than one exercise at a box, list them in a `pickKey` table with their chances and kinds, so a session's hint can choose between them): `type` (the name shown), `typeKey`, `kind`, `mode`, `promptHtml`, `accepted` / `correct`, `shownAnswer`; `showWhy: introduce` so a new item explains itself; `say` only for Italian the prompt shows; `sayAnswer`, `missedText` and `answerLine` / `okLine` when the defaults don't fit.
+4. `makeExercise`: the exercise itself (where an item can be given more than one exercise at a box, list them in a `pickKey` table with their chances and kinds, so a session's hint can choose between them): `type` (the name shown), `typeKey`, `kind`, `mode`, `promptHtml`, `accepted` / `correct`, `shownAnswer`; `showWhy: introduce` so a new item explains itself; `say` only for Italian the prompt shows; `sayAnswer`, `missedText` and `answerLine` / `okLine` when the defaults don't fit; and `meaning` (`glossLine` for words, `sentenceGloss` for a sentence) when the prompt shows Italian without its English and the English isn't the answer.
 5. `renderSession`: the markup for a new `mode`, with a Don't know button (`data-act="giveup"`) so the tests and the learner can always move on; `action()`, the `keydown` handler and `wire()` for its taps and keys; `resetExState()` for any state it keeps in `S`.
 6. `explainFor`: the reasons in the answer panel, every wrong choice named.
 7. The glossary (`PRACTICE_TYPES`, `rowHtml`), Look up and the glossary filter (`itemFields`), the summary line, `itemLabel`, the Stats names (`typeName`) and `knownWords` (what the typo rule treats as real words; leave out text that is wrong on purpose).

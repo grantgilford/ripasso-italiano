@@ -21,20 +21,30 @@
        every grammar unit, new and half-learned, no option of any multiple choice is one of the exercise's answers.
     3. Flashcards in context: about 660 cards have a grammar-unit sentence (the slang unit aside) that uses their word
        as whole words, accents ignored, and every sentence offered does.
+    4. Meanings (from 9.16). Every exercise of every item (the grammar units, the vocab packs and the Verbs section,
+       new to learned, with the Verbs section's other tenses started) either shows the item's English in its prompt
+       (or on a flip card's back), asks for the English, or carries a meaning for the answer panel (ex.meaning) that
+       gives the item's own English: the verb of a conjugation, Which verb?, Which person?, Which tense? and Change
+       the tense, the noun of an article or plural drill, the adjective and noun of an agreement drill, the preposition
+       and noun of a merged form, the English of Listen and type, of a transform's answer and of a reply's line. Only
+       rule questions, sort, match, numbers and clock times have none, and none of those shows a lone Italian word.
 
   Then in the real app (Playwright and Chromium, with a stand-in Italian voice): the indexes the traps and the confusion
   memory use (NEAR, ANSWERS) are built in idle time after Today, the same as built on the spot; and
 
-    4. Confusion memory (itapp.confusions.v1): a wrong meaning chosen, a word typed that is another word's Italian, and
+    5. Confusion memory (itapp.confusions.v1): a wrong meaning chosen, a word typed that is another word's Italian, and
        a card typed with another card's meaning are each remembered as a pair; the answer panel says "You've mixed up
        X and Y N times" from the second time only; the pair survives a reload and its word is then offered first;
        Accept my answer takes the mix-up back; the store stays out of progress, the backup and the cloud's documents;
        it keeps at most 500 pairs (the oldest go), drops damaged entries, and a damaged value or a device that
        refuses to store it costs nothing (no script error, the answer still counts).
-    5. A word order trap on the screen: choosing it gets "You chose …" with its reason; leaving it out, with
+    6. A word order trap on the screen: choosing it gets "You chose …" with its reason; leaving it out, with
        explanations after every answer, gets "Near miss: …".
-    6. A flashcard's sentence on the screen: after the answer, the panel shows one sentence with the card's word in
+    7. A flashcard's sentence on the screen: after the answer, the panel shows one sentence with the card's word in
        bold, its English and a speaker that reads it (the same sentence on every redraw); a card with none shows none.
+    8. Meanings on the screen: a conjugation (sognare), a transform, a reply and Listen and type, each answered right
+       and wrong, show the meaning in the answer panel (“sognare: to dream”) whichever way, after the answer and
+       "You typed", with explanations shown only after mistakes; never in the prompt; and Which verb? shows it once.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -56,7 +66,8 @@ const seeded = (s) => () => { s = (s + 0x6D2B79F5) | 0; let t = Math.imul(s ^ (s
 function nodeChecks() {
   const app = loadApp(`buildContent, makeExercise, nearMisses, wordBank, mcMeaning, explainFor, translationsOf, checkAnswer, contextFor,
     normalize, deaccent, enForms, arr, isSideUnit, isFlashUnit, pid, formVariants, VERB_GYM, SLANG_PACK,
-    getContent: () => content, setRandom: f => { Math.random = f; }, setConfusions: m => { CONFUSIONS = m; }, confKey`, { html: fs.readFileSync(file, "utf8") });
+    getContent: () => content, getProgress: () => progress, setRandom: f => { Math.random = f; }, setListen: f => { canListen = f; },
+    setConfusions: m => { CONFUSIONS = m; }, confKey, esc, enList`, { html: fs.readFileSync(file, "utf8") });
   app.buildContent();
   const content = app.getContent(), { arr, normalize, deaccent, enForms, checkAnswer } = app;
   const grammar = Object.values(content.items).filter(i => !app.isSideUnit(i.unit));
@@ -217,6 +228,43 @@ function nodeChecks() {
     }
     check(`about 660 cards have a sentence from a grammar unit that uses their word (${withCtx} of ${cards.length}, in ${Date.now() - t0} ms in Node), and each sentence has the word, as whole words, accents ignored`, withCtx >= 600 && withCtx <= 800 && !bad.length, bad.slice(0, 8).join("\n"));
   }
+
+  /* 4. Meanings */
+  section("4. Meanings in the answer panel (every exercise of every item)");
+  {
+    const progress = app.getProgress(), saved = progress.items;
+    progress.items = {};
+    for (const it of Object.values(content.items)) if (it.type === "vtense") progress.items[app.pid(it.id)] = { box: 1, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3, lastRight: 0 }; // every tense started: Change the tense and Which tense? can be built
+    app.setListen(() => true);
+    const NONE = new Set(["grammar", "sort", "match", "number", "clock"]); // a rule question, a sorting or matching of several words, a number or a time: no one English to give
+    const MEANT = new Set(["conjugation", "article", "plural", "agreement", "preparticle", "listen", "transform", "reply", "vswitch", "vinf", "vtenseid", "vperson"]);
+    const plain = (h) => String(h || "").replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
+    const bad = [], kinds = {}, missing = [];
+    let n = 0, s = 7;
+    for (const item of Object.values(content.items)) for (const box of [0, 1, 2, 3, 4]) for (let k = 0; k < (app.isFlashUnit(item.unit) ? 1 : 4); k++) { // a card gives the same kind every time
+      app.setRandom(seeded(s += 7919));
+      const ex = app.makeExercise(item, { box, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3, lastRight: 0 }, box === 0 && k % 2 ? "production" : undefined);
+      if (!ex) continue;
+      n++;
+      const ens = arr(item.en).map(String).concat(item.lineEn ? [item.lineEn] : []);
+      const shows = ens.some(e => ex.promptHtml.includes(app.esc(e)) || (ex.backHtml || "").includes(app.esc(e)) || (ex.introHtml || "").includes(app.esc(e)));
+      const asks = !!ex.english || (ex.correct != null && arr(item.en).includes(ex.correct));
+      const k2 = ex.typeKey + (ex.mode === "flip" ? " (flip)" : "");
+      kinds[k2] = kinds[k2] || { n: 0, meaning: 0 }; kinds[k2].n++;
+      if (ex.meaning) {
+        kinds[k2].meaning++;
+        // the meaning gives the item's own English: all its glosses (enList), or a sentence's English, or a reply line's
+        const m = plain(ex.meaning), own = item.type === "reply" ? [item.lineEn] : ["listen", "transform"].includes(ex.typeKey) ? [arr(item.en)[0]] : [app.enList(item).join(", ")];
+        if (!own.every(e => e && m.includes(plain(app.esc(e))))) bad.push(`${item.id} (${ex.typeKey}): the meaning “${m}” isn't its own English (${own.join(" | ")})`);
+        if (plain(ex.promptHtml).includes(m)) bad.push(`${item.id} (${ex.typeKey}): the meaning is in the prompt already`);
+      } else if (MEANT.has(ex.typeKey) || !(shows || asks || NONE.has(ex.typeKey))) missing.push(`${item.id} (${ex.type}, box ${box}): “${plain(ex.promptHtml).trim().slice(0, 60)}” shows Italian with no English, before or after the answer`);
+    }
+    progress.items = saved;
+    const counted = Object.entries(kinds).filter(([, v]) => v.meaning).map(([k, v]) => `${k} ${v.meaning}`).join(", ");
+    check(`every exercise shows its English, asks for it, or gives it in the answer panel (${n} exercises; with a meaning: ${counted})`, n > 100000 && !missing.length, [...new Set(missing)].slice(0, 10).join("\n"));
+    check("every meaning is the item's own English (its glosses, a sentence's English, a reply line's), and none repeats the prompt", !bad.length, [...new Set(bad)].slice(0, 10).join("\n"));
+    check("all twelve kinds that need one give a meaning", [...MEANT].every(k => kinds[k] && kinds[k].meaning === kinds[k].n), JSON.stringify(Object.fromEntries([...MEANT].map(k => [k, kinds[k]]))));
+  }
 }
 
 // Run in the page before the app: a stand-in Italian voice that records what it reads.
@@ -255,8 +303,8 @@ async function browserChecks(browser, origin) {
   });
   check(`the word order traps' forms and every word's Italian are built in idle time after Today, the same as built on the spot (${idle.near} forms/nouns/adjectives/other words/verbs; ${idle.answers} answers)`, idle.same, JSON.stringify(idle));
 
-  /* 4. Confusion memory */
-  section("4. Confusion memory (itapp.confusions.v1)");
+  /* 5. Confusion memory */
+  section("5. Confusion memory (itapp.confusions.v1)");
   // a word and another word of its unit with the same part of speech: the meaning of the other chosen twice
   const pair = await page.evaluate(() => {
     const it = content.byUnit.u02.find(i => i.type === "vocab" && arr(i.it)[0] === "casa") || content.byUnit.u02.find(i => i.type === "vocab" && i.pos === "noun");
@@ -358,7 +406,7 @@ async function browserChecks(browser, origin) {
   check("a device that refuses to store it: no script error, and the answer still counts", errors.length === before && counted === answered + 1 && /Not quite/.test(await panel()), JSON.stringify({ answered, counted, errors: errors.slice(before) }));
 
   /* 5. A word order trap on the screen */
-  section("5. A word order trap on the screen");
+  section("6. A word order trap on the screen");
   await page.reload(); await page.waitForFunction(ready);
   const bankEx = async (explain) => page.evaluate((explain) => {
     progress.settings.explain = explain;
@@ -388,8 +436,8 @@ async function browserChecks(browser, origin) {
   check("leaving it out is Correct, and with explanations after every answer the panel names it: “Near miss: …”", /Correct/.test(p) && p.includes("Near miss:") && p.includes(b.near.w.toLowerCase()), p);
   await page.evaluate(() => { progress.settings.explain = "mistakes"; });
 
-  /* 6. A flashcard's sentence on the screen */
-  section("6. A flashcard's sentence on the screen");
+  /* 7. A flashcard's sentence on the screen */
+  section("7. A flashcard's sentence on the screen");
   const fc = await page.evaluate(() => {
     progress.settings.fcDir = "it-en";
     const cards = content.byUnit.fc01.filter(i => i.type === "vocab");
@@ -419,6 +467,62 @@ async function browserChecks(browser, origin) {
   await cardSession(fc.none);
   await page.fill("#answer", "zzz"); await page.click('[data-act="check"]');
   check("a card with no such sentence shows none", /Not quite/.test(await panel()) && !(await page.$(".fb .fb-ctx")));
+
+  /* 8. Meanings on the screen */
+  section("8. Meanings on the screen");
+  await page.evaluate(() => { progress.settings.explain = "mistakes"; });
+  // one exercise of an item, of the kind asked for (built until it comes up), in a session of its own
+  const meaningSession = (id, typeKey, box) => page.evaluate(([id, typeKey, box]) => {
+    const item = content.items[id];
+    let ex = null;
+    for (let k = 0; k < 200 && !(ex && ex.typeKey === typeKey); k++) ex = makeExercise(item, { box, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3, lastRight: 0 });
+    if (!ex || ex.typeKey !== typeKey) return null;
+    session = { kind: "unit", unitId: item.unit, queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+    S.screen = "session"; S.feedback = null; S.revealed = false; S.picked = null; S.retry = null; resetExState(); render();
+    const tmp = document.createElement("div"); tmp.innerHTML = ex.meaning || "";
+    return { right: ex.mode === "options" ? ex.correct : arr(ex.accepted)[0], meaning: tmp.textContent, prompt: document.querySelector(".prompt").textContent, mode: ex.mode };
+  }, [id, typeKey, box]);
+  const meaningLine = () => page.evaluate(() => { // the meaning, and what comes before it in the panel
+    const m = document.querySelector(".fb .mean"); if (!m) return null;
+    const kids = [...document.querySelector(".fb .fb-body").children];
+    return { text: m.textContent, before: kids.slice(0, kids.indexOf(m)).map(k => k.textContent).join(" | "), whyBefore: kids.slice(0, kids.indexOf(m)).some(k => k.matches(".why")) };
+  });
+  const answerWith = async (x, text) => {
+    if (x.mode === "options") await page.click(`[data-opt="${text.replace(/"/g, '\\"')}"]`);
+    else { await page.fill("#answer", text); await page.click('[data-act="check"]'); }
+    await page.waitForTimeout(150);
+  };
+  const conjId = await page.evaluate(() => (content.items["vb-u03-y-sognare"] || content.byUnit.u03.find(i => i.type === "verb")).id);
+  const cases = [
+    { name: "a conjugation (the verb)", id: conjId, key: "conjugation", box: 2, want: (it) => `${it.it}: ${enList(it).join(", ")}` },
+    { name: "a transform (its answer in English)", id: "t-u13-01", key: "transform", box: 2, want: (it) => `In English: ${arr(it.en)[0]}` },
+    { name: "Choose the reply (the other person's line)", id: "re-u01-z01", key: "reply", box: 1, want: (it) => `${it.who}: “${it.lineEn}”` },
+    { name: "Listen and type (the sentence)", id: "s-u01-01", key: "listen", box: 2, want: (it) => `In English: ${arr(it.en)[0]}` }
+  ];
+  for (const c of cases) {
+    const want = await page.evaluate(([id, f]) => (0, eval)("(" + f + ")")(content.items[id]), [c.id, c.want.toString()]);
+    for (const right of [true, false]) {
+      const x = await meaningSession(c.id, c.key, c.box);
+      if (!x) { check(`${c.name}: built`, false, c.id); break; }
+      await answerWith(x, right ? x.right : x.mode === "options" ? await page.evaluate(() => [...document.querySelectorAll("[data-opt]")].map(b => b.dataset.opt).find(o => o !== session.queue[0].ex.correct)) : "zzz");
+      const m = await meaningLine(), p = await panel();
+      check(`${c.name}, answered ${right ? "right" : "wrong"}: “${want}” in the panel${right ? "" : x.mode === "options" ? ", after the answer" : ", after the answer and what was typed"}`,
+        (right ? /Correct/ : /Not quite/).test(p) && m && m.text === want && !x.prompt.includes(want.replace(/^[^:]*: /, "")) && !m.whyBefore && (right || x.mode === "options" || /You typed: zzz/.test(m.before)), JSON.stringify({ m, want, x }));
+    }
+  }
+  { // Which verb? (the Verbs section): the English isn't in the prompt (it would give the answer away) and the panel gives it once
+    const v = await page.evaluate(() => {
+      const item = content.byUnit.vb.find(i => i.it === "andare" && i.tense === "presente") || content.byUnit.vb[0];
+      let ex = null;
+      for (let k = 0; k < 400 && !(ex && ex.typeKey === "vinf"); k++) ex = makeExercise(item, { box: 3, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3, lastRight: 0 });
+      session = { kind: "verbs", unitId: "vb", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+      S.screen = "session"; S.feedback = null; S.retry = null; resetExState(); render();
+      return { key: ex.typeKey, en: arr(item.en)[0], it: item.it, prompt: document.querySelector(".prompt").textContent };
+    });
+    await page.fill("#answer", "zzz"); await page.click('[data-act="check"]'); await page.waitForTimeout(150);
+    const p = await panel();
+    check("Which verb?: no English in the prompt, and the panel gives the verb's meaning once", v.key === "vinf" && !v.prompt.includes(v.en) && p.split(v.en).length === 2 && /Not quite/.test(p), JSON.stringify({ v, p }));
+  }
   await page.evaluate(() => { session = null; S.feedback = null; S.screen = "home"; render(); });
   check("no script errors", !errors.length, errors.slice(0, 5).join("\n"));
   await context.close();
