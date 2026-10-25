@@ -139,12 +139,15 @@ for (const it of allItems) {
     count("transforms");
     if (!it.explanation) problem("Missing explanations", `${where}: transform has no explanation`);
     if (arr(it.answer).some(a => normalize(a) === normalize(it.it))) problem("Transforms whose answer is the sentence unchanged", `${where}: “${it.it}”`);
+    // from 9.16 the answer panel shows what the rewrite means, so every transform carries the English of its first answer
+    if (!arr(it.en).length) problem("Transforms without English", `${where}: add "en", the English of “${arr(it.answer)[0]}” (shown after answering)`);
+    for (const s of [it.it, ...arr(it.answer), ...arr(it.en)]) if (/"/.test(s)) problem("Straight quotation marks in sentences", `${where}: ${s}`);
   }
   // the exercise types added in v8.6 (docs/exercise-types.md)
   if (["spot", "sort", "match", "reply", "endings"].includes(it.type)) {
     count("v8.6 practice items");
     if (!it.explanation) problem("Missing explanations", `${where}: ${it.type} has no explanation`);
-    const texts = it.type === "spot" ? [it.it, ...arr(it.en), ...arr(it.fix)] : it.type === "reply" ? [it.line, ...arr(it.answer), ...arr(it.options)] : it.type === "endings" ? [it.text, ...arr(it.en)] : [];
+    const texts = it.type === "spot" ? [it.it, ...arr(it.en), ...arr(it.fix)] : it.type === "reply" ? [it.line, it.lineEn || "", ...arr(it.answer), ...arr(it.options)] : it.type === "endings" ? [it.text, ...arr(it.en)] : [];
     for (const s of texts) if (/"/.test(s)) problem("Straight quotation marks in sentences", `${where}: ${s}`);
   }
   if (it.type === "spot") {
@@ -162,6 +165,8 @@ for (const it of allItems) {
   }
   if (it.type === "reply") {
     const acc = new Set(arr(it.answer).map(normalize)), notes = it.notes || {};
+    // from 9.16 the answer panel shows what the other person said in English
+    if (!it.lineEn || !String(it.lineEn).trim()) problem("Replies without English", `${where}: add "lineEn", the English of “${it.line}” (shown after answering)`);
     if (arr(it.options).length === 1) look("Replies with a single wrong option", `${where}: the multiple choice needs at least two, so it is never shown`);
     for (const o of arr(it.options)) {
       count("wrong options checked");
@@ -349,7 +354,7 @@ function british(where, s) {
 for (const it of allItems) {
   const where = `${it.id} (${it.unit})`;
   if (arr(it.en).length) british(where + " first gloss", arr(it.en)[0]);
-  for (const k of ["explanation", "note", "prompt", "task", "cue"]) if (it[k]) british(where, it[k]);
+  for (const k of ["explanation", "note", "prompt", "task", "cue", "lineEn"]) if (it[k]) british(where, it[k]);
   for (const v of Object.values(it.distractorNotes || {})) british(where, v);
   for (const v of Object.values((it.cloze && it.cloze.notes) || {})) british(where, v);
   if (["spot", "reply"].includes(it.type)) for (const v of Object.values(it.notes || {})) british(where, v);
