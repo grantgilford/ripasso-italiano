@@ -14,7 +14,8 @@
   The figures: the median rank (half the pack's cards are more common than this), and the share of
   cards among the 1,000, 3,000, 5,000 and 10,000 most common words. A phrase counts as hard as its rarest
   word; a verb form counts as its verb (looked up in the Verbs section's tables, so "mi fa male" counts
-  as fare), and a few endings are undone (nessuna → nessuno, auguri → augurio). As a rough guide, the 1,000 most common words take a learner to about A2, 3,000 to B1,
+  as fare), and a few endings are undone (nessuna → nessuno, auguri → augurio, bianche → bianco, gocce → goccia),
+  as are words cut short (far, dir, man, ciel: a caval donato counts as cavallo). As a rough guide, the 1,000 most common words take a learner to about A2, 3,000 to B1,
   5,000 to B2 and 8,000–10,000 to C1. Packs should run from the most common words to the least,
   so a new pack is numbered by where its median falls, and its cards are stored in the same order
   (another script can load this file and use its rankOf). Reads index.html and changes nothing.
@@ -35,12 +36,12 @@ const app = loadApp("BUILTIN_PACKS, VERB_GYM");
 const arr = x => Array.isArray(x) ? x : (x == null ? [] : [x]);
 
 /* ranks */
-const STOP = new Set("il lo la i gli le un uno una di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se glielo gliela glieli gliele gliene del della dei delle al alla ai alle dal dalla nel nella sul sulla è".split(" "));
+const STOP = new Set("il lo la i gli le un uno una di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se glielo gliela glieli gliele gliene del della dei delle al alla ai alle dal dalla nel nella sul sulla è dello degli allo agli dallo dagli dai dalle nello negli nei nelle sullo sugli sui sulle col coi ad ed od".split(" "));
 const low = s => String(s).toLowerCase().replace(/[’‘]/g, "'").replace(/\s*\([^)]*\)/g, "").trim();
 const variants = w => { // the word as written, then the dictionary forms it may stand for
   const v = [w, w.replace(/^\p{L}+'/u, "")]; // an elided word in front (l'anno, quest'anno, nient'altro) is left out
   const r = w.match(/^(.*)(ar|er|ir)(si|sene|sela|cela|ci|ne)$/); if (r) v.push(r[1] + r[2] + "e");
-  const p = [["chi", "co"], ["ghi", "go"], ["che", "ca"], ["ghe", "ga"], ["i", "o"], ["i", "e"], ["e", "a"]];
+  const p = [["chi", "co"], ["ghi", "go"], ["che", "ca"], ["ghe", "ga"], ["che", "co"], ["ghe", "go"], ["ce", "cia"], ["ge", "gia"], ["i", "o"], ["i", "e"], ["e", "a"]]; // bianche → bianco, gocce → goccia
   for (const [a, b] of p) if (w.endsWith(a)) v.push(w.slice(0, -a.length) + b);
   return v;
 };
@@ -61,9 +62,10 @@ for (const v of app.VERB_GYM) addForms(v.it, v.f);
 for (const p of app.BUILTIN_PACKS) for (const it of p.items || []) if (it.type === "verb" && it.forms && !Array.isArray(it.forms)) addForms(it.it, Object.values(it.forms));
 const CLITICS = ["glielo", "gliela", "glieli", "gliele", "gliene", "melo", "mela", "telo", "tela", "celo", "cela", "mene", "tene", "cene", "sene", "mi", "ti", "ci", "vi", "si", "lo", "la", "li", "le", "ne", "gli"];
 const lookUp = w => { for (const v of variants(w)) if (ranks.has(v)) return ranks.get(v); return 0; };
-const TRUNC = { bel: "bello", bei: "bello", begli: "bello", buon: "buono", gran: "grande", san: "santo", mal: "male", quel: "quello", quei: "quello", quegli: "quello", nessun: "nessuno", alcun: "alcuno", ciascun: "ciascuno", qual: "quale", miei: "mio", tuoi: "tuo", suoi: "suo" };
+const TRUNC = { bel: "bello", bei: "bello", begli: "bello", buon: "buono", gran: "grande", san: "santo", mal: "male", quel: "quello", quei: "quello", quegli: "quello", nessun: "nessuno", alcun: "alcuno", ciascun: "ciascuno", qual: "quale", miei: "mio", tuoi: "tuo", suoi: "suo", man: "mano", pian: "piano", ciel: "cielo", amor: "amore", cuor: "cuore", ragion: "ragione", tal: "tale", fuor: "fuori", caval: "cavallo", vien: "venire", piè: "piede", "mo'": "modo", uomini: "uomo" };
 const guesses = w => { // the dictionary forms a word may stand for when it is none itself: last resorts, tried in order
   const g = TRUNC[w] ? [TRUNC[w]] : [];
+  if (/[aei]r$/.test(w)) g.push(w + "e"); // an infinitive cut short: far, dir, voler, batter
   if (/a$/.test(w)) g.push(w.slice(0, -1) + "o"); // nessuna → nessuno
   if (/e$/.test(w)) g.push(w.slice(0, -1) + "o"); // altre → altro
   if (/i$/.test(w)) g.push(w.slice(0, -1) + "io"); // auguri → augurio

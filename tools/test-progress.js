@@ -418,7 +418,8 @@ async function runSession(page, start, maxSteps = 200) {
       const sizes = [...cloud.docs.entries()].filter(([k]) => k.startsWith("progress2/")).map(([k, v]) => [k.slice(10), Buffer.byteLength(JSON.stringify(v))]).sort((a, b) => b[1] - a[1]);
       const shards = sizes.filter(([k]) => /^s\d\d$/.test(k)), others = sizes.filter(([k]) => !/^s\d\d$/.test(k));
       const inCloud = shards.reduce((n, [k]) => n + Object.keys(cloud.docs.get("progress2/" + k).items).length, 0);
-      console.log(`         ${ids.length} records: largest shard ${shards[0][0]} ${kb(shards[0][1])}, smallest ${kb(shards[shards.length - 1][1])}; largest other document ${others[0][0]} ${kb(others[0][1])}; browser copy ${(lsSize / MB).toFixed(2)} MB`);
+      const perRec = (JSON.stringify(items).length - 2) / ids.length; // what one more record adds to the browser copy
+      console.log(`         ${ids.length} records: largest shard ${shards[0][0]} ${kb(shards[0][1])}, smallest ${kb(shards[shards.length - 1][1])}; largest other document ${others[0][0]} ${kb(others[0][1])}; browser copy ${(lsSize / MB).toFixed(2)} MB, room under 3 MB for about ${Math.max(0, Math.floor((3 * MB - lsSize) / perRec))} more records`);
       check(`all ${ids.length} records reach the cloud`, inCloud === ids.length, `${inCloud} in the cloud`);
       check(`the largest shard document stays under 200 KB (${kb(shards[0][1])}, ${shards[0][0]}; the limit is 256 KB)`, shards[0][1] < 200 * KB);
       check(`every other cloud document stays under 200 KB too (largest ${others[0][0]}, ${kb(others[0][1])})`, others[0][1] < 200 * KB);
