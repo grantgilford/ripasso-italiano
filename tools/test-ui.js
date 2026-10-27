@@ -72,6 +72,26 @@
        of those items only (Another round at the end gives another), and is
        disabled, saying why, when its items are all new and today's new items
        are used up.
+   12. reports (from 9.19), in light and dark at 390 and 360 px and at 120% text,
+       with window.open replaced so a report link opens nothing (its address is
+       kept and checked): Report it after Flag this item, Suggest it for
+       everyone after Accept my answer, each flag's Report beside Remove and
+       "Reported on <date>", Report all, Suggest and Suggest all, the problems
+       the app noticed with Report and Clear, Report an app problem (asking for
+       a description first), the learning summary's Copy and Save as a text
+       file, and the You rows that lead to them; the report sheet's note (a
+       public page, what it holds, a GitHub account or Copy), within the
+       screen, with the focus inside, the screen behind out of reach and 44 px
+       controls, closed by Close, Escape, a tap beside it and the back button;
+       each link's form, title and fields, within 6,000 characters and holding
+       nothing else (no progress, settings or other flags); Copy, the box to
+       select and copy by hand where copying is refused, Copy where a link
+       can't open, and Copy plus an empty form when a report is too long; an
+       email link where REPORT_TO has only an address, only Copy where it has
+       neither; and the problems the app noticed: a thrown error and an
+       unhandled rejection kept in itapp.errors.v1 with their message, place,
+       screen, version and time, the last 20, a repeated one counted, kept out
+       of progress and backups, and harmless when damaged or refused.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -104,8 +124,8 @@ function seedProgress() {
   localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items, days, flags, currentUnit: "u05", settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T }));
 }
 
-async function openApp(browser, origin, { width, height, scheme, init, touch }) {
-  const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, hasTouch: !!touch });
+async function openApp(browser, origin, { width, height, scheme, init, touch, permissions }) {
+  const context = await browser.newContext({ viewport: { width, height }, colorScheme: scheme, hasTouch: !!touch, permissions: permissions || [] });
   if (init) await context.addInitScript(init);
   const page = await context.newPage();
   page.errors = []; page.outside = [];
@@ -505,6 +525,261 @@ async function newTypes(browser, origin) {
 /* ---------- read aloud ---------- */
 // A stand-in for the phone's speech, run in the page before the app: it lists the given voices, plays each
 // utterance for 300 ms in turn, and records what was read (window.__said) and how often it was stopped.
+/* ---------- Reports (from 9.19) ---------- */
+const REPORT_KEYS = ["kind", "app version", "copy", "item", "unit", "exercise", "shown", "expected", "given", "note", "screen", "browser", "errors"]; // all a report may hold
+const fieldsOf = (text) => { const out = {}; let last = null; for (const l of String(text).split("\n")) { const m = l.match(/^([a-z][a-z ]*[a-z]): (.*)$/); if (m) { out[m[1]] = m[2]; last = m[1]; } else if (last && l.startsWith("  ")) out[last] += "\n" + l.trim(); } return out; };
+const linkOf = (u) => { const x = new URL(u); return { base: x.origin + x.pathname, keys: [...x.searchParams.keys()], template: x.searchParams.get("template"), title: x.searchParams.get("title"), report: x.searchParams.get("report"), subject: x.searchParams.get("subject"), body: x.searchParams.get("body"), length: u.length }; };
+async function reports(browser, origin) {
+  // window.open is replaced, so a report link opens nothing: the address it was given is kept to be checked (window.__openFails: as a view that can't open links)
+  const stub = () => { window.__opened = []; window.open = (u) => { window.__opened.push(String(u)); return window.__openFails ? null : {}; }; };
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Reports, ${label}: ${t}`;
+    const { page, context } = await openApp(browser, origin, { width, height, scheme, init: stub, permissions: ["clipboard-read", "clipboard-write"] });
+    const start = page.url(), V = await page.evaluate("APP_VERSION");
+    const opened = () => page.evaluate(() => window.__opened.slice());
+    const clip = () => page.evaluate(() => navigator.clipboard.readText());
+    const sheet = () => page.evaluate(() => {
+      const bg = document.getElementById("reportBg"), k = bg && bg.querySelector(".reportsheet");
+      if (!k) return null;
+      const r = k.getBoundingClientRect(), box = k.querySelector("#reportText");
+      return { head: k.querySelector("#rp-t").textContent, line: k.querySelector("#rp-d").textContent, long: !!k.querySelector("#rp-long"), state: (k.querySelector(".rp-state") || {}).textContent || "",
+        text: S.rsheet.text, box: box ? { value: box.value, selected: box.selectionStart === 0 && box.selectionEnd === box.value.length && document.activeElement === box } : null,
+        acts: [...k.querySelectorAll("button[data-act]")].map(b => b.dataset.act), github: (k.querySelector('[data-act="rpGithub"]') || {}).textContent || "",
+        inside: r.top >= -0.5 && r.bottom <= window.innerHeight + 0.5 && r.left >= -0.5 && r.right <= window.innerWidth + 0.5, focus: k.contains(document.activeElement),
+        behind: [...app.children].filter(c => c !== bg).every(c => c.inert), sideways: document.documentElement.scrollWidth > window.innerWidth + 1 || k.scrollWidth > k.clientWidth + 1,
+        small: [...k.querySelectorAll("button, summary, textarea")].filter(b => b.offsetParent !== null).map(b => [b.textContent.trim().slice(0, 20), b.getBoundingClientRect()]).filter(([, c]) => c.width < 43.5 || c.height < 43.5).map(([t, c]) => `${t} ${Math.round(c.width)}×${Math.round(c.height)}`) };
+    });
+    const sheetOk = (k) => k && k.inside && k.focus && k.behind && !k.sideways && !k.small.length;
+    const toData = async (sec) => { await page.evaluate((sec) => { S.screen = "data"; S.scrollTo = sec; render(); }, sec); await page.waitForTimeout(60); };
+    const safe = (text) => Object.keys(fieldsOf(text)).every(k => REPORT_KEYS.includes(k)) && !/"box"|lapses|settings|currentUnit|synonyms/.test(text);
+
+    // 1. A content problem from the answer panel: Flag this item, then Report it
+    const itemId = "s-u05-03";
+    await page.evaluate((id) => {
+      const it = content.items[id];
+      session = { kind: "unit", unitId: it.unit, queue: [{ ex: makeExercise(it, rec(id)), repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+      S.screen = "session"; S.feedback = null; S.rule = null; S.leaveAsk = false; S.retry = null; resetExState(); render(); finishAnswer(false, "", "zzz");
+    }, itemId);
+    await page.waitForTimeout(450);
+    await tap(page, '[data-act="flagOpen"]');
+    await page.fill("#flagNote", "The answer looks wrong to me");
+    await tap(page, '[data-act="flagSave"]');
+    check(L("after Save flag, the answer panel says Flagged and offers Report it, at least 44 px"), await page.evaluate(() => /Flagged\./.test(document.querySelector(".fb-actions").textContent) && (() => { const b = document.querySelector('.fb [data-act="reportFlag"]'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width >= 43.5 && r.height >= 43.5; })()));
+    await layout(page, L("the answer panel with Report it"), { zoomOnly: true });
+    const before = await page.evaluate(() => JSON.stringify({ pos: session.pos, answered: session.answered, fb: [S.feedback.ok, S.feedback.given] }));
+    await tap(page, '.fb [data-act="reportFlag"]');
+    let k = await sheet();
+    check(L("Report it opens the report sheet over the session"), k && k.head === "Report this item" && (await screen(page)) === "session", JSON.stringify(k && k.head));
+    check(L("the sheet says the page will be public, what the report holds, and that it needs a GitHub account (otherwise Copy)"), k && /public page/.test(k.line) && /GitHub account/.test(k.line) && /use Copy/.test(k.line) && /holds the exercise, the answers and your note, and nothing about you or your progress/.test(k.line), k && k.line);
+    check(L("it offers Open GitHub, Copy and Close (no email: REPORT_TO has none)"), k && k.acts.join() === "rpGithub,rpCopy,rpClose", k && k.acts.join());
+    check(L("the sheet sits within the screen, takes the focus, keeps the session out of reach, and its controls are 44 px"), sheetOk(k), JSON.stringify(k && { inside: k.inside, focus: k.focus, behind: k.behind, sideways: k.sideways, small: k.small }));
+    await tap(page, ".rp-text summary");
+    check(L("See the report shows the report itself"), await page.evaluate(() => { const p = document.querySelector(".rp-text pre"); return !!p && p.offsetParent !== null && p.textContent === S.rsheet.text && p.textContent.startsWith("Ripasso report 1\n"); }));
+    await tap(page, '[data-act="rpGithub"]');
+    let urls = await opened(), u = urls.length === 1 && linkOf(urls[0]), f = u && fieldsOf(u.report || "");
+    const want = await page.evaluate((id) => { const it = content.items[id], ex = current().ex; return { unit: `u05 (${content.unitById.u05.title})`, exercise: ex.type, expected: ex.shownAnswer || ex.correct || "" }; }, itemId);
+    check(L("Open GitHub opens the repository's new-issue form, content-problem.yml, filled in through the address, within 6,000 characters"), u && u.base === "https://github.com/grantgilford/ripasso-italiano/issues/new" && u.template === "content-problem.yml" && u.keys.join() === "template,title,report" && u.length <= 6000, JSON.stringify(urls).slice(0, 300));
+    check(L("…the title starts with the unit and the item id"), u && u.title.startsWith(`u05 · ${itemId} · `), u && u.title);
+    check(L("…and the report carries the right fields"), f && u.report.startsWith("Ripasso report 1\n") && f.kind === "content problem" && f["app version"] === V && f.copy === "browser" && f.item === itemId && f.unit === want.unit && f.exercise === want.exercise && f.expected === want.expected && f.given === "zzz" && f.note === "The answer looks wrong to me" && f.shown, JSON.stringify(f));
+    check(L("…and nothing else (no progress, settings or other flags)"), u && safe(u.report), u && u.report);
+    check(L("the link opened nothing here: the page stayed, with no new tab and nothing loaded from outside"), page.url() === start && context.pages().length === 1 && !page.outside.length, page.outside.join());
+    k = await sheet();
+    check(L("the sheet then says GitHub has opened, and the flag is marked reported"), k && /GitHub has opened with the report filled in/.test(k.state) && await page.evaluate(() => { const f = progress.flags[flagId(current().ex)]; return f.reportedAt > 0 && JSON.parse(localStorage.getItem("itapp.progress.v1")).flags[flagId(current().ex)].reportedAt === f.reportedAt; }), k && k.state);
+    await tap(page, '[data-act="rpClose"]');
+    check(L("Close closes it, leaving the session as it was, and the panel says Flagged and reported"), !(await sheet()) && (await page.evaluate(() => JSON.stringify({ pos: session.pos, answered: session.answered, fb: [S.feedback.ok, S.feedback.given] }))) === before && await page.evaluate(() => /Flagged and reported\./.test(document.querySelector(".fb-actions").textContent) && ![...app.children].some(c => c.inert)));
+
+    // 2. A missing answer: Accept my answer, then Suggest it for everyone
+    const card = await page.evaluate(() => {
+      progress.settings.fcDir = "it-en";
+      const it = content.byUnit.fc01[3], ex = makeExercise(it, rec(it.id));
+      session = { kind: "flashcards", unitId: "fc01", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+      S.screen = "session"; S.feedback = null; S.retry = null; resetExState(); render();
+      return { id: it.id, it: [].concat(it.it).join(" / "), en: [].concat(it.en).join(" · "), type: ex.type };
+    });
+    await page.fill("#answer", "a learner's own answer"); await tap(page, '[data-act="check"]'); await page.waitForTimeout(450);
+    await tap(page, '[data-act="accept"]');
+    check(L("after Accept my answer, the panel offers Suggest it for everyone, at least 44 px"), await page.evaluate(() => { const b = document.querySelector('.fb [data-act="suggest"]'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width >= 43.5 && r.height >= 43.5; }));
+    await tap(page, '.fb [data-act="suggest"]');
+    k = await sheet();
+    check(L("Suggest it for everyone opens the sheet, saying what it holds"), k && k.head === "Suggest this answer" && /the card, its answers and what you typed/.test(k.line) && sheetOk(k), JSON.stringify(k && [k.head, k.line, k.small]));
+    await tap(page, '[data-act="rpGithub"]');
+    urls = await opened(); u = linkOf(urls[urls.length - 1]); f = fieldsOf(u.report || "");
+    check(L("…its link opens missing-answer.yml with the card, its answers and what was typed"), u.template === "missing-answer.yml" && u.title.startsWith(`fc01 · ${card.id} · missing answer: `) && f.kind === "missing answer" && f.item === card.id && f.shown === card.it && f.expected === card.en && f.given === "a learner's own answer" && f.exercise === card.type && safe(u.report) && u.length <= 6000, JSON.stringify(f));
+    await page.keyboard.press("Escape"); await page.waitForTimeout(60);
+    check(L("Escape closes the sheet"), !(await sheet()));
+    await page.evaluate(() => { session = null; S.feedback = null; S.screen = "home"; render(); });
+
+    // 3. Your data: flagged items, each with Report beside Remove, and Report all
+    await page.evaluate(() => {
+      const T = Date.now(), mk = (id, unit, n, extra) => ({ id, unit, exercise: "Typed recall", prompt: "prompt " + n, expected: "answer " + n, given: "given " + n, note: n % 2 ? "note " + n : "", createdAt: T - n, updatedAt: T - n, version: APP_VERSION, ...extra });
+      progress.flags.f1 = mk("v-fiore", "u02", 1); progress.flags.f2 = mk("v-zaino", "u02", 2); progress.flags.f3 = mk("g-u01-02", "u01", 3, { reportedAt: T - 864e5 });
+      saveProgress();
+    });
+    await toData("sec-flags");
+    const rows = await page.evaluate(() => [...document.querySelectorAll("#sec-flags .frow")].map(r => ({ report: !!r.querySelector("[data-reportflag]"), remove: !!r.querySelector("[data-unflag]"), level: (() => { const a = r.querySelector("[data-reportflag]"), b = r.querySelector("[data-unflag]"); return a && b && Math.abs(a.getBoundingClientRect().top - b.getBoundingClientRect().top) < 2; })(), reported: /Reported on \d+ \w+ \d{4}/.test(r.textContent) })));
+    check(L("every flag has Report beside Remove"), rows.length >= 4 && rows.every(r => r.report && r.remove && r.level), JSON.stringify(rows));
+    check(L("a reported flag says Reported on <date>, and only those"), rows.filter(r => r.reported).length === 2, JSON.stringify(rows.map(r => r.reported)));
+    check(L("the old wording about asking Claude is gone"), !(await page.evaluate(() => /Ask Claude/.test(document.body.textContent))));
+    await layout(page, L("Your data, flagged items"));
+    const unrep = await page.evaluate(() => unreportedFlags().length);
+    check(L("Report all names how many are not yet reported"), new RegExp(`^Report all ${unrep} not yet reported$`).test(await page.textContent('[data-act="reportFlags"]')), await page.textContent('[data-act="reportFlags"]'));
+    await tap(page, '[data-act="reportFlags"]');
+    k = await sheet();
+    check(L("Report all opens one sheet for them all"), k && k.head === `Report ${unrep} items` && sheetOk(k), JSON.stringify(k && [k.head, k.small]));
+    await tap(page, '[data-act="rpCopy"]');
+    k = await sheet();
+    check(L("Copy copies the report, and says so"), (await clip()) === k.text && /^Copied\./.test(k.state) && !k.box, k.state);
+    check(L("…one report per flag, in one text"), (k.text.match(/^Ripasso report 1$/gm) || []).length === unrep && safe(k.text));
+    await tap(page, '[data-act="rpGithub"]');
+    urls = await opened(); u = linkOf(urls[urls.length - 1]);
+    check(L("…and Open GitHub fills them all into one issue"), u.template === "content-problem.yml" && (u.report.match(/^Ripasso report 1$/gm) || []).length === unrep && u.length <= 6000 && /items · content problems$/.test(u.title), u.title);
+    await tap(page, '[data-act="rpClose"]');
+    check(L("…after which every flag says it was reported, and Report all is gone"), await page.evaluate(() => !unreportedFlags().length && !document.querySelector('[data-act="reportFlags"]') && [...document.querySelectorAll("#sec-flags .frow")].every(r => /Reported on/.test(r.textContent))));
+    // too long for a link: Copy plus an empty form, with a note to paste
+    await page.evaluate(() => { const T = Date.now(); for (let n = 0; n < 60; n++) progress.flags["long" + n] = { id: "v-fiore", unit: "u02", exercise: "Typed recall", prompt: "a long one " + n, expected: "il fiore", given: "la fiore", note: "This note is long on purpose, so that sixty of them make a report too long for a link. ".repeat(2), createdAt: T + n, updatedAt: T + n }; saveProgress(); render(); });
+    await tap(page, '[data-act="reportFlags"]');
+    k = await sheet();
+    check(L("a report too long for a link says so, and offers Copy and open GitHub"), k && k.long && k.github === "Copy and open GitHub" && sheetOk(k), JSON.stringify(k && [k.long, k.github, k.small]));
+    await tap(page, '[data-act="rpGithub"]');
+    urls = await opened(); u = linkOf(urls[urls.length - 1]); k = await sheet();
+    check(L("…which copies it and opens the form with only its title, saying to paste it in"), (await clip()) === k.text && u.template === "content-problem.yml" && u.keys.join() === "template,title" && u.length <= 6000 && /paste the report into the Report box/.test(k.state), k.state);
+    // closing it: a tap beside it, and the back button
+    await tap(page, '[data-act="rpClose"]');
+    await tap(page, '[data-reportflag="f1"]');
+    await page.mouse.click(4, 4); await page.waitForTimeout(60);
+    check(L("a tap beside the sheet closes it, and the focus goes back to Report"), !(await sheet()) && await page.evaluate(() => document.activeElement && document.activeElement.dataset.reportflag === "f1"));
+    await tap(page, '[data-reportflag="f1"]');
+    await page.goBack(); await page.waitForTimeout(150);
+    check(L("the back button closes the sheet and stays on Your data"), !(await sheet()) && (await screen(page)) === "data");
+    // copying refused, and a view that can't open links
+    await tap(page, '[data-reportflag="f1"]');
+    await page.evaluate(() => { window.__openFails = true; });
+    await tap(page, '[data-act="rpGithub"]');
+    k = await sheet();
+    check(L("where a link can't open, the report is copied instead, and the sheet says so"), /can't open links, so the report has been copied/.test(k.state) && (await clip()) === k.text && !k.box, k.state);
+    await page.evaluate(() => { window.__openFails = false; navigator.clipboard.writeText = () => Promise.reject(new Error("not allowed")); document.execCommand = () => false; });
+    await tap(page, '[data-act="rpCopy"]');
+    k = await sheet();
+    check(L("where copying isn't allowed, Copy shows the report in a box, selected, to copy by hand"), k.box && k.box.value === k.text && k.box.selected && /Copying isn't allowed here/.test(k.state) && sheetOk(Object.assign({}, k, { focus: true })), JSON.stringify(k && [k.state, k.box && k.box.selected, k.small]));
+    await tap(page, '[data-act="rpClose"]');
+
+    // 4. Accepted answers, each with Suggest, and Suggest all
+    await page.evaluate(() => { const b = content.byUnit.fc01[5]; progress.synonyms[b.id] = ["another answer"]; saveProgress(); render(); });
+    await toData("sec-answers");
+    const acc = await page.evaluate(() => [...document.querySelectorAll("#sec-answers [data-suggest]")].map(b => b.closest(".frow").textContent));
+    const stored = await page.evaluate(() => normEn("a learner's own answer")); // kept as answers are compared: "a" and "to" left off, small letters
+    check(L("Your data lists the accepted answers, each with Suggest"), acc.length === 2 && acc.some(t => t.includes("→ " + stored)) && acc.some(t => /another answer/.test(t)), JSON.stringify(acc));
+    await tap(page, `[data-suggest="${card.id}"]`);
+    urls = await opened(); await tap(page, '[data-act="rpGithub"]');
+    u = linkOf((await opened()).slice(-1)[0]); f = fieldsOf(u.report);
+    check(L("Suggest sends that answer as a missing answer"), u.template === "missing-answer.yml" && f.item === card.id && f.given === stored, JSON.stringify(f));
+    await tap(page, '[data-act="rpClose"]');
+    await tap(page, '[data-act="suggestAll"]');
+    await tap(page, '[data-act="rpGithub"]');
+    u = linkOf((await opened()).slice(-1)[0]);
+    check(L("Suggest all sends them together"), u.template === "missing-answer.yml" && (u.report.match(/^Ripasso report 1$/gm) || []).length === 2 && safe(u.report));
+    await tap(page, '[data-act="rpClose"]');
+    await layout(page, L("Your data, accepted answers"));
+
+    // 5. App problems: the problems the app noticed, Report and Clear, and Report an app problem
+    await page.evaluate(() => { const T = Date.now(); localStorage.setItem("itapp.errors.v1", JSON.stringify([1, 2, 3].map(n => ({ m: "TypeError: test problem " + n, at: "index.html:100:" + n, screen: "units", v: APP_VERSION, t: T - (4 - n) * 1000, n: n === 3 ? 3 : undefined })))); S.screen = "you"; render(); }); // kept oldest first, as the app keeps them
+    await tap(page, '.srow[data-to="sec-problems"]');
+    check(L("You → Report a problem opens Your data at Problems the app noticed (3)"), (await screen(page)) === "data" && /Problems the app noticed \(3\)/.test(await page.textContent("#sec-problems")) && await page.evaluate(() => { const t = document.getElementById("sec-problems").getBoundingClientRect().top; return t >= -1 && t < 120; }));
+    await layout(page, L("Your data, problems"));
+    await tap(page, '[data-act="reportErrors"]');
+    k = await sheet();
+    check(L("Report opens the sheet, saying it holds the errors, the version and the browser"), k && k.head === "Report an app problem" && /the problems the app noticed, the app's version and your browser/.test(k.line) && sheetOk(k));
+    await tap(page, '[data-act="rpGithub"]');
+    u = linkOf((await opened()).slice(-1)[0]); f = fieldsOf(u.report);
+    check(L("…its link opens app-problem.yml with the browser and the three errors, newest first"), u.template === "app-problem.yml" && u.title.startsWith(`app · ${V} · `) && f.kind === "app problem" && /Chrome \d+/.test(f.browser) && f.errors.split("\n").length === 3 && /test problem 3 · index\.html:100:3 · 3 times$/.test(f.errors.split("\n")[0]) && f.screen === "units" && safe(u.report), JSON.stringify(f));
+    await tap(page, '[data-act="rpClose"]');
+    await tap(page, '[data-act="clearErrors"]');
+    check(L("Clear empties the list, on this device"), /Problems the app noticed \(0\)/.test(await page.textContent("#sec-problems")) && (await page.evaluate(() => localStorage.getItem("itapp.errors.v1"))) === null);
+    await tap(page, '[data-act="reportApp"]');
+    check(L("Report an app problem with nothing written asks for a description first"), !(await sheet()) && /First write what looks or works wrong/.test(await page.textContent("#sec-problems")) && await page.evaluate(() => document.activeElement.id === "problemNote"));
+    await page.evaluate(() => { S.screen = "rules"; render(); S.screen = "you"; render(); S.screen = "data"; S.scrollTo = "sec-problems"; render(); });
+    await page.fill("#problemNote", "The Rules screen jumps\nwhen I scroll");
+    await tap(page, '[data-act="reportApp"]');
+    await tap(page, '[data-act="rpGithub"]');
+    u = linkOf((await opened()).slice(-1)[0]); f = fieldsOf(u.report);
+    check(L("…with a description, it sends it, the screen the learner came from and the browser"), u.template === "app-problem.yml" && f.note === "The Rules screen jumps\nwhen I scroll" && f.screen === "rules" && f.browser && !f.errors && u.title === `app · ${V} · The Rules screen jumps when I scroll`, JSON.stringify(f));
+    await tap(page, '[data-act="rpClose"]');
+    check(L("…and the box is emptied once it is sent"), (await page.inputValue("#problemNote")) === "");
+
+    // 6. Where REPORT_TO sends reports: no GitHub, an email address, neither
+    await page.evaluate(() => { REPORT_TO.github = ""; REPORT_TO.email = "reports@example.org"; });
+    await tap(page, '[data-reportflag="f1"]');
+    k = await sheet();
+    check(L("with only an email address, the sheet offers Email and Copy"), k.acts.join() === "rpEmail,rpCopy,rpClose" && /Email opens your mail app/.test(k.line), k.acts.join());
+    await tap(page, '[data-act="rpEmail"]');
+    u = linkOf((await opened()).slice(-1)[0]);
+    check(L("…and Email opens a mailto: with the title and the report"), (await opened()).slice(-1)[0].startsWith("mailto:reports@example.org?") && u.subject && u.subject.startsWith("u02 · v-fiore · ") && u.body === k.text);
+    await tap(page, '[data-act="rpClose"]');
+    await page.evaluate(() => { REPORT_TO.email = ""; });
+    await tap(page, '[data-reportflag="f1"]');
+    k = await sheet();
+    check(L("with neither, only Copy"), k.acts.join() === "rpCopy,rpClose" && /^Copy the report/.test(k.line), k.acts.join());
+    await tap(page, '[data-act="rpClose"]');
+    await page.evaluate(() => { REPORT_TO.github = "grantgilford/ripasso-italiano"; });
+
+    // 7. The learning summary: copied, and saved as a text file
+    await page.evaluate(() => { S.screen = "you"; render(); });
+    await tap(page, '.srow[data-to="sec-summary"]');
+    check(L("You → Learning summary opens Your data at the summary"), (await screen(page)) === "data" && await page.evaluate(() => { const t = document.getElementById("sec-summary").getBoundingClientRect().top; return t >= -1 && t < 120; }));
+    await page.reload(); await page.waitForFunction(ready); // the clipboard as the browser has it
+    await page.evaluate(() => { S.screen = "data"; S.scrollTo = "sec-summary"; render(); });
+    await tap(page, '[data-act="summaryCopy"]');
+    const sum = await clip(), wantSum = await page.evaluate(() => learningSummary());
+    check(L("Copy my learning summary copies it, and says so"), sum === wantSum && /Copied/.test(await page.textContent("#sec-summary")));
+    check(L("…with the most-missed items, the weakest kinds and units, each unit and the mix-ups"), /^# Ripasso learning summary, /.test(sum) && ["## Overall", "## The 30 most-missed items", "## Weakest kinds of exercise, last 30 days", "## Weakest units, last 30 days", "## Each unit: items started, learned and due", "## Words mixed up"].every(h => sum.includes(h)) && /never sends it/.test(sum), sum.slice(0, 400));
+    const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 3000 }).catch(() => null), tap(page, '[data-act="summarySave"]')]);
+    const saved = dl && require("fs").readFileSync(await dl.path(), "utf8");
+    check(L("Save as a text file saves the same text as a .txt file"), dl && /^ripasso-learning-summary-\d{4}-\d\d-\d\d\.txt$/.test(dl.suggestedFilename()) && saved === wantSum, dl && dl.suggestedFilename());
+    await layout(page, L("Your data, learning summary"));
+
+    check(L("no script errors"), !page.errors.length, page.errors.slice(0, 3).join("\n"));
+    check(L("nothing loaded from outside the file"), !page.outside.length, page.outside.slice(0, 3).join("\n"));
+    await context.close();
+    console.log(`  Reports checked, ${label}`);
+  }
+
+  /* Problems the app noticed: script errors and unhandled rejections kept on the device (itapp.errors.v1), the last 20 */
+  {
+    const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light" });
+    const kept = () => page.evaluate(() => JSON.parse(localStorage.getItem("itapp.errors.v1")));
+    const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
+    await page.evaluate(() => { setTimeout(() => { throw new TypeError("a test error"); }); });
+    await page.waitForTimeout(100);
+    let e = await kept(), V = await page.evaluate("APP_VERSION");
+    check("Errors: a thrown error is kept, with its message, place, screen, version and time", e && e.length === 1 && /a test error/.test(e[0].m) && typeof e[0].at === "string" && e[0].screen === "home" && e[0].v === V && Math.abs(e[0].t - Date.now()) < 60000, JSON.stringify(e));
+    await page.evaluate(() => { Promise.reject(new Error("a test rejection")); });
+    await page.waitForTimeout(100);
+    e = await kept();
+    check("Errors: an unhandled rejection is kept too", e.length === 2 && /Error: a test rejection/.test(e[1].m), JSON.stringify(e[1]));
+    await page.evaluate(() => { for (let n = 0; n < 25; n++) setTimeout(() => { throw new Error("test error " + n); }); });
+    await page.waitForTimeout(300);
+    e = await kept();
+    check("Errors: the list is capped at the last 20", e.length === 20 && /test error 24/.test(e[19].m) && /test error 5/.test(e[0].m), JSON.stringify(e.map(x => x.m)).slice(0, 300));
+    await page.evaluate(() => { const f = () => { throw new Error("the same error"); }; for (let n = 0; n < 3; n++) setTimeout(f); });
+    await page.waitForTimeout(150);
+    e = await kept();
+    check("Errors: the same error again and again is kept once, with how many times", /the same error/.test(e[19].m) && e[19].n === 3 && !/the same error/.test(e[18].m), JSON.stringify(e.slice(-2)));
+    check("Errors: saved progress is untouched, and they are not part of progress (so never synced) or a backup", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore && await page.evaluate(() => !/test error|errors\.v1/.test(JSON.stringify(progress)) && !/test error/.test(backupText())));
+    await page.evaluate(() => localStorage.setItem("itapp.errors.v1", "{damaged"));
+    await page.evaluate(() => { S.screen = "data"; render(); });
+    check("Errors: a damaged list counts as none, and Your data still draws", /Problems the app noticed \(0\)/.test(await page.textContent("#sec-problems")));
+    await page.evaluate(() => { setTimeout(() => { throw new Error("after the damage"); }); }); await page.waitForTimeout(100);
+    e = await kept();
+    check("Errors: …and keeping one starts a new list", e && e.length === 1 && /after the damage/.test(e[0].m));
+    const n = page.errors.length;
+    await page.evaluate(() => { Storage.prototype.setItem = function () { throw new Error("QuotaExceededError"); }; setTimeout(() => { throw new Error("storage refused"); }); });
+    await page.waitForTimeout(100);
+    check("Errors: a device that refuses to store them simply forgets, with no further error", page.errors.length === n + 1 && (await kept()).length === 1);
+    await context.close();
+    console.log("  Problems the app noticed checked");
+  }
+}
+
 function fakeSpeech(voices) {
   if (voices === null) return `Object.defineProperty(window, "speechSynthesis", { value: undefined, configurable: true }); window.SpeechSynthesisUtterance = undefined;`;
   return `(() => {
@@ -924,6 +1199,9 @@ async function readAloud(browser, origin) {
 
     /* Read aloud */
     await readAloud(browser, origin);
+
+    /* Reports (from 9.19) */
+    await reports(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

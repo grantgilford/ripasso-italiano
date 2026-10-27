@@ -1,0 +1,26 @@
+# A content problem: a word, sentence, answer or explanation that looks wrong. Ripasso opens this form from a flagged
+# item (You → Your data → Flagged items → Report, or Report it in the answer panel), filling in the report field through
+# the address (?template=content-problem.yml&title=…&report=…): keep the field's id "report", which the app's address uses.
+name: Content problem
+description: A word, sentence, answer or explanation in Ripasso that looks wrong.
+title: "Content problem: "
+labels: ["content"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This page is public.** The report below was filled in by Ripasso from an item you flagged: the exercise, its answers and your note, and nothing about you or your progress. Check it, add anything you like, then submit. To report from the app, flag the item under its answer, then tap **Report it** (or use **You → Your data → Flagged items → Report**).
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: Filled in by Ripasso. If you copied a report from the app, paste it here.
+      placeholder: "Ripasso report 1"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: comment
+    attributes:
+      label: Anything to add?
+      description: Optional. What you think the right answer or wording is, and why.

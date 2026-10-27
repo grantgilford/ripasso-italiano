@@ -1,0 +1,26 @@
+# A missing answer: an English answer to a flashcard that Ripasso marked wrong, which the learner accepted with Accept my
+# answer and suggests for everyone (Suggest it for everyone in the answer panel, or You → Your data → Accepted answers).
+# The app fills in the report field through the address (?template=missing-answer.yml&title=…&report=…): keep its id "report".
+name: Missing answer
+description: An answer Ripasso marked wrong that should count as right, for everyone.
+title: "Missing answer: "
+labels: ["missing-answer"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This page is public.** The report below was filled in by Ripasso: the card, the answers it accepts and what you typed, and nothing about you or your progress. An answer is added for everyone once it has been checked in a dictionary.
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: Filled in by Ripasso. If you copied a report from the app, paste it here.
+      placeholder: "Ripasso report 1"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: comment
+    attributes:
+      label: Anything to add?
+      description: Optional. Where you have seen it used, or a dictionary that gives it.

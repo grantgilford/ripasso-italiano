@@ -5,7 +5,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "check": "node tools/check-content.js",
-    "test": "node tools/check-content.js && node tools/test-progress.js && node tools/test-ui.js && node tools/test-install.js && node tools/test-speedups.js && node tools/test-sessions.js && node tools/test-choices.js && node tools/test-perf.js",
+    "test": "node tools/check-content.js && node tools/test-reports.js && node tools/test-progress.js && node tools/test-ui.js && node tools/test-install.js && node tools/test-speedups.js && node tools/test-sessions.js && node tools/test-choices.js && node tools/test-perf.js",
     "test:items": "node tools/test-items.js"
   },
   "devDependencies": {
