@@ -30,6 +30,13 @@
        device's write is merged and answered only where this device is newer;
        a change made without being marked still reaches the cloud when the app
        is put away; a backup and a reset reach it too.
+   11. Reports (from 9.19): a flag's reportedAt (an optional field, which
+       older copies ignore) loads, syncs in the flag's own document, arrives
+       from another device, survives a backup and a merge with an older copy
+       of the flag, and reporting a flag writes that document only; the
+       problems the app noticed (itapp.errors.v1, the last 20) stay out of
+       progress, the cloud and backups, and leave the saved progress exactly
+       as it was.
 
   The storage formats are written out here by hand, not borrowed from the app,
   so a change to either format makes this test fail until a migration is
@@ -568,6 +575,56 @@ async function runSession(page, start, maxSteps = 200) {
       const left = [...cloud.docs.keys()].filter(k => /^progress2\/s\d\d$/.test(k)).reduce((n, k) => n + Object.keys(cloud.docs.get(k).items || {}).length, 0);
       check("a reset empties the cloud's shards", left === 0 && cloud.docs.get("progress2/meta").resetAt > 0, `${left} records left`);
       check("no script errors", !page.__errors, page.__errors);
+      await context.close();
+    }
+
+    /* 11. Reports (from 9.19): a flag's reportedAt and the problems the app noticed */
+    section("11. Reports leave progress and sync as they were");
+    {
+      // A flag reported on another device: reportedAt is an optional field on the flag, synced in its flags/<id> document as it is.
+      const reported = { id: seedIds[1], unit: "u05", exercise: "Translate", prompt: "a prompt", expected: "an answer", given: "a guess", note: "a note", createdAt: T - 3 * DAY, updatedAt: T - 2 * DAY, version: "9.19", reportedAt: T - 2 * DAY };
+      const seed11 = Object.assign({}, seed, { flags: Object.assign({}, seed.flags, { "rep-flag": reported }) });
+      const cloud = makeCloud();
+      const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: seed11 }, cloud });
+      await settleSync(page);
+      const since = async (fn) => { const n = cloud.writes.length; await fn(); await settleSync(page); return cloud.writes.slice(n); };
+      const noEmpty = (days) => Object.fromEntries(Object.entries(days || {}).filter(([, d]) => canon(d) !== canon({ xp: 0, new: 0 }))); // drawing Today starts today's empty entry
+      const learning = (p) => canon({ items: p.items, days: noEmpty(p.days), settings: p.settings, synonyms: p.synonyms, currentUnit: p.currentUnit });
+      const changed = (p) => { const was = JSON.parse(base), now = JSON.parse(learning(p)); return Object.keys(now).filter(k => canon(now[k]) !== canon(was[k])).join(", "); };
+      let p = await stored(page);
+      check("a reported flag loads with its reportedAt, as saved", same(p.flags["rep-flag"], reported), JSON.stringify(p.flags["rep-flag"]));
+      check("…and reaches the cloud in its flags/ document as it is", same(cloud.docs.get("flags/rep-flag"), reported));
+      const base = learning(p);
+      // another device reports a flag: its newer copy arrives with reportedAt, and nothing else changes
+      const theirs = Object.assign({}, seed.flags[seedIds[0]], { reportedAt: T, updatedAt: T });
+      let w = await since(() => page.evaluate(([k, f]) => db.doc("flags/" + k).set(f), [seedIds[0], theirs]));
+      p = await stored(page);
+      check("another device's report of a flag arrives with its reportedAt", same(p.flags[seedIds[0]], theirs), JSON.stringify(p.flags[seedIds[0]]));
+      check(`…changing nothing else and writing nothing back (${w.join(", ") || "nothing"})`, learning(p) === base && w.length === 1 && w[0] === "flags/" + seedIds[0], changed(p));
+      // reporting a flag on this device writes that flag's document and nothing else
+      await page.evaluate(() => { progress.flags["new-flag"] = { id: "v-fiore", unit: "u02", exercise: "Typed recall", prompt: "flower", expected: "il fiore", given: "la fiore", note: "", createdAt: Date.now(), updatedAt: Date.now(), version: APP_VERSION }; saveProgress(); });
+      await settleSync(page);
+      const updatedAt = (await stored(page)).updatedAt;
+      w = await since(() => page.evaluate(() => markReported(["new-flag"])));
+      p = await stored(page);
+      check(`reporting a flag writes only that flag's document (${w.join(", ")})`, w.length === 1 && w[0] === "flags/new-flag", w.join(", "));
+      check("…which then holds reportedAt, as the browser copy does", cloud.docs.get("flags/new-flag").reportedAt > 0 && cloud.docs.get("flags/new-flag").reportedAt === p.flags["new-flag"].reportedAt);
+      check("…and the records, days, settings, accepted answers, current unit and updatedAt are unchanged", learning(p) === base && p.updatedAt === updatedAt, changed(p) + ` updatedAt ${p.updatedAt} was ${updatedAt}`);
+      // a backup carries reportedAt, and loading one keeps the newer copy of a flag
+      const backup = await page.evaluate(() => JSON.parse(backupText()));
+      check("a backup holds a flag's reportedAt", backup.flags["rep-flag"].reportedAt === reported.reportedAt && backup.flags["new-flag"].reportedAt === p.flags["new-flag"].reportedAt);
+      const merged = await page.evaluate(([f]) => mergeProgress(progress, { v: 2, items: {}, days: {}, flags: { "rep-flag": Object.assign({}, f, { updatedAt: f.updatedAt - 1, reportedAt: undefined }) } }).flags["rep-flag"], [reported]);
+      check("merging an older copy of a flag, without reportedAt (as an older version wrote it), keeps the reported one", same(merged, reported), JSON.stringify(merged));
+      // the problems the app noticed: kept on the device in itapp.errors.v1, apart from progress
+      const textBefore = await page.evaluate(k => localStorage.getItem(k), LS_PROGRESS);
+      w = await since(() => page.evaluate(() => { for (let n = 0; n < 25; n++) setTimeout(() => { throw new Error("progress test error " + n); }); Promise.reject(new Error("progress test rejection")); }));
+      const errs = await stored(page, "itapp.errors.v1");
+      check("errors are kept in itapp.errors.v1, the last 20", Array.isArray(errs) && errs.length === 20 && errs.every(e => typeof e.m === "string" && e.t > 0), JSON.stringify(errs).slice(0, 200));
+      check("…leaving the browser copy of progress exactly as it was", (await page.evaluate(k => localStorage.getItem(k), LS_PROGRESS)) === textBefore);
+      check(`…writing nothing to the cloud (${w.join(", ") || "nothing"})`, !w.length);
+      check("…and appearing neither in progress nor in a backup", await page.evaluate(() => !/progress test (error|rejection)/.test(JSON.stringify(progress) + backupText()) && !("errors" in progress)));
+      await page.evaluate(() => { S.screen = "data"; render(); action("clearErrors"); });
+      check("clearing them removes only itapp.errors.v1", (await stored(page, "itapp.errors.v1")) === null && (await page.evaluate(k => localStorage.getItem(k), LS_PROGRESS)) === textBefore);
       await context.close();
     }
   } catch (e) {

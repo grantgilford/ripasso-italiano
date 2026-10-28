@@ -1,0 +1,26 @@
+# An app problem: anything that looks or works wrong in Ripasso itself, and the script errors it noticed on the device.
+# The app opens this form from You → Your data → Report a problem, filling in the report field through the address
+# (?template=app-problem.yml&title=…&report=…): keep its id "report".
+name: App problem
+description: Something in Ripasso that looks or works wrong.
+title: "App problem: "
+labels: ["app"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **This page is public.** The report below was filled in by Ripasso: what you wrote, the problems the app noticed on your device, the app's version and your browser, and nothing about you or your progress. A screenshot helps: add it under Anything to add.
+  - type: textarea
+    id: report
+    attributes:
+      label: Report
+      description: Filled in by Ripasso. If you copied a report from the app, paste it here.
+      placeholder: "Ripasso report 1"
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: comment
+    attributes:
+      label: Anything to add?
+      description: Optional. Steps to make it happen again, or a screenshot.

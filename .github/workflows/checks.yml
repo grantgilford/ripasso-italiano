@@ -40,6 +40,10 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/check-content.js
 
+      - name: Reports test (tools/test-reports.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node tools/test-reports.js
+
       - name: Progress safety test (tools/test-progress.js)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/test-progress.js

@@ -505,6 +505,25 @@ details > summary { cursor: pointer; }
 .frow > div { min-width: 0; overflow-wrap: anywhere; }
 .frow > button { flex: none; min-height: 44px; padding: 8px 14px; }
 .report { padding: 10px 12px; border-radius: 12px; background: var(--note-bg); font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; }
+/* reports (from 9.19): Report and Remove under each flag, the problems the app noticed, and the report sheet */
+.frow.stack { flex-direction: column; align-items: stretch; gap: 8px; }
+.frow-b { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.frow-b > button { min-height: 44px; padding: 8px 14px; }
+.rp-done { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--accent); font-weight: 600; }
+.rp-done .ico { flex: none; }
+.dsec > h3.label { margin: 6px 0 0; font-size: 15px; }
+.dsec > label.small { display: block; }
+.errs > div { padding: 8px 0; overflow-wrap: anywhere; }
+.errs > div + div { border-top: 1px solid var(--line); }
+.errm { font: 13px/1.45 ui-monospace, Menlo, Consolas, monospace; }
+.dnote { color: var(--fg); }
+.reportsheet { max-height: 88vh; overflow-y: auto; overscroll-behavior: contain; }
+.reportsheet > p { margin: 0; }
+.reportsheet > .btnrow.end { margin-top: -4px; }
+.rp-text > summary { display: flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; cursor: pointer; }
+.rp-text pre { margin: 0; padding: 10px 12px; max-height: 38vh; overflow-y: auto; border-radius: 12px; background: var(--note-bg); color: var(--fg); font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.rp-state { font-weight: 500; }
+#reportText, #summaryText { min-height: 140px; font-size: 13px; }
 .rule { display: flex; flex-direction: column; gap: 6px; scroll-margin-top: 12px; }
 .rule .notes { margin: 4px 0 6px; }
 .rule .btnrow { margin-top: 4px; }
@@ -553,6 +572,7 @@ details > summary { cursor: pointer; }
 </head>
 <body>
 <main id="app"></main>
+<script>/* Problems the app noticed (from 9.19): each script error and unhandled rejection is kept on this device in itapp.errors.v1, the last 20, never synced or sent (Your data lists them, to report). Set up before the app's script, so an error while it starts is kept too; every read and write guarded. */(function(){var K="itapp.errors.v1";function note(m,at){try{var s="",v="",l=null,t=Date.now();try{s=String(S.screen||"")}catch(e){}try{v=String(APP_VERSION)}catch(e){}m=String(m==null?"":m).slice(0,300);at=String(at||"").replace(/[a-z][\w+.-]*:\/\/[^\s)]*\/([^\/\s)]*)/gi,"$1").slice(0,120);try{l=JSON.parse(localStorage.getItem(K))}catch(e){}if(!Array.isArray(l))l=[];var last=l[l.length-1];if(last&&last.m===m&&last.at===at&&last.screen===s&&last.v===v){last.n=(last.n||1)+1;last.t=t}else l.push({m:m,at:at,screen:s,v:v,t:t});localStorage.setItem(K,JSON.stringify(l.slice(-20)))}catch(e){}}addEventListener("error",function(e){if(e&&e.message)note(e.message,(e.filename?e.filename+":":"")+e.lineno+":"+e.colno)});addEventListener("unhandledrejection",function(e){var r=e&&e.reason;note(r&&r.message?(r.name?r.name+": ":"")+r.message:r,r&&r.stack?String(r.stack).split("\n").slice(1,2).join("").trim():"")})})();</script>
 <script>
 'use strict';
 /* =========================================================
@@ -19697,7 +19717,7 @@ function acceptAnswer() {
   const out = applyResult(ex.item.id, true, ex.kind, q.repeat, ex.typeKey);
   session.answered++; session.correct++;
   if (!q.repeat) { session.xp += out.xp; if (out.promoted) session.promoted++; }
-  S.feedback = { ok: true, note: "accepted as a synonym", given: fb.given, ex, res: out };
+  S.feedback = { ok: true, note: "accepted as a synonym", given: fb.given, ex, res: out, accepted: true }; // the panel then offers Suggest it for everyone
   render();
 }
 function continueSession() {
@@ -19732,7 +19752,8 @@ function render() {
   const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
   app.className = S.screen === "session" ? "session" : bare ? "notabs" : "";
   const flash = S.flash && S.screen !== "home" && !bare ? `<div class="card flash" id="flash" role="status">${esc(S.flash)}</div>` : "";
-  app.innerHTML = flash + fn() + (bare ? "" : tabBar()) + (S.screen === "session" && S.leaveAsk ? leaveSheetHtml() : "") + (S.screen === "session" && S.rule ? ruleSheetHtml() : "");
+  app.innerHTML = flash + fn() + (bare ? "" : tabBar()) + (S.screen === "session" && S.leaveAsk ? leaveSheetHtml() : "") + (S.screen === "session" && S.rule ? ruleSheetHtml() : "") + (S.rsheet ? reportSheetHtml() : "");
+  if (S.screen !== "you" && S.screen !== "data") S.lastScreen = key + (S.screen === "session" && session ? ":" + session.kind + (session.unitId ? ":" + session.unitId : "") : ""); // an app problem's report names it
   nbHyphens(app);
   if (prev !== key) { S.viewKey = key; window.scrollTo(0, (/^(units|rules|lookup|reference)/.test(key) && mem[key]) || 0); }
   if (S.jumpSec != null) { const t = S.screen === "reference" && document.getElementById("lsec-" + S.jumpSec); S.jumpSec = null; if (t) t.scrollIntoView({ block: "start" }); }
@@ -19779,6 +19800,8 @@ const ICON = { // 24-unit stroke icons, as drawn in docs/design/mockups
   layers: '<path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5M4 16.5l8 4.5 8-4.5"/>',
   speaker: '<path d="M4 9.5h3.2L12 5.6v12.8l-4.8-3.9H4z"/><path d="M15.6 9.2a4 4 0 0 1 0 5.6M18.3 6.5a7.7 7.7 0 0 1 0 11"/>',
   sparkle: '<path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/>', // What's new (v9.1), in the same style
+  send: '<path d="M20 4L3 11l7 3 3 7z"/><path d="M10 14l10-10"/>', // Report a problem (v9.19)
+  doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>', // the learning summary (v9.19)
 };
 function icon(name, size = 22, stroke = 1.8) { return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[name]}</svg>`; }
 function logo(size) { return `<svg class="ico logo" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="23" fill="#0F6B4B"/><path d="M31 32 L45 68" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" fill="none"/><path d="M55 32 L69 68" stroke="#EF4B55" stroke-width="13" stroke-linecap="round" fill="none"/></svg>`; }
@@ -19952,7 +19975,7 @@ function syncValue() {
   return `<span class="sync"><span class="dot ${cls}" aria-hidden="true"></span>${esc(words)}</span>`;
 }
 function renderYou() {
-  const s = progress.settings, flags = Object.values(progress.flags || {}).filter(f => !f.removed).length, theme = themePref(), audio = audioPref();
+  const s = progress.settings, flags = Object.values(progress.flags || {}).filter(f => !f.removed).length, errs = appErrors().length, theme = themePref(), audio = audioPref();
   const row = (ic, label, value, attrs) => `<button type="button" class="srow" ${attrs}><span class="well">${icon(ic, 20)}</span><span class="srow-l">${label}</span>${value != null ? `<span class="srow-v">${value}</span>` : ""}${icon("next", 18, 2)}</button>`;
   return `<header class="hdr"><h1 class="title">You</h1></header>
   <button type="button" class="card statcard" data-go="stats"><span class="statcard-h"><span class="label">Stats</span><span class="see">See all${icon("next", 18, 2)}</span></span>
@@ -19970,6 +19993,8 @@ function renderYou() {
   + groupHtml("Your data", `<div class="card rows">
     ${row("cloud", "Sync", syncValue(), 'data-go="data"')}
     ${row("flag", "Flagged items", String(flags), 'data-go="data" data-to="sec-flags"')}
+    ${row("send", "Report a problem", errs ? `${errs} noticed` : null, 'data-go="data" data-to="sec-problems"')}
+    ${row("doc", "Learning summary", null, 'data-go="data" data-to="sec-summary"')}
     ${row("download", "Back up progress", null, 'data-go="data" data-to="sec-backup"')}
     ${row("layers", "Content packs", "Advanced", 'data-go="data" data-to="sec-packs"')}</div>`)
   + groupHtml("About", `<details class="card about"><summary>${logo(36)}<span class="about-t"><span class="label">Ripasso Italiano</span><span class="small muted">Version ${esc(APP_VERSION)} · About and credits</span></span>${icon("next", 18, 2)}</summary>
@@ -20129,7 +20154,7 @@ function renderSession() {
     if (ex.typeKey === "flashcard" && ex.ctx === undefined) ex.ctx = pick(contextFor(ex.item)) || null; // one sentence per card shown, kept across redraws
     const anim = S.fbShown !== fb; S.fbShown = fb; // the panel slides up once per answer, not on every redraw
     if (anim) S.fbScroll = true; // …and the page moves down so the answer (and a table's corrections) sit just above it
-    const flagged = progress.flags && progress.flags[flagId(ex)] && !progress.flags[flagId(ex)].removed;
+    const flag = progress.flags && progress.flags[flagId(ex)], flagged = flag && !flag.removed;
     const accept = !fb.ok && ex.english && ex.typeKey === "flashcard" && fb.given ? `<button type="button" data-act="accept">Accept my answer</button>` : "";
     body += `<section class="fb ${fb.ok ? "ok" : "bad"}${anim ? " anim" : ""}" aria-live="polite" aria-labelledby="fbtitle"><div class="fb-body">
       <div class="fb-head"><span class="fb-icon" aria-hidden="true">${icon(fb.ok ? "tick" : "cross", 16, 2.6)}</span><h2 class="fb-title" id="fbtitle">${title}</h2>${sayBtn(sayAnswerOf(ex, fb), "Listen to the answer", "solo")}</div>`
@@ -20145,7 +20170,7 @@ function renderSession() {
       + ruleBtn(ex, fb)
       + (S.flagOpen
         ? (accept ? `<div class="fb-actions">${accept}</div>` : "") + `<div class="flagbox"><label for="flagNote">What looks wrong? (optional)</label><textarea id="flagNote" class="plain" placeholder="e.g. my answer should also be accepted"></textarea><div class="btnrow end"><button type="button" class="quiet" data-act="flagCancel">Cancel</button><button type="button" data-act="flagSave">Save flag</button></div></div>`
-        : `<div class="fb-actions">${accept}${flagged ? `<span class="fb-flagged">Flagged for review.</span>` : `<button type="button" class="quiet" data-act="flagOpen">Flag this item</button>`}</div>`)
+        : `<div class="fb-actions">${accept}${fb.accepted ? `<button type="button" data-act="suggest">Suggest it for everyone</button>` : ""}${flagged ? (flag.reportedAt ? `<span class="fb-flagged">Flagged and reported.</span>` : `<span class="fb-flagged">Flagged.</span><button type="button" data-act="reportFlag">Report it</button>`) : `<button type="button" class="quiet" data-act="flagOpen">Flag this item</button>`}</div>`)
       + `</div><div class="fb-foot"><button type="button" class="fb-continue" data-act="continue">Continue</button></div></section>`;
   }
   return body;
@@ -20533,12 +20558,19 @@ function renderRules() {
     + `<nav class="card toc" id="rulestop" aria-labelledby="rulestoplabel"><div class="toclabel" id="rulestoplabel">Units</div>` + units.map((u, i) => `<button type="button" class="tocb" data-rjump="${esc(u.id)}"><span class="n">${i + 1}</span><span>${esc(u.title)}</span></button>`).join("") + `</nav>`
     + units.map(u => `<section class="card rule" id="rules-${esc(u.id)}"><div class="eyebrow">${esc(unitEyebrow(u))}</div><h2 class="title-s">${esc(u.title)}</h2><div class="notes">${u.notes.map(n => `<p>${esc(n)}</p>`).join("")}</div><div class="btnrow wrap">${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">Lesson</button><button type="button" data-ref="${esc(u.id)}" data-tab="glossary">Glossary</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}<button type="button" data-unit="${esc(u.id)}">Practise</button><button type="button" class="quiet" data-rjump="top">Units ↑</button></div></section>`).join("");
 }
+// The kinds of exercise (typeKey) by name, for Stats and the learning summary
+const TYPE_NAME = { flashcard: "Flashcards", recall: "Typed recall", article: "Article drill", conjugation: "Conjugation", cloze: "Fill in the blank", grammar: "Grammar questions", meaning: "Meaning (multiple choice)", flip: "Flip cards", intro: "New-item cards", agreement: "Adjective agreement", number: "Numbers", bank: "Word order", translate: "Translation", preparticle: "Preposition + article", transform: "Transformations", clock: "Telling the time", vtable: "Verbs: full tables", vspot: "Verbs: single forms", vtenseid: "Verbs: which tense?", vperson: "Verbs: which person?", vaux: "Verbs: essere or avere?", vpick: "Verbs: pick the form", vmeaning: "Verbs: from English", vswitch: "Verbs: change the tense", vinf: "Verbs: which verb?", spot: "Spot the mistake", sort: "Sort the words", match: "Match the pairs", reply: "Replies", endings: "Complete the endings", listen: "Listen and type", plural: "Plurals" };
+function accuracyByType(days, t = now()) { // [[typeKey, [right, answered]]] over the last `days` days of the daily log, weakest first
+  const cut = dayKey(t - (days - 1) * 864e5), m = {};
+  for (const [d, v] of Object.entries(progress.days)) if (d >= cut && v.t) for (const [k, x] of Object.entries(v.t)) if (k !== "all") { m[k] = m[k] || [0, 0]; m[k][0] += x[0]; m[k][1] += x[1]; }
+  return Object.entries(m).filter(e => e[1][1] > 0).sort((a, b) => (a[1][0] / a[1][1]) - (b[1][0] / b[1][1]));
+}
 function renderStats() {
   const t = now(), { learned, started, dueToday, dueWeek, lapsed, anyLapses, items, tricky, forecast } = counts();
   const days = Object.keys(progress.days).sort().slice(-14).reverse();
   const acc = (n) => { const a = accuracy(n); return a[1] ? pctOf(a) + " (" + a[0] + "/" + a[1] + ")" : "–"; };
-  const byType = (() => { const cut = dayKey(t - 29 * 864e5), m = {}; for (const [d, v] of Object.entries(progress.days)) if (d >= cut && v.t) for (const [k, x] of Object.entries(v.t)) if (k !== "all") { m[k] = m[k] || [0, 0]; m[k][0] += x[0]; m[k][1] += x[1]; } return Object.entries(m).filter(e => e[1][1] > 0).sort((a, b) => (a[1][0] / a[1][1]) - (b[1][0] / b[1][1])); })();
-  const typeName = { flashcard: "Flashcards", recall: "Typed recall", article: "Article drill", conjugation: "Conjugation", cloze: "Fill in the blank", grammar: "Grammar questions", meaning: "Meaning (multiple choice)", flip: "Flip cards", intro: "New-item cards", agreement: "Adjective agreement", number: "Numbers", bank: "Word order", translate: "Translation", preparticle: "Preposition + article", transform: "Transformations", clock: "Telling the time", vtable: "Verbs: full tables", vspot: "Verbs: single forms", vtenseid: "Verbs: which tense?", vperson: "Verbs: which person?", vaux: "Verbs: essere or avere?", vpick: "Verbs: pick the form", vmeaning: "Verbs: from English", vswitch: "Verbs: change the tense", vinf: "Verbs: which verb?", spot: "Spot the mistake", sort: "Sort the words", match: "Match the pairs", reply: "Replies", endings: "Complete the endings", listen: "Listen and type", plural: "Plurals" };
+  const byType = accuracyByType(30, t);
+  const typeName = TYPE_NAME;
   const table = (title, rows, after) => groupHtml(title, `<div class="card gcard"><div class="tablewrap"><table>${rows}</table></div></div>` + (after || ""));
   const stat = (k, v) => `<div class="stat"><span>${k}</span><span>${v}</span></div>`;
   return screenHead("Stats", { back: "you", backLabel: "You" }) + `
@@ -20591,11 +20623,26 @@ function renderSettings() {
 }
 function renderData() {
   const packList = BUILTIN_PACKS.map(b => ({ pack: b.pack, units: b.units.length, items: b.items.length, builtin: true })).concat(Object.values(packs).map(p => ({ pack: p.pack, units: (p.units || []).length, items: (p.items || []).length })));
-  const fl = Object.entries(progress.flags || {}).filter(([, f]) => !f.removed).sort((a, b) => b[1].createdAt - a[1].createdAt);
+  const fl = Object.entries(progress.flags || {}).filter(([, f]) => !f.removed).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+  const unreported = unreportedFlags(), acc = acceptedList(), errs = appErrors();
   return screenHead("Your data", { back: "you", backLabel: "You" }) + `
   <section class="card dsec" id="sec-sync"><h2>Sync</h2><p class="muted">${esc(syncDetail())}</p>${S.report ? `<div class="report" role="status">${esc(S.report)}</div>` : ""}</section>
-  <section class="card dsec" id="sec-flags"><h2>Flagged items</h2>` + (fl.length ? `<p class="small muted">${fl.length} item${fl.length === 1 ? "" : "s"} flagged. Ask Claude to review your flagged items and they can be fixed in the next update.</p><div>` + fl.map(([k, f]) => `<div class="frow"><div><div>${esc(f.prompt)}</div><div class="small muted">${esc((content.unitById[f.unit] || {}).title || f.unit)} · expected ${esc(f.expected)}${f.given ? " · you gave " + esc(f.given) : ""}</div>${f.note ? `<div class="small">${esc(f.note)}</div>` : ""}</div><button type="button" data-unflag="${esc(k)}">Remove</button></div>`).join("") + `</div>`
+  <section class="card dsec" id="sec-flags"><h2>Flagged items</h2>` + (fl.length ? `<p class="small muted">${fl.length} item${fl.length === 1 ? "" : "s"} flagged. Report a flag to send it to the project, so the item can be checked and fixed for everyone; nothing is sent until you choose how.</p><div>` + fl.map(([k, f]) => `<div class="frow stack"><div><div>${esc(f.prompt || f.id)}</div><div class="small muted">${esc([(content.unitById[f.unit] || {}).title || f.unit, f.expected && "expected " + f.expected, f.given && "you gave " + f.given].filter(Boolean).join(" · "))}</div>${f.note ? `<div class="small">${esc(f.note)}</div>` : ""}${f.reportedAt ? `<div class="small rp-done">${icon("tick", 16, 2.4)}<span>Reported on ${esc(dateText(f.reportedAt))}</span></div>` : ""}</div><div class="frow-b"><button type="button" data-reportflag="${esc(k)}">Report</button><button type="button" class="quiet" data-unflag="${esc(k)}">Remove</button></div></div>`).join("") + `</div>`
+      + (unreported.length > 1 ? `<div class="btnrow"><button type="button" class="primary" data-act="reportFlags">Report all ${unreported.length}${unreported.length < fl.length ? " not yet reported" : ""}</button></div>` : "")
       : `<p class="small muted">None yet. Use Flag this item under any answer that looks wrong.</p>`) + `</section>
+  <section class="card dsec" id="sec-answers"><h2>Accepted answers</h2>` + (acc.length ? `<p class="small muted">Answers you added with Accept my answer. They count only in your own copies of Ripasso; suggest one so it can be added for everyone.</p><div>` + acc.map(([id, a, n]) => { const it = content.items[id]; return `<div class="frow"><div><div><span lang="it">${esc(arr(it.it)[0])}</span> → ${esc(a)}</div><div class="small muted">${esc((content.unitById[it.unit] || {}).title || it.unit)} · its answers: ${esc(arr(it.en).join(", "))}</div></div><button type="button" data-suggest="${esc(id)}" data-n="${n}">Suggest</button></div>`; }).join("") + `</div>`
+      + (acc.length > 1 ? `<div class="btnrow"><button type="button" class="primary" data-act="suggestAll">Suggest all ${acc.length}</button></div>` : "")
+      : `<p class="small muted">None yet. When a flashcard marks your English answer wrong and you're sure it's right, Accept my answer adds it here.</p>`) + `</section>
+  <section class="card dsec" id="sec-problems"><h2>Report a problem</h2>
+  <h3 class="label">Problems the app noticed (${errs.length})</h3>` + (errs.length ? `<p class="small muted">Errors in the app's own workings, kept on this device only (the last ${ERRORS_CAP}). Reporting them helps get them fixed.</p><div class="errs">` + errs.slice(-5).reverse().map(e => `<div><div class="errm">${esc(e.m)}${e.n > 1 ? ` <span class="muted">(${e.n} times)</span>` : ""}</div><div class="small muted">${esc([stamp(e.t), e.v && "version " + e.v, e.screen && "on " + e.screen].filter(Boolean).join(" · "))}</div></div>`).join("") + (errs.length > 5 ? `<div class="small muted">…and ${errs.length - 5} earlier, all in the report.</div>` : "") + `</div><div class="btnrow"><button type="button" data-act="reportErrors">Report</button><button type="button" class="quiet" data-act="clearErrors">Clear</button></div>`
+      : `<p class="small muted">None on this device.</p>`) + `
+  <h3 class="label" id="probnote-h">Report an app problem</h3>
+  <label class="small muted" for="problemNote">Describe anything that looks or works wrong: where you were, what you did, what you saw and what you expected.</label><textarea id="problemNote" class="plain" placeholder="e.g. On the Units screen, the bar under Unit 3 stays empty">${esc(S.problemNote || "")}</textarea>
+  <div class="btnrow"><button type="button" data-act="reportApp">Report an app problem</button></div>${dataNote("problems")}</section>
+  <section class="card dsec" id="sec-summary"><h2>Your learning summary</h2>
+  <p class="small muted">Your 30 most-missed items, your weakest kinds of exercise and units over the last 30 days, each unit's progress and the words you mix up, as text: for your own use, or to share with a teacher or any assistant you choose. Ripasso never sends it.</p>
+  <div class="btnrow wrap"><button type="button" class="primary" data-act="summaryCopy">Copy my learning summary</button>${S.downloadsOk || S.standalone ? `<button type="button" data-act="summarySave">Save as a text file</button>` : ""}</div>${dataNote("summary")}
+  ${S.summaryBox ? `<label class="vh" for="summaryText">Your learning summary</label><textarea id="summaryText" readonly>${esc(S.summaryBox)}</textarea>` : ""}</section>
   ${appSectionHtml()}
   <section class="card dsec" id="sec-backup"><h2>Progress backup</h2>
   <p class="small muted">A backup file holds all your progress. Keep one somewhere safe, such as Google Drive, and load it to restore your progress or move it to another device; loading merges it with what's here, so nothing is lost.</p>
@@ -20615,11 +20662,227 @@ function renderData() {
   <section class="card dsec" id="sec-reset"><h2>Reset</h2><div><button type="button" class="danger" data-act="reset">Reset all progress</button></div><p class="small muted">Version ${esc(APP_VERSION)}</p></section>`;
 }
 
+/* ---------- reports (from 9.19) ----------
+   Anyone using Ripasso can send a problem to the project (REPORT_TO, beside APP_VERSION): a flagged item (a content
+   problem), an answer they accepted with Accept my answer (a missing answer), or something the app got wrong (an app
+   problem). Nothing leaves the device unless they tap: the report sheet says what the report holds, and offers GitHub's
+   new-issue form for REPORT_TO.github, filled in through its address (an issue form in .github/ISSUE_TEMPLATE/, its report
+   field prefilled by id), an email to REPORT_TO.email, and Copy, always (with a box to select and copy by hand where copying
+   isn't allowed). A report is plain text, readable by people and by tools/read-reports.js: a first line "Ripasso report 1",
+   then "key: value" lines, a value's further lines indented by two spaces. It never holds progress, settings, other flags
+   or anything about the person; several reports sent together follow one another, a blank line apart. */
+const REPORT_HEAD = "Ripasso report 1";
+const REPORT_FORMS = { "content problem": "content-problem.yml", "missing answer": "missing-answer.yml", "app problem": "app-problem.yml" }; // the issue forms, by kind
+const REPORT_URL_MAX = 6000; // characters: a longer address can be refused (GitHub answers 414) or cut short, so the form then opens empty, to paste into
+function reportText(fields) { // [[key, value], …] → one report; a value left empty is left out
+  const lines = [REPORT_HEAD];
+  for (const [k, v] of fields) {
+    const parts = String(v == null ? "" : v).split(/\r\n|\r|\n/).map(x => x.trim()).filter(Boolean);
+    if (parts.length) lines.push(k + ": " + parts[0], ...parts.slice(1).map(x => "  " + x));
+  }
+  return lines.join("\n");
+}
+const copyName = () => IN_CLAUDE ? "claude.ai" : isInstalled() ? "installed" : "browser"; // which copy of the app
+const reportBase = (kind, version) => [["kind", kind], ["app version", version || APP_VERSION], ["copy", copyName()]];
+const unitLabel = (id) => { const u = id && content.unitById[id]; return u ? `${id} (${u.title})` : id || ""; };
+const shortLine = (s, n) => { s = String(s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + "…" : s; };
+const reportTitle = (...parts) => shortLine(parts.filter(Boolean).join(" · "), 110); // "u05 · s-u05-03 · …": unit and item first, so duplicates are easy to spot
+function browserName(ua = navigator.userAgent || "") { // a short form of the user agent: "Chrome 141 · Android 10"
+  const m = (re) => { const x = ua.match(re); return x ? x[1] : ""; };
+  const b = m(/EdgA?\/(\d+)/) ? "Edge " + m(/EdgA?\/(\d+)/) : m(/SamsungBrowser\/(\d+)/) ? "Samsung Internet " + m(/SamsungBrowser\/(\d+)/)
+    : m(/(?:Firefox|FxiOS)\/(\d+)/) ? "Firefox " + m(/(?:Firefox|FxiOS)\/(\d+)/) : m(/(?:Chrome|CriOS)\/(\d+)/) ? "Chrome " + m(/(?:Chrome|CriOS)\/(\d+)/)
+    : m(/Version\/(\d+(?:\.\d+)?).*Safari/) ? "Safari " + m(/Version\/(\d+(?:\.\d+)?).*Safari/) : "";
+  const os = m(/Android (\d+(?:\.\d+)?)/) ? "Android " + m(/Android (\d+(?:\.\d+)?)/) : m(/(?:iPhone|iPad|iPod).*? OS (\d+(?:_\d+)?)/) ? "iOS " + m(/(?:iPhone|iPad|iPod).*? OS (\d+(?:_\d+)?)/).replace("_", ".")
+    : /Windows/.test(ua) ? "Windows" : /CrOS/.test(ua) ? "ChromeOS" : /Mac OS X/.test(ua) ? "macOS" : /Linux/.test(ua) ? "Linux" : "";
+  return [b, os].filter(Boolean).join(" · ") + (/; wv\)/.test(ua) ? " (inside an app)" : "") || "unknown";
+}
+const stamp = (t) => { const d = new Date(t); return dayKey(t) + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+const dateText = (t) => new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+
+// A content problem: a flagged item, as Flag this item saved it (the exercise, what was expected and given, the note)
+function flagFields(f) {
+  return reportBase("content problem", f.version).concat([["item", f.id], ["unit", unitLabel(f.unit)], ["exercise", f.exercise], ["shown", f.prompt], ["expected", f.expected], ["given", f.given], ["note", f.note]]);
+}
+function flagsReport(keys) { // the flags (keys of progress.flags) in one report; sending it marks each one reported
+  const fl = keys.map(k => [k, progress.flags && progress.flags[k]]).filter(([, f]) => f && !f.removed), one = fl.length === 1 && fl[0][1];
+  const units = [...new Set(fl.map(([, f]) => f.unit).filter(Boolean))];
+  return { kind: "content problem", n: fl.length, text: fl.map(([, f]) => reportText(flagFields(f))).join("\n\n"),
+    title: one ? reportTitle(one.unit, one.id, one.note || (one.expected ? "expected " + one.expected : "content problem")) : reportTitle(units.length === 1 ? units[0] : "several units", fl.length + " items", "content problems"),
+    sent: () => markReported(fl.map(([k]) => k)) };
+}
+function markReported(keys) { // a reported flag says so on Your data until it is removed (reportedAt, which older copies ignore)
+  const t = now();
+  for (const k of keys) { const f = progress.flags[k]; if (f && !f.removed) { f.reportedAt = t; f.updatedAt = t; } }
+  saveProgress(false); // only the flags changed: each one's own document carries it to the cloud
+}
+const unreportedFlags = () => Object.keys(progress.flags || {}).filter(k => { const f = progress.flags[k]; return f && typeof f === "object" && !f.removed && !f.reportedAt; });
+// A missing answer: what was typed on a card, accepted with Accept my answer, offered for everyone
+function answerFields(item, given, exercise) {
+  return reportBase("missing answer").concat([["item", item.id], ["unit", unitLabel(item.unit)], ["exercise", exercise || "Flashcard · translate to English"], ["shown", arr(item.it).join(" / ")], ["expected", arr(item.en).join(" · ")], ["given", given]]);
+}
+function answersReport(list) { // [[item, the answer, the exercise]]
+  const one = list.length === 1 && list[0], units = [...new Set(list.map(x => x[0].unit))];
+  return { kind: "missing answer", n: list.length, text: list.map(([it, g, e]) => reportText(answerFields(it, g, e))).join("\n\n"),
+    title: one ? reportTitle(one[0].unit, one[0].id, "missing answer: " + one[1]) : reportTitle(units.length === 1 ? units[0] : "several units", list.length + " answers", "missing answers") };
+}
+const acceptedList = () => Object.keys(progress.synonyms || {}).filter(id => content.items[id] && Array.isArray(progress.synonyms[id])).flatMap(id => progress.synonyms[id].map((s, n) => [id, String(s), n])).filter(x => x[1]);
+// An app problem: what the learner describes, the screen they came from, the browser, and the errors the app noticed
+const LS_ERRORS = "itapp.errors.v1", ERRORS_CAP = 20; // written by the small script before this one (an error while this one starts is kept too)
+function appErrors() { // the errors kept on this device, oldest first, as { m: message, at: place in the code, screen, v: version, t: time, n: times in a row }
+  try {
+    const v = lsGet(LS_ERRORS);
+    return Array.isArray(v) ? v.filter(e => e && typeof e === "object" && typeof e.m === "string" && Number.isFinite(e.t)).slice(-ERRORS_CAP)
+      .map(e => ({ m: e.m, at: String(e.at || ""), screen: String(e.screen || ""), v: String(e.v || ""), t: e.t, n: Number.isInteger(e.n) && e.n > 1 ? e.n : 1 })) : [];
+  } catch (e) { return []; }
+}
+function clearErrors() { try { localStorage.removeItem(LS_ERRORS); } catch (e) { } }
+const errorLine = (e) => [stamp(e.t), e.v && "version " + e.v, e.screen && "on " + e.screen, e.m, e.at, e.n > 1 && e.n + " times"].filter(Boolean).join(" · ");
+function appReport(note) {
+  const errs = appErrors(), last = errs[errs.length - 1]; // the screen: the one the learner came to Your data from, or the last error's
+  return { kind: "app problem", n: 1, text: reportText(reportBase("app problem").concat([["screen", note ? S.lastScreen : last ? last.screen : ""], ["browser", browserName()], ["note", note], ["errors", errs.slice().reverse().map(errorLine).join("\n")]])),
+    title: reportTitle("app", APP_VERSION, note || (last ? last.m : "app problem")) };
+}
+
+// Where a report goes: GitHub's form, filled in through the address (or, when the text is too long, opened with only its
+// title, the report copied to paste in), and an email the same way. Each is null when REPORT_TO doesn't name one.
+function issueLink(rep, to = REPORT_TO) {
+  if (!to || !to.github) return null;
+  const base = `https://github.com/${to.github}/issues/new?template=${REPORT_FORMS[rep.kind]}&title=${encodeURIComponent(rep.title)}`, url = base + "&report=" + encodeURIComponent(rep.text);
+  return url.length <= REPORT_URL_MAX ? { url, full: true } : { url: base, full: false };
+}
+function mailLink(rep, to = REPORT_TO) {
+  if (!to || !to.email) return null;
+  const base = `mailto:${to.email}?subject=${encodeURIComponent(rep.title)}`, url = base + "&body=" + encodeURIComponent(rep.text);
+  return url.length <= REPORT_URL_MAX ? { url, full: true } : { url: base, full: false };
+}
+async function copyText(text) { // true when the text reached the clipboard; call it while the page has the focus (before opening a link)
+  try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } } catch (e) { }
+  try {
+    const t = document.createElement("textarea"), had = document.activeElement;
+    t.value = text; t.setAttribute("readonly", ""); t.style.cssText = "position:fixed;top:0;left:0;opacity:0";
+    document.body.appendChild(t); t.select(); t.setSelectionRange(0, text.length);
+    const ok = document.execCommand("copy"); t.remove(); if (had && had.focus) had.focus({ preventScroll: true });
+    return !!ok;
+  } catch (e) { return false; }
+}
+
+/* The report sheet (.reportsheet in #reportBg): over whatever screen is open, which it leaves as it was, in the frame of the
+   leave-session sheet. Close, a tap beside it, Escape and the back button close it, and the focus goes back where it was. */
+const REPORT_HOLDS = { "content problem": "the exercise, the answers and your note", "missing answer": "the card, its answers and what you typed", "app problem": "what you wrote, the problems the app noticed, the app's version and your browser" };
+function openReport(rep) { // rep: { kind, title, text, n, sent (called once it is sent), from (where the focus goes back to) }
+  if (!rep || !rep.n) return;
+  S.rsheet = Object.assign({ state: "", box: false }, rep);
+  drawReport();
+  syncHistory();
+}
+function reportSheetHtml() {
+  const r = S.rsheet, gh = issueLink(r), em = mailLink(r), many = r.n > 1;
+  const head = { "content problem": many ? `Report ${r.n} items` : "Report this item", "missing answer": many ? `Suggest ${r.n} answers` : "Suggest this answer", "app problem": "Report an app problem" }[r.kind];
+  const holds = `It holds ${REPORT_HOLDS[r.kind]}, and nothing about you or your progress.`;
+  const line = gh ? `Open GitHub makes this a public page anyone can read, and needs a GitHub account (without one, use Copy and send it any way you like). ${holds}`
+    : em ? `Email opens your mail app with the report. ${holds}` : `Copy the report and send it to whoever looks after Ripasso. ${holds}`;
+  const btns = (gh ? `<button type="button" class="primary" data-act="rpGithub">${gh.full ? "Open GitHub" : "Copy and open GitHub"}</button>` : "")
+    + (em ? `<button type="button"${gh ? "" : ' class="primary"'} data-act="rpEmail">${em.full ? "Email" : "Copy and email"}</button>` : "")
+    + `<button type="button"${gh || em ? "" : ' class="primary"'} data-act="rpCopy">Copy</button>`;
+  return `<div class="sheet-bg" id="reportBg"><div class="card sheet reportsheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="rp-t" aria-describedby="rp-d">
+  <h2 class="label" id="rp-t">${head}</h2><p class="small" id="rp-d">${line}</p>
+  ${(gh && !gh.full) || (!gh && em && !em.full) ? `<p class="small muted" id="rp-long">This report is too long to fill in for you, so ${gh ? "Copy and open GitHub copies it first: paste it into the Report box there." : "Copy and email copies it first: paste it into the email."}</p>` : ""}
+  <details class="rp-text"><summary>See the report</summary><pre>${esc(r.text)}</pre></details>
+  ${r.state ? `<p class="small rp-state" role="status">${esc(r.state)}</p>` : ""}
+  ${r.box ? `<label class="vh" for="reportText">The report</label><textarea id="reportText" readonly>${esc(r.text)}</textarea>` : ""}
+  <div class="btnrow wrap">${btns}</div><div class="btnrow end"><button type="button" class="quiet" data-act="rpClose">Close</button></div></div></div>`;
+}
+function drawReport() { // the sheet drawn (again) without drawing the screen under it
+  const box = document.createElement("div"); box.innerHTML = reportSheetHtml();
+  const bg = box.firstElementChild, old = document.getElementById("reportBg"), was = old && old.contains(document.activeElement) && document.activeElement.dataset.act;
+  if (old) old.replaceWith(bg); else app.appendChild(bg);
+  wireReport(bg, was);
+}
+function wireReport(bg, focusAct) {
+  wire(bg);
+  bg.onclick = (e) => { if (e.target === bg) closeReport(); };
+  for (const c of app.children) c.inert = c !== bg; // the screen behind can't be reached until the sheet closes
+  const ta = bg.querySelector("#reportText"), b = focusAct && bg.querySelector(`[data-act="${focusAct}"]`), k = bg.querySelector(".sheet");
+  if (ta) { ta.focus({ preventScroll: true }); ta.setSelectionRange(0, ta.value.length); } // copying isn't allowed: the text is selected, to copy by hand
+  else if (b) b.focus({ preventScroll: true });
+  else if (k && !k.contains(document.activeElement)) k.focus({ preventScroll: true });
+}
+function closeReport() {
+  const r = S.rsheet; S.rsheet = null;
+  const bg = document.getElementById("reportBg"); if (bg) bg.remove();
+  for (const c of app.children) c.inert = false;
+  if (r && r.dirty) render(); // a flag now says it was reported
+  const b = r && r.from && app.querySelector(r.from); if (b) b.focus({ preventScroll: true });
+  syncHistory(); // back closed it: the history entry that keeps this screen is put back
+}
+async function reportVia(how) { // GitHub, email or Copy, from the sheet
+  const r = S.rsheet; if (!r) return;
+  const link = how === "github" ? issueLink(r) : how === "email" ? mailLink(r) : null;
+  const copying = !link || !link.full ? copyText(r.text) : null; // started while this page still has the focus, before a link opens
+  let opened = false;
+  if (link) { try { opened = !!window.open(link.url, "_blank"); } catch (e) { opened = false; } }
+  let copied = copying ? await copying : false;
+  if (link && !opened && !copying) copied = await copyText(r.text); // some views can't open a link: copying is the way out
+  const where = how === "github" ? `a new issue at github.com/${REPORT_TO.github}` : `an email to ${REPORT_TO.email}`;
+  if (link && !opened) r.state = copied ? `This view can't open links, so the report has been copied: paste it into ${where}, or send it any way you like.` : `This view can't open links: copy the report from the box below and paste it into ${where}, or send it any way you like.`;
+  else if (link && link.full) r.state = how === "github" ? "GitHub has opened with the report filled in: check it there, then submit it." : "Your mail app should open with the report: send it from there.";
+  else if (link) r.state = copied ? `Copied, and ${how === "github" ? "GitHub has opened: paste the report into the Report box there, then submit it." : "your mail app should open: paste the report into the email."}` : `${how === "github" ? "GitHub has opened" : "Your mail app should open"}: copy the report from the box below and paste it in there.`;
+  else r.state = copied ? "Copied. Paste it into an email, a message or an issue on GitHub." : "Copying isn't allowed here: the report is selected in the box below, so copy it from there.";
+  r.box = !copied && !(link && link.full && opened);
+  if ((opened || copied) && r.sent && !r.dirty) { r.sent(); r.dirty = true; }
+  if (S.rsheet === r) drawReport();
+}
+
+/* The learning summary (Your data): how the learning is going, as text, for the learner's own use or to share with a
+   teacher or any assistant they choose. Made only when asked for, and never sent by the app. */
+function learningSummary() {
+  const t = now(), cut = t - 30 * 864e5, c = counts(), out = [];
+  const unitName = (id) => { const u = content.unitById[id]; return u ? unitEyebrow(u) + " · " + u.title : id; };
+  const meaning = (it) => { const en = it && it.type !== "grammar_mc" && arr(it.en)[0]; return en ? ` (${en})` : ""; };
+  const a7 = accuracy(7), a30 = accuracy(30), list = (title, rows, none) => out.push("", "## " + title, ...(rows.length ? rows : [none]));
+  out.push(`# Ripasso learning summary, ${new Date(t).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}`,
+    `Ripasso ${APP_VERSION}, an Italian practice app with spaced repetition (items move up boxes 1 to 7 as they are answered right; box 5 or higher counts as learned). Made for the learner's own use; the app never sends it.`);
+  list("Overall", [`- ${fmtN(c.started)} of ${fmtN(c.items)} items started, ${fmtN(c.learned)} learned, ${fmtN(c.dueToday)} due within a day.`,
+    `- Accuracy: ${pctOf(a7)} over the last 7 days (${a7[0]} of ${a7[1]} right), ${pctOf(a30)} over the last 30 days (${a30[0]} of ${a30[1]}).`, `- Streak: ${streak()} day${streak() === 1 ? "" : "s"}.`]);
+  const missed = Object.keys(progress.items).filter(id => content.items[id] && progress.items[id].lapses > 0)
+    .sort((a, b) => progress.items[b].lapses - progress.items[a].lapses || progress.items[a].box - progress.items[b].box).slice(0, 30);
+  list("The 30 most-missed items", missed.map(id => { const it = content.items[id], r = progress.items[id]; return `- ${itemLabel(it)}${meaning(it)} · ${unitName(it.unit)} · missed ${r.lapses} time${r.lapses === 1 ? "" : "s"} · box ${r.box}`; }), "- None missed yet.");
+  list("Weakest kinds of exercise, last 30 days (weakest first)", accuracyByType(30, t).slice(0, 10).map(([k, v]) => `- ${TYPE_NAME[k] || k}: ${Math.round(100 * v[0] / v[1])}% (${v[0]} of ${v[1]} right)`), "- No answers in the last 30 days.");
+  const weak = [];
+  for (const u of content.units) { // of the unit's items practised in the last 30 days, how many were missed in that time
+    let seen = 0, wrong = 0; const done = new Set();
+    for (const it of content.byUnit[u.id] || []) { const p = pid(it.id), r = progress.items[p]; if (done.has(p) || !r) continue; done.add(p); if ((r.lastSeen || 0) >= cut) { seen++; if ((r.lastWrong || 0) >= cut) wrong++; } }
+    if (seen >= 5 && wrong) weak.push([u, wrong, seen]);
+  }
+  weak.sort((a, b) => b[1] / b[2] - a[1] / a[2] || b[1] - a[1]);
+  list("Weakest units, last 30 days (weakest first)", weak.slice(0, 10).map(([u, w, s]) => `- ${unitName(u.id)}: ${w} of the ${s} items practised were missed (${Math.round(100 * w / s)}%)`), "- No unit with 5 or more items practised and missed in the last 30 days.");
+  list("Each unit: items started, learned and due", content.units.map(u => { const k = c.unit[u.id]; return !k || !k.total ? null : k.started ? `- ${unitName(u.id)}: ${k.started} of ${k.total} started, ${k.learned} learned, ${k.due} due` : `- ${unitName(u.id)}: not started (${k.total} items)`; }).filter(Boolean), "- No units.");
+  const label = (id) => { const it = content.items[id]; return it ? arr(it.it)[0] + meaning(it) : id; };
+  list("Words mixed up (remembered on this device)", [...confusions().values()].sort((a, b) => b[2] - a[2]).slice(0, 30).map(([x, y, n]) => `- ${label(x)} and ${label(y)}: ${n} time${n === 1 ? "" : "s"}`), "- None remembered.");
+  return out.join("\n") + "\n";
+}
+async function copySummary() {
+  const text = learningSummary(), ok = await copyText(text);
+  S.summaryBox = ok ? null : text;
+  S.dataNote = { at: "summary", text: ok ? "Copied. Paste it wherever you like." : "Copying isn't allowed here: your summary is in the box below, selected, so copy it from there." };
+  render();
+  const b = document.getElementById("summaryText"); if (b) { b.focus({ preventScroll: true }); b.setSelectionRange(0, b.value.length); }
+}
+async function saveSummary() {
+  const filename = "ripasso-learning-summary-" + dayKey(now()) + ".txt", text = learningSummary();
+  if (S.downloads) {
+    try { await S.downloads.save({ filename, data: text }); S.dataNote = { at: "summary", text: "Saved as " + filename + "." }; }
+    catch (e) { if (e && e.code === "declined") return; S.dataNote = { at: "summary", text: "Could not save the file (" + ((e && e.code) || "error") + "). Use Copy instead." }; }
+  } else { saveBlob(filename, text, "text/plain"); S.dataNote = { at: "summary", text: "Saved to your downloads as " + filename + "." }; }
+  render();
+}
+const dataNote = (at) => S.dataNote && S.dataNote.at === at ? `<p class="small dnote" role="status">${esc(S.dataNote.text)}</p>` : "";
+
 /* ---------- wiring ---------- */
 function wire(root = app) { // root: the screen, or the part of it just drawn again (only its buttons and links are wired)
   root.querySelectorAll("[data-go]").forEach(b => b.onclick = () => {
     const g = b.dataset.go;
-    S.flash = null; S.report = null; S.exportText = null;
+    S.flash = null; S.report = null; S.exportText = null; S.dataNote = null; S.summaryBox = null;
     if (g === "quit") { session = null; S.feedback = null; S.leaveAsk = false; S.rule = null; S.screen = "home"; }
     else S.screen = g;
     S.scrollTo = b.dataset.to || null; // a You row can open a screen at one of its sections
@@ -20628,6 +20891,11 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   root.querySelectorAll("[data-start]").forEach(b => b.onclick = () => { S.flash = null; startSession(b.dataset.start); });
   root.querySelectorAll("[data-setunit]").forEach(b => b.onclick = () => { progress.currentUnit = b.dataset.setunit; saveProgress(); render(); });
   root.querySelectorAll("[data-unflag]").forEach(b => b.onclick = () => { const f = progress.flags[b.dataset.unflag]; if (f) { f.removed = true; f.updatedAt = now(); saveProgress(); render(); } });
+  root.querySelectorAll("[data-reportflag]").forEach(b => b.onclick = () => openReport(Object.assign(flagsReport([b.dataset.reportflag]), { from: `[data-reportflag="${CSS.escape(b.dataset.reportflag)}"]` })));
+  root.querySelectorAll("[data-suggest]").forEach(b => b.onclick = () => {
+    const it = content.items[b.dataset.suggest], a = it && ((progress.synonyms || {})[it.id] || [])[Number(b.dataset.n)];
+    if (a) openReport(Object.assign(answersReport([[it, a]]), { from: `[data-suggest="${CSS.escape(it.id)}"][data-n="${b.dataset.n}"]` }));
+  });
   root.querySelectorAll("[data-ref]").forEach(b => b.onclick = (e) => { e.preventDefault(); S.flash = null; S.refUnit = b.dataset.ref; S.refFilter = ""; if (b.dataset.tab) S.refTab = b.dataset.tab; S.jumpSec = b.dataset.jump != null ? Number(b.dataset.jump) : null; S.screen = "reference"; render(); });
   root.querySelectorAll("[data-reftab]").forEach(b => b.onclick = () => { S.refTab = b.dataset.reftab; render(); });
   root.querySelectorAll("[data-rjump]").forEach(b => b.onclick = () => { const t = document.getElementById(b.dataset.rjump === "top" ? "rulestop" : "rules-" + b.dataset.rjump); if (t) t.scrollIntoView({ block: "start" }); });
@@ -20670,20 +20938,22 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   if (sb) { sb.onclick = (e) => { if (e.target === sb) action("stay"); }; const k = sb.querySelector(".sheet"); if (k) k.focus({ preventScroll: true }); } // focus moves into the sheet (and the keyboard closes)
   const rb = document.getElementById("ruleBg"); if (rb) wireRule(rb);
   const inp = document.getElementById("answer");
-  if (inp && !S.feedback && !S.leaveAsk) { inp.focus(); }
+  if (inp && !S.feedback && !S.leaveAsk && !S.rsheet) { inp.focus(); }
   const cellInputs = app.querySelectorAll("[data-cell]");
   cellInputs.forEach(c => c.onfocus = () => { S.focusId = c.id; });
   if (cellInputs.length && !S.feedback && !S.leaveAsk) cellInputs[0].focus();
   const fldInputs = app.querySelectorAll("[data-fld]");
   fldInputs.forEach(c => c.onfocus = () => { S.focusId = c.id; });
   if (fldInputs.length && !S.feedback && !S.leaveAsk) fldInputs[0].focus();
-  if (S.feedback && !S.leaveAsk && !S.rule) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
+  if (S.feedback && !S.leaveAsk && !S.rule && !S.rsheet) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
   const lb = document.getElementById("lookupBox");
   if (lb) { lb.oninput = () => { S.lookup = lb.value; afterTyping(() => redrawResults("lookupResults", lookupResultsHtml)); }; if (!S.lookup) lb.focus(); }
   const rf = document.getElementById("refFilter");
   if (rf) rf.oninput = () => { S.refFilter = rf.value; afterTyping(() => { const u = content.unitById[S.refUnit]; if (u) redrawResults("refResults", () => u.mode === "verbs" ? verbListHtml() : glossaryHtml(u)); }); };
   const pf = document.getElementById("packFile"); if (pf) pf.onchange = () => readFile(pf, txt => { document.getElementById("packText").value = txt; action("importPack"); });
   const prf = document.getElementById("progressFile"); if (prf) prf.onchange = () => readFile(prf, txt => { document.getElementById("progressText").value = txt; action("importProgress"); });
+  const pn = document.getElementById("problemNote"); if (pn) pn.oninput = () => { S.problemNote = pn.value; }; // kept when the screen is drawn again
+  const rp = document.getElementById("reportBg"); if (rp) wireReport(rp); // last, so the focus ends in the sheet
 }
 function readFile(input, cb) { const f = input.files && input.files[0]; if (!f) return; const r = new FileReader(); r.onload = () => cb(String(r.result)); r.readAsText(f); }
 function insertChar(ch) {
@@ -20725,6 +20995,23 @@ function action(a) {
     case "flagOpen": S.flagOpen = true; render(); { const n = document.getElementById("flagNote"); if (n) n.focus(); } break;
     case "flagCancel": S.flagOpen = false; render(); break;
     case "flagSave": saveFlag(); break;
+    case "reportFlag": { const k = q && flagId(q.ex); if (k && progress.flags[k] && !progress.flags[k].removed) openReport(Object.assign(flagsReport([k]), { from: '[data-act="reportFlag"]' })); break; } // the answer panel, after Flag this item
+    case "suggest": { const fb = S.feedback; if (q && fb && fb.accepted && fb.given) openReport(Object.assign(answersReport([[q.ex.item, fb.given, q.ex.type]]), { from: '[data-act="suggest"]' })); break; } // …after Accept my answer
+    case "reportFlags": openReport(Object.assign(flagsReport(unreportedFlags()), { from: '[data-act="reportFlags"]' })); break;
+    case "suggestAll": openReport(Object.assign(answersReport(acceptedList().map(([id, a]) => [content.items[id], a])), { from: '[data-act="suggestAll"]' })); break;
+    case "reportErrors": openReport(Object.assign(appReport(""), { from: '[data-act="reportErrors"]' })); break;
+    case "clearErrors": clearErrors(); S.dataNote = { at: "problems", text: "Cleared." }; render(); break;
+    case "reportApp": {
+      const ta = document.getElementById("problemNote"), note = ta ? ta.value.trim() : "";
+      if (!note) { S.dataNote = { at: "problems", text: "First write what looks or works wrong, in the box above." }; render(); const t = document.getElementById("problemNote"); if (t) t.focus(); break; }
+      openReport(Object.assign(appReport(note), { from: '[data-act="reportApp"]', sent: () => { S.problemNote = ""; } })); break;
+    }
+    case "rpGithub": reportVia("github"); break;
+    case "rpEmail": reportVia("email"); break;
+    case "rpCopy": reportVia("copy"); break;
+    case "rpClose": closeReport(); break;
+    case "summaryCopy": copySummary(); break;
+    case "summarySave": saveSummary(); break;
     case "importPack": {
       const txt = document.getElementById("packText").value.trim();
       let obj; try { obj = JSON.parse(txt); } catch (e) { S.report = "Not valid JSON: " + e.message; render(); return; }
@@ -20769,6 +21056,7 @@ function action(a) {
   }
 }
 document.addEventListener("keydown", (e) => {
+  if (S.rsheet) { if (e.key === "Escape") closeReport(); return; } // the report sheet, on any screen
   if (S.screen !== "session" || !session) return;
   if (S.rule) { if (e.key === "Escape") closeRule(); return; } // Enter belongs to the sheet's own buttons, not to Continue
   if (S.leaveAsk) { if (e.key === "Escape") action("stay"); return; }
@@ -21046,9 +21334,9 @@ function damageNote(g) { // what loading a backup says about the records the gua
   if (g.skipped) parts.push(n(g.skipped, "record in it couldn't be read and was skipped", "records in it couldn't be read and were skipped"));
   return parts.length ? " " + parts.join("; ") + "." : "";
 }
-function saveBlob(filename, text) {
+function saveBlob(filename, text, type = "application/json") {
   const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  a.href = URL.createObjectURL(new Blob([text], { type }));
   a.download = filename; document.body.appendChild(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
 }
@@ -21170,6 +21458,7 @@ window.addEventListener("popstate", () => {
   goBack();
 });
 function goBack() {
+  if (S.rsheet) { closeReport(); return; }
   S.flash = null; S.report = null; S.exportText = null;
   if (S.screen === "session" && session) { if (S.rule) { closeRule(); return; } S.leaveAsk = !S.leaveAsk; render(); return; }
   if (S.screen === "home") { render(); return; }
@@ -21186,8 +21475,9 @@ function leaveSheetHtml() {
 document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(true); } }); // every document compared, in case a change went unmarked
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.18";
-const CHANGES = "A new Vocab pack 9: 1,000 upper-intermediate words and phrases, almost half of them idioms, sayings and spoken expressions, between the old packs 8 and 9. The old pack 9 is now pack 10, with your progress on it unchanged."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.19";
+const CHANGES = "You can now report a problem from the app: a flagged item, an answer you accepted or something that works wrong becomes a public GitHub issue, or a copy to send any way you like, and only when you tap. Your data also has a learning summary to copy or save."; // this version's changes in one or two plain sentences, for What's new on Today
+const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 applyTheme(themePref());
 const tidied = loadLocal();
 if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new

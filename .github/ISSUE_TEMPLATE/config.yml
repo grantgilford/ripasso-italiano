@@ -1,0 +1,7 @@
+# The new-issue page: the three forms Ripasso fills in (content problem, missing answer, app problem), and a blank
+# issue for anything else.
+blank_issues_enabled: true
+contact_links:
+  - name: Ripasso Italiano (the app)
+    url: https://grantgilford.github.io/ripasso-italiano/
+    about: The easiest way to report is from the app itself, You → Your data, which fills in the form for you.

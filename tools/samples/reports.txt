@@ -1,0 +1,75 @@
+Sample reports for tools/read-reports.js and tools/test-reports.js, in the wrappings they arrive in.
+Text outside a report, like this, is skipped.
+
+--- 1. A GitHub issue (the body of one made from the content-problem form), as copied from the page ---
+
+### Report
+
+```text
+Ripasso report 1
+kind: content problem
+app version: 9.19
+copy: installed
+item: s-u05-03
+unit: u05 (Verb tenses: present, past, future and conditional)
+exercise: Fill in the blank
+shown: Io ___ alle sei. (finire)
+expected: finisco
+given: finisco
+note: I typed the right answer and it was marked wrong?
+  It happened twice.
+```
+
+### Anything to add?
+
+_No response_
+
+--- 2. An email, quoted in a reply ---
+
+> Ripasso report 1
+> kind: missing answer
+> app version: 9.19
+> copy: claude.ai
+> item: fc1-se
+> unit: fc01 (Vocab pack 1)
+> exercise: Flashcard · translate to English
+> shown: se
+> expected: if · whether
+> given: in case
+
+--- 3. Report all: two content problems in one issue, one for an item removed since (ID_ALIASES leads on) ---
+
+Ripasso report 1
+kind: content problem
+app version: 9.17
+copy: browser
+item: v-u02-y-fiore
+unit: u02 (Nouns, gender & articles)
+exercise: Typed recall
+shown: flower
+expected: il fiore
+given: la fiore
+
+Ripasso report 1
+kind: content problem
+app version: 9.19
+copy: installed
+item: s-u05-03
+unit: u05 (Verb tenses: present, past, future and conditional)
+exercise: Translate
+shown: I finish at six.
+expected: Io finisco alle sei.
+given: Finisco alle 6.
+note: Digits for the time should be fine.
+
+--- 4. An app problem with the errors the app noticed ---
+
+Ripasso report 1
+kind: app problem
+app version: 9.19
+copy: installed
+screen: reference:u05:lesson
+browser: Chrome 141 · Android 10
+note: The section chips don't scroll on my phone.
+errors: 2026-10-27 21:03 · version 9.19 · on reference · TypeError: Cannot read properties of null (reading 'top') · index.html:20310:44 · 3 times
+  2026-10-26 08:15 · version 9.18 · on session · Uncaught Error: test · index.html:19700:12
