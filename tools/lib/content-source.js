@@ -1,7 +1,7 @@
 /*
   The content constants as text in index.html: where each one sits, and the layout every tool
   writes them in, so a change to the content shows in a pull request as the lines it changes.
-  Used by format-content (which lays them all out), add-items and edit-items (which change
+  Used by format-content (which lays them all out), check-content (which checks the layout), add-items and edit-items (which change
   items, aliases and links and write the constant back in the same layout).
 
   The content constants are JSON literals (const NAME = {…}; or […];), laid out like this:
@@ -10,6 +10,7 @@
                                                       grammar unit (no mode) with one note per line
     LESSONS                                           one section per line, under its unit's line
     VERB_GYM                                          one verb per line
+    VERB_SENTENCES                                    one verb per line: its example sentences
     ID_ALIASES                                        one alias per line
     ITEM_SECTIONS                                     one unit per line: its items' lesson links
 
@@ -24,7 +25,7 @@
 "use strict";
 const { BOOT_MARK, appScript } = require("./load-app");
 
-const LESSON_NAMES = ["LESSONS"], VERB_NAMES = ["VERB_GYM"], ALIAS_NAMES = ["ID_ALIASES"], LINK_NAMES = ["ITEM_SECTIONS"];
+const LESSON_NAMES = ["LESSONS"], VERB_NAMES = ["VERB_GYM"], ALIAS_NAMES = ["ID_ALIASES"], LINK_NAMES = ["ITEM_SECTIONS"], SENTENCE_NAMES = ["VERB_SENTENCES"];
 
 // JSON.stringify, made safe inside a <script>: "</script" and "<!--" would end or confuse the
 // script, so they are written with an escape (which JSON.parse and JavaScript read back unchanged).
@@ -58,12 +59,12 @@ function formatLessons(lessons) {
   return block("{", Object.keys(lessons).map(u => json(u) + ": " + lesson(lessons[u])), "  ", "", "}");
 }
 const formatList = list => block("[", list.map(json), "  ", "", "]");                                        // VERB_GYM
-const formatMap = map => block("{", Object.keys(map).map(k => json(k) + ": " + json(map[k])), "  ", "", "}"); // ID_ALIASES, ITEM_SECTIONS
+const formatMap = map => block("{", Object.keys(map).map(k => json(k) + ": " + json(map[k])), "  ", "", "}"); // ID_ALIASES, ITEM_SECTIONS, VERB_SENTENCES
 
 function formatConstant(name, value) {
   if (LESSON_NAMES.includes(name)) return formatLessons(value);
   if (VERB_NAMES.includes(name)) return formatList(value);
-  if (ALIAS_NAMES.includes(name) || LINK_NAMES.includes(name)) return formatMap(value);
+  if (ALIAS_NAMES.includes(name) || LINK_NAMES.includes(name) || SENTENCE_NAMES.includes(name)) return formatMap(value);
   if (value && Array.isArray(value.items)) return formatPack(value);
   throw new Error(`No layout for ${name}.`);
 }
@@ -117,8 +118,8 @@ function packNames(html) {
   if (!m) throw new Error("Could not find BUILTIN_PACKS in index.html.");
   return m[1].split(",").map(s => s.trim()).filter(n => /^[A-Z][A-Z0-9_]*$/.test(n) && findLiteral(html, n));
 }
-// Every content constant that has a layout: the literal packs, LESSONS, VERB_GYM, ID_ALIASES and ITEM_SECTIONS.
-const contentNames = html => packNames(html).concat(LESSON_NAMES, VERB_NAMES, ALIAS_NAMES, LINK_NAMES).filter(n => findLiteral(html, n));
+// Every content constant that has a layout: the literal packs, LESSONS, VERB_GYM, VERB_SENTENCES, ID_ALIASES and ITEM_SECTIONS.
+const contentNames = html => packNames(html).concat(LESSON_NAMES, VERB_NAMES, SENTENCE_NAMES, ALIAS_NAMES, LINK_NAMES).filter(n => findLiteral(html, n));
 
 // The packs written as literals, parsed: [{ name, pack }], in the order of BUILTIN_PACKS.
 const literalPacks = html => packNames(html).map(name => ({ name, pack: parseLiteral(html, name) }));
