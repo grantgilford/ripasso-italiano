@@ -67,3 +67,7 @@ jobs:
       - name: Choices test (tools/test-choices.js)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/test-choices.js
+
+      - name: Verbs test (tools/test-verbs.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node tools/test-verbs.js

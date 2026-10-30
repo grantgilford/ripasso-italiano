@@ -12,7 +12,7 @@
        the results drawn), a unit's glossary filter (five units, one of them 1,000 cards) and the Verbs
        filter, against searching every field afresh as 9.2 did.
     2. The Verbs reference: no tables drawn until a row is opened; every row, once opened, the same as
-       9.2 drew it; a filter's rows drawn open, the same as 9.2's.
+       9.2 drew it (from 9.20 with each tense's example sentences under its table); a filter's rows drawn open, the same as 9.2's.
     3. Counts: with about 6,600 records saved (tools/lib/seed.js), every count Today, Units, Stats and You
        show, from the cache, against 9.2's functions: when loaded, through the next 25 moments when time
        alone changes one (the cache kept just before each and worked out again at it), a day, a week and
@@ -87,7 +87,7 @@ function REFERENCE() {
     const items = VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
     const summ = items.map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
     return `<details class="vref"${open ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>`
-      + items.map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)).join("")
+      + items.map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("") // from 9.20, each tense's example sentences under its table
       + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "") + `</details>`;
   };
   R.verbListHtml = (f) => {

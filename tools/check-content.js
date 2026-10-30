@@ -50,7 +50,7 @@ const srcTags = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]
 for (const s of srcTags) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(s)) problem("Structure", `script loaded from outside cdnjs: ${s}`);
 
 /* ---------- 2. load the content (and a few of the app's own helpers) ---------- */
-const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, sectionTarget, getContent: () => content, ITEM_SECTIONS: typeof ITEM_SECTIONS === 'undefined' ? null : ITEM_SECTIONS";
+const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, sectionTarget, getContent: () => content, ITEM_SECTIONS: typeof ITEM_SECTIONS === 'undefined' ? null : ITEM_SECTIONS, VERB_SENTENCES: typeof VERB_SENTENCES === 'undefined' ? null : VERB_SENTENCES, vsFind: typeof vsFind === 'undefined' ? null : vsFind";
 const appVersion = (code.match(/const APP_VERSION = "([^"]+)"/) || [])[1];
 let app;
 try { app = loadApp(exportsExpr, { html }); } // stops with a message if the boot section is missing
@@ -605,6 +605,84 @@ for (const it of allItems.filter(i => i.type === "verb").concat(vgCheckItems)) {
       if (!/(ando|endo)$/.test(ger)) look("Progressive forms with an unusual gerund", `${where} ${t}: “${ger}”`);
     }
   }
+}
+
+/* ---------- 9b. the Verbs section's example sentences (VERB_SENTENCES) ---------- */
+// Each verb's sentences, [tense, person, Italian, English, clue, also], as the content guide sets out (The Verbs section):
+// one per tense the verb has, the form for that tense and person in the Italian as whole words in a row (the app's own
+// vsFind, so the drills blank exactly what is checked here), the clue in the Italian, 4 to 9 words, British English, and
+// no sentence twice or copied from a grammar unit. Rare words go to the look list: the ranks come from
+// tools/pack-levels.js, and the words below, everyday ones the frequency list ranks low, have been reviewed.
+if (app.VERB_SENTENCES) {
+  const VS = app.VERB_SENTENCES, T8 = VG_TENSES.map(t => t.replace(/_/g, " ")), words = s => String(s).split(/\s+/).filter(Boolean);
+  const { rankOf } = require("./pack-levels");
+  const EVERYDAY = new Set(("signora signore subito figli figlie torta telegiornale lotteria cameriere camerieri professoressa trecento pulsante yoga puntuali puntuale cenare ceniamo raccomando timido pescare freschissimo"
+    + " dubito stanchissima cartolina cartoline modulo ombrello sedici astronauta cornetto nuotare glielo grammatica morbido piova pizzeria zaino"
+    + " guance raffreddore timida garage purché cuoco pigri bisognava postino zoo panettone conviene maglione atterrati ambulanza trasloco barista tortellini lasagne parcheggiato rileggeste cravatta cappotti peccatore"
+    + " pigro prudente stivali cappotto pioveva auguro cassetto ascensore tango stanchissimo nevica").split(" "));
+  const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
+  const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
+  const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
+  const NAMES = new Set("Anna Marco Luca Sara Giulia Paolo Chiara Elena Marta Davide Matteo Francesca Giorgio Laura Roberto Luigi Maria Giovanni Silvia Andrea Federica Simone Alessandro Valentina Stefano".split(" "));
+  const SUBJ = /(^|\s)(che|se|magari|come se|nel caso|benché|sebbene|purché|affinché|perché|prima che|a meno che|senza che|qualunque|qualsiasi|chiunque|ovunque|dovunque|non importa (?:quando|cosa|quale|chi|dove|come))(\s|$)/i;
+  const known = new Map(); // a sentence (normalised) → where it first is
+  for (const it of allItems) {
+    if (units[it.unit] && (units[it.unit].mode === "flashcards" || units[it.unit].mode === "verbs")) continue;
+    for (const s of arr(it.it).concat(it.type === "transform" || it.type === "reply" ? arr(it.answer) : [], it.line ? [it.line] : [])) if (typeof s === "string") known.set(normalize(s), `${it.id} (a grammar-unit sentence)`);
+  }
+  let without = [];
+  for (const v of VERB_GYM) if (!VS[v.it]) without.push(v.it);
+  for (const [inf, list] of Object.entries(VS)) {
+    const v = vg[inf];
+    if (!v) { problem("Verb sentences", `“${inf}” is not a verb in VERB_GYM`); continue; }
+    if (!Array.isArray(list)) { problem("Verb sentences", `${inf}: its value must be a list of sentences`); continue; }
+    const has = new Set(), persons = new Set();
+    list.forEach((s, k) => {
+      count("verb sentences checked");
+      const [t, p, itx, en, clue, also] = Array.isArray(s) ? s : [];
+      const where = `${inf} sentence ${k + 1}`;
+      if (!Array.isArray(s) || s.length < 5 || s.length > 6 || typeof itx !== "string" || typeof clue !== "string") { problem("Verb sentences", `${where}: write it as [tense, person, Italian, English, clue] or [tense, person, Italian, English, clue, also]`); return; }
+      if (!Number.isInteger(t) || t < 0 || t > 7) { problem("Verb sentences", `${where}: tense ${JSON.stringify(t)} is not 0–7`); return; }
+      const tl = T8[t], tag = `${inf} ${tl}, ${t === 5 ? ["—", "tu", "Lei", "noi", "voi", "Loro"][p] : P6[p]}: “${itx}”`;
+      if (!v.f[t]) { problem("Verb sentences", `${tag}: ${inf} has no ${tl}`); return; }
+      if (!Number.isInteger(p) || p < 0 || p > 5 || !v.f[t][p] || v.f[t][p] === "—") { problem("Verb sentences", `${tag}: person ${JSON.stringify(p)} has no form in the ${tl}`); return; }
+      has.add(t); persons.add(p);
+      const item = content.items["vg-" + inf + "-" + VG_TENSES[t]];
+      const hit = item && app.vsFind(item, p, itx);
+      if (!hit) problem("Verb sentences: the form isn't in the sentence", `${tag}: needs “${v.f[t][p]}”${v.alts && v.alts[VG_TENSES[t]] && v.alts[VG_TENSES[t]][p] ? " or “" + v.alts[VG_TENSES[t]][p] + "”" : ""} as whole words in a row (no word between the auxiliary and the participle)`);
+      if (typeof en !== "string" || !en.trim()) problem("Verb sentences", `${tag}: no English`);
+      else { const m = en.match(AMERICAN); if (m && !AMERICAN_OK.test(en)) problem("Verb sentences: American spelling", `${tag}: “${m[0]}” in “${en}”`); }
+      for (const x of [itx, en || ""]) if (/"/.test(x)) problem("Straight quotation marks in sentences", `${where}: ${x}`);
+      const toks = words(itx).map(normalize);
+      for (const part of clue.split("…").map(x => x.trim()).filter(Boolean)) {
+        const cw = words(part).map(normalize);
+        if (!toks.some((_, i) => cw.every((w, j) => toks[i + j] === w))) problem("Verb sentences: the clue isn't in the sentence", `${tag}: clue “${part}”`);
+      }
+      if (also !== undefined) {
+        if (!Array.isArray(also) || !also.length) problem("Verb sentences", `${tag}: also must be a list of tense numbers (leave it out when there are none)`);
+        else for (const a of also) if (a === t || !Number.isInteger(a) || !v.f[a]) problem("Verb sentences: also", `${tag}: also names ${a === t ? "the sentence's own tense" : Number.isInteger(a) && a >= 0 && a <= 7 ? "the " + T8[a] + ", which " + inf + " lacks" : JSON.stringify(a)}`);
+      }
+      const n = words(itx).length;
+      if (n > 9) problem("Verb sentences over 9 words", `${tag} (${n} words)`);
+      if (n < 4) look("Verb sentences under 4 words", tag);
+      const key = normalize(itx);
+      if (known.has(key)) problem("Verb sentences repeated", `${tag} is also ${known.get(key)}`);
+      else known.set(key, `${inf} sentence ${k + 1}`);
+      if (t === 5 && hit && hit.at > 0 && toks[hit.at - 1] === "non") problem("Verb sentences: negative commands", `${tag}: a negative tu command is non + the infinitive; write an affirmative command`);
+      if (t >= 6 && hit && !SUBJ.test(words(itx).slice(0, hit.at).join(" "))) look("Verb sentences: a subjunctive without che or a conjunction before it", tag);
+      const formW = new Set(hit ? words(hit.variant).map(normalize) : []);
+      words(itx).forEach((w0, wi) => {
+        const w = normalize(w0); if (!w || formW.has(w) || STOP.has(w) || EVERYDAY.has(w.replace(/^\p{L}+'(?=\p{L})/u, "")) || (wi > 0 && /^\p{Lu}/u.test(w0)) || NAMES.has(w0.replace(/[^\p{L}]/gu, ""))) return; // names aside
+        if (/^\d+$/.test(w)) return; // a year or a number in figures
+        const r = rank(w); if (r > 5000) look("Verb sentences: rare words", `${tag}: “${w}” (rank ${r >= 19000 ? "beyond 19,000" : r})`);
+      });
+    });
+    const need = v.f.map((x, i) => x ? i : -1).filter(i => i >= 0 && !has.has(i));
+    if (need.length) problem("Verb sentences: tenses without a sentence", `${inf}: no sentence for the ${need.map(i => T8[i]).join(", ")}`);
+    if (persons.size < 4 && !/third person/i.test(v.note || "")) look("Verb sentences: few persons", `${inf}: only ${[...persons].map(p => P6[p]).join(", ")}`);
+  }
+  count("verbs with sentences", Object.keys(VS).length);
+  if (without.length) look("Verbs without sentences yet", `${without.length} of ${VERB_GYM.length}, from ${without[0]} to ${without[without.length - 1]} (in VERB_GYM order)`);
 }
 
 /* ---------- 10. release notes: CHANGES and CHANGELOG.md ---------- */
