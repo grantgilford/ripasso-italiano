@@ -616,12 +616,13 @@ for (const it of allItems.filter(i => i.type === "verb").concat(vgCheckItems)) {
 if (app.VERB_SENTENCES) {
   const VS = app.VERB_SENTENCES, T8 = VG_TENSES.map(t => t.replace(/_/g, " ")), words = s => String(s).split(/\s+/).filter(Boolean);
   const { rankOf } = require("./pack-levels");
-  const EVERYDAY = new Set("signora signore subito figli figlie torta telegiornale lotteria cameriere camerieri professoressa trecento pulsante yoga puntuali puntuale cenare ceniamo raccomando timido pescare freschissimo".split(" "));
+  const EVERYDAY = new Set(("signora signore subito figli figlie torta telegiornale lotteria cameriere camerieri professoressa trecento pulsante yoga puntuali puntuale cenare ceniamo raccomando timido pescare freschissimo"
+    + " dubito stanchissima cartolina cartoline modulo ombrello sedici astronauta cornetto nuotare glielo grammatica morbido piova pizzeria zaino").split(" "));
   const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
   const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
   const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
   const NAMES = new Set("Anna Marco Luca Sara Giulia Paolo Chiara Elena Marta Davide Matteo Francesca Giorgio Laura Roberto Luigi Maria Giovanni Silvia Andrea Federica Simone Alessandro Valentina Stefano".split(" "));
-  const SUBJ = /\b(che|se|magari|come se|nel caso|benché|sebbene|purché|affinché|perché|prima che|a meno che|senza che)\b/i;
+  const SUBJ = /(^|\s)(che|se|magari|come se|nel caso|benché|sebbene|purché|affinché|perché|prima che|a meno che|senza che|qualunque|qualsiasi|chiunque|ovunque|dovunque)(\s|$)/i;
   const known = new Map(); // a sentence (normalised) → where it first is
   for (const it of allItems) {
     if (units[it.unit] && (units[it.unit].mode === "flashcards" || units[it.unit].mode === "verbs")) continue;
@@ -669,7 +670,7 @@ if (app.VERB_SENTENCES) {
       if (t >= 6 && hit && !SUBJ.test(words(itx).slice(0, hit.at).join(" "))) look("Verb sentences: a subjunctive without che or a conjunction before it", tag);
       const formW = new Set(hit ? words(hit.variant).map(normalize) : []);
       words(itx).forEach((w0, wi) => {
-        const w = normalize(w0); if (!w || formW.has(w) || STOP.has(w) || EVERYDAY.has(w) || (wi > 0 && /^\p{Lu}/u.test(w0)) || NAMES.has(w0.replace(/[^\p{L}]/gu, ""))) return; // names aside
+        const w = normalize(w0); if (!w || formW.has(w) || STOP.has(w) || EVERYDAY.has(w.replace(/^\p{L}+'(?=\p{L})/u, "")) || (wi > 0 && /^\p{Lu}/u.test(w0)) || NAMES.has(w0.replace(/[^\p{L}]/gu, ""))) return; // names aside
         const r = rank(w); if (r > 5000) look("Verb sentences: rare words", `${tag}: “${w}” (rank ${r >= 19000 ? "beyond 19,000" : r})`);
       });
     });
