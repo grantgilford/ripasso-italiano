@@ -32,7 +32,8 @@
        exercise type sits in the session's top row, the answer box says "Your
        answer" inside it, and Don't know and Check end within the top 460 px
        (about what the phone leaves above its keyboard) on at least 95% of
-       typed questions;
+       typed questions, and on every typed Verb in a sentence and Which tense
+       fits? (from 9.20);
     8. read aloud, with a stand-in for the phone's voices: the speakers in the
        lessons, glossary, verb tables, Look up, Today and a practice session
        read their Italian with the Italian voice; a prompt's speaker reads only
@@ -47,8 +48,12 @@
        mistake (a right word tapped, the wrong word tapped and typed right, No
        mistake), Sort the words, Match the pairs, Choose / Write the reply,
        Complete the endings (Enter moves between blanks), Listen and type (Play,
-       Slow, and Can't listen now, which costs nothing) and Make it plural, each
-       with the 44 px and no-sideways-scroll rules and the right answer panel;
+       Slow, and Can't listen now, which costs nothing) and Make it plural, and
+       (from 9.20) the Verbs section's Verb in a sentence (chosen and typed, the
+       other agreement ending refused with its reason) and Which tense fits?
+       (chosen and typed, with no English or tense in the prompt, a tense listed
+       in also accepted with a note), each with the 44 px and no-sideways-scroll
+       rules and the right answer panel, the completed sentence in it;
    10. What's new: a new device starts with this version seen (no card); after
        the version changes Today shows "What's new in <version>" with CHANGES,
        as its only notice, in the layout rules, until Got it is tapped, which is
@@ -516,6 +521,52 @@ async function newTypes(browser, origin) {
     await page.fill("#answer", "i diti"); await page.press("#answer", "Enter"); p = await panel();
     check(L("Plural drill: a wrong form gives Not quite, with the noun's forms"), ok(p, "Not quite") && /il dito · un dito · le dita/.test(p.text), JSON.stringify(p));
 
+    // Verbs in a sentence (from 9.20): Verb in a sentence and Which tense fits?, each chosen and typed, right and wrong
+    const verb = (id, box, key) => page.evaluate(([id, box, key]) => {
+      const it = content.items[id];
+      for (const t of VG_TENSES) { const x = content.items[vgId(it.it, t)]; if (x) progress.items[pid(x.id)] = Object.assign({}, rec(x.id), { box: 3 }); } // every tense started
+      let ex = null;
+      for (let k = 0; k < 500 && (!ex || ex.typeKey !== key); k++) ex = makeExercise(it, { box, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3 });
+      session = { kind: "verbs", unitId: "vb", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+      S.screen = "session"; S.feedback = null; S.retry = null; resetExState(); render(); window.scrollTo(0, 0);
+      return { key: ex.typeKey, mode: ex.mode, correct: ex.correct, options: ex.options || [], accepted: ex.accepted, sentence: ex.vs && ex.vs.it, en: ex.vs && ex.vs.en, clue: ex.vs && ex.vs.clue, prompt: document.querySelector(".prompt").textContent.replace(/\s+/g, " "), speaker: !!document.querySelector(".prompt-card [data-say]") };
+    }, [id, box, key]);
+    const sentenceCard = () => page.evaluate(() => { const c = document.querySelector(".fb .fb-ctx"); return c ? { text: c.querySelector(".it").textContent, bold: (c.querySelector(".it b") || {}).textContent || "", en: c.querySelector(".ctx-en").textContent, say: (c.querySelector("[data-say]") || {}).dataset ? c.querySelector("[data-say]").dataset.say : null, head: (document.querySelector(".fb-head [data-say]") || {}).dataset ? document.querySelector(".fb-head [data-say]").dataset.say : null } : null; });
+    let v = await verb("vg-andare-passato_prossimo", 1, "vctx");
+    check(L("Verb in a sentence: at box 1, four options, the form blanked, the verb, person and tense and the English shown, and no speaker"), v.key === "vctx" && v.mode === "options" && v.options.length === 4 && !v.prompt.includes(v.correct) && v.prompt.includes("andare · loro · passato prossimo") && v.prompt.includes(v.en) && !v.speaker, JSON.stringify(v));
+    await layout(page, L("Verb in a sentence, chosen"));
+    await tap(page, `[data-opt="${v.options.find(o => o !== v.correct)}"]`); p = await panel();
+    let card = await sentenceCard();
+    check(L("Verb in a sentence: a wrong option gives Not quite with its reason, the completed sentence with the form in bold, and the panel reads the sentence"), ok(p, "Not quite") && /You chose/.test(p.text) && card && card.text === v.sentence && card.bold === v.correct && card.say === v.sentence && card.head === v.sentence, JSON.stringify({ p, card }));
+    v = await verb("vg-andare-passato_prossimo", 1, "vctx");
+    await tap(page, `[data-opt="${v.correct}"]`); p = await panel();
+    check(L("Verb in a sentence: the right option gives Correct, with the verb's meaning"), ok(p, "Correct") && /andare: to go/.test(p.text), JSON.stringify(p));
+    v = await verb("vg-arrivare-passato_prossimo", 2, "vctx");
+    check(L("Verb in a sentence: from box 2 it is typed"), v.mode === "typed" && await page.$("#answer"), JSON.stringify(v));
+    await layout(page, L("Verb in a sentence, typed"));
+    await page.fill("#answer", "è arrivato"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Verb in a sentence: the other agreement ending is refused, with the reason"), ok(p, "Not quite") && /agrees with the subject, which here is feminine singular: è arrivata/.test(p.text) && /stamattina points to a finished event/.test(p.text), JSON.stringify(p));
+    v = await verb("vg-arrivare-passato_prossimo", 2, "vctx");
+    await page.fill("#answer", "è arrivata"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Verb in a sentence: the sentence's own form, typed with Enter, gives Correct"), ok(p, "Correct"), JSON.stringify(p));
+    v = await verb("vg-andare-futuro", 3, "vfit");
+    check(L("Which tense fits?: at box 3, options in other tenses, with only the verb and the person: no English, no tense named, no speaker"), v.key === "vfit" && v.mode === "options" && v.options.length >= 3 && v.prompt.includes("andare · noi") && !v.prompt.includes(v.en) && !/futuro|presente|imperfetto|passato|condizionale|congiuntivo/.test(v.prompt) && !v.speaker, JSON.stringify(v));
+    await layout(page, L("Which tense fits?, chosen"));
+    await tap(page, `[data-opt="${v.options.find(o => o !== v.correct)}"]`); p = await panel();
+    card = await sentenceCard();
+    check(L("Which tense fits?: a wrong tense gives Not quite, saying why it doesn't fit and what the clue points to, then the sentence and its English"), ok(p, "Not quite") && /You chose .*: that is the /.test(p.text) && p.text.includes(v.clue + " points to the future: futuro") && card && card.en === v.en, JSON.stringify({ p, card }));
+    v = await verb("vg-andare-futuro", 3, "vfit");
+    await tap(page, `[data-opt="${v.correct}"]`); p = await panel();
+    check(L("Which tense fits?: the right form gives Correct"), ok(p, "Correct"), JSON.stringify(p));
+    v = await verb("vg-andare-futuro", 4, "vfit");
+    check(L("Which tense fits?: from box 4 it is typed"), v.mode === "typed" && await page.$("#answer"), JSON.stringify(v));
+    await layout(page, L("Which tense fits?, typed"));
+    await page.fill("#answer", "andiamo"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Which tense fits?: typed, a tense the sentence lists in also is right, with a note"), ok(p, "Correct") && /andiamo works too: the presente often covers the near future/.test(p.text), JSON.stringify(p));
+    v = await verb("vg-andare-futuro", 4, "vfit");
+    await page.fill("#answer", "andavamo"); await page.press("#answer", "Enter"); p = await panel();
+    check(L("Which tense fits?: typed, another tense is refused, with why it doesn't fit"), ok(p, "Not quite") && /You wrote andavamo: that is the imperfetto, for the past as background/.test(p.text), JSON.stringify(p));
+
     check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
     await context.close();
   }
@@ -880,7 +931,8 @@ async function readAloud(browser, origin) {
     const dataWords = (item, ex) => {
       const own = [item, ex.noun].filter(Boolean).flatMap(i => [i.it, i.forms, i.allForms, i.plural, i.art, i.indef, i.artPl, i.answer, i.alt, i.cloze && i.cloze.text,
         i.fix, i.line, i.type === "endings" ? endingsFull(i) : null, i.rows && i.rows.map(r => [r.it, r.say]), i.pairs && i.pairs.map(p => i.right === "en" ? p[0] : p)]) // the v8.6 types
-        .concat(item.type === "prep" ? [PREP_TABLE[item.it]] : []); // a preposition's merged forms (della, nello…) come from the app's table
+        .concat(item.type === "prep" ? [PREP_TABLE[item.it]] : []) // a preposition's merged forms (della, nello…) come from the app's table
+        .concat(item.type === "vtense" && typeof VERB_SENTENCES !== "undefined" ? (VERB_SENTENCES[item.it] || []).map(x => x[2]) : []); // a verb's example sentences (from 9.20)
       return new Set(words(JSON.stringify(own).replace(/[{}|]/g, " ")).concat(["io", "tu", "lui", "lei", "noi", "voi", "loro", "che"]));
     };
     const keep = [progress.settings.fcDir, progress.settings.flipDir], bad = [], typesRead = new Set();
@@ -1135,6 +1187,24 @@ async function readAloud(browser, origin) {
       }, KEYBOARD_TOP);
       const pct = r.n ? 100 * r.fit / r.n : 0;
       check(`Keyboard room: Don't know and Check end within the top ${KEYBOARD_TOP} px on at least 95% of typed questions (${pct.toFixed(1)}% of ${r.n})`, r.n > 1000 && pct >= 95, r.worst.join("\n"));
+      const rv = await page.evaluate((limit) => { // Verb in a sentence and Which tense fits?, typed, on every example sentence (from 9.20)
+        const out = { n: 0, worst: [] };
+        for (const item of content.byUnit.vb || []) {
+          if (typeof verbSentences !== "function" || !verbSentences(item).length) continue;
+          for (const t of VG_TENSES) { const x = content.items[vgId(item.it, t)]; if (x) progress.items[pid(x.id)] = Object.assign({}, rec(x.id), { box: 3 }); }
+          for (const s of verbSentences(item)) for (const key of ["vctx", "vfit"]) {
+            const ex = { item, note: "" };
+            if (!(key === "vctx" ? vgCtxExercise(ex, item, s, 4) : vgFitExercise(ex, item, s, 4))) continue;
+            session = { kind: "verbs", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+            S.screen = "session"; S.feedback = null; S.retry = null; render(); window.scrollTo(0, 0);
+            const bottom = Math.max(...[...document.querySelectorAll('[data-act="giveup"], [data-act="check"]')].map(b => b.getBoundingClientRect().bottom));
+            out.n++; if (bottom > limit) out.worst.push(`${item.id} (${ex.type}) ends at ${Math.round(bottom)} px`);
+          }
+        }
+        session = null; S.screen = "home"; render();
+        return out;
+      }, KEYBOARD_TOP);
+      check(`Keyboard room: Verb in a sentence and Which tense fits?, typed, keep Don't know and Check within the top ${KEYBOARD_TOP} px on every example sentence (${rv.n})`, rv.n > 100 && !rv.worst.length, rv.worst.slice(0, 5).join("\n"));
       check("Keyboard room: the answer box says \"Your answer\" inside it, and keeps it as its label", r.placeholder);
       check("Keyboard room: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
