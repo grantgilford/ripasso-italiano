@@ -618,7 +618,8 @@ if (app.VERB_SENTENCES) {
   const { rankOf } = require("./pack-levels");
   const EVERYDAY = new Set(("signora signore subito figli figlie torta telegiornale lotteria cameriere camerieri professoressa trecento pulsante yoga puntuali puntuale cenare ceniamo raccomando timido pescare freschissimo"
     + " dubito stanchissima cartolina cartoline modulo ombrello sedici astronauta cornetto nuotare glielo grammatica morbido piova pizzeria zaino"
-    + " guance raffreddore timida garage purché cuoco pigri bisognava postino zoo panettone conviene maglione atterrati ambulanza trasloco barista tortellini lasagne parcheggiato rileggeste cravatta cappotti peccatore").split(" "));
+    + " guance raffreddore timida garage purché cuoco pigri bisognava postino zoo panettone conviene maglione atterrati ambulanza trasloco barista tortellini lasagne parcheggiato rileggeste cravatta cappotti peccatore"
+    + " pigro prudente stivali cappotto pioveva auguro cassetto ascensore tango stanchissimo nevica").split(" "));
   const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
   const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
   const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
@@ -672,12 +673,13 @@ if (app.VERB_SENTENCES) {
       const formW = new Set(hit ? words(hit.variant).map(normalize) : []);
       words(itx).forEach((w0, wi) => {
         const w = normalize(w0); if (!w || formW.has(w) || STOP.has(w) || EVERYDAY.has(w.replace(/^\p{L}+'(?=\p{L})/u, "")) || (wi > 0 && /^\p{Lu}/u.test(w0)) || NAMES.has(w0.replace(/[^\p{L}]/gu, ""))) return; // names aside
+        if (/^\d+$/.test(w)) return; // a year or a number in figures
         const r = rank(w); if (r > 5000) look("Verb sentences: rare words", `${tag}: “${w}” (rank ${r >= 19000 ? "beyond 19,000" : r})`);
       });
     });
     const need = v.f.map((x, i) => x ? i : -1).filter(i => i >= 0 && !has.has(i));
     if (need.length) problem("Verb sentences: tenses without a sentence", `${inf}: no sentence for the ${need.map(i => T8[i]).join(", ")}`);
-    if (persons.size < 4) look("Verb sentences: few persons", `${inf}: only ${[...persons].map(p => P6[p]).join(", ")}`);
+    if (persons.size < 4 && !/third person/i.test(v.note || "")) look("Verb sentences: few persons", `${inf}: only ${[...persons].map(p => P6[p]).join(", ")}`);
   }
   count("verbs with sentences", Object.keys(VS).length);
   if (without.length) look("Verbs without sentences yet", `${without.length} of ${VERB_GYM.length}, from ${without[0]} to ${without[without.length - 1]} (in VERB_GYM order)`);
