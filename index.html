@@ -443,6 +443,8 @@ details > summary { cursor: pointer; }
 .fb-ctx .it { color: var(--fg); font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
 .fb-ctx .it b { font-weight: 700; }
 .fb-ctx .ctx-en { margin-top: 2px; color: var(--muted); font-size: 14.5px; line-height: 1.4; }
+/* a verb's example sentence inside a card (from 9.20: the New verb card, the Verbs reference) sits on the page colour */
+.fb-ctx.vs-in { background: var(--bg); margin-top: 10px; }
 .fb-continue { width: 100%; min-height: 52px; border-radius: 16px; font-size: 16px; font-weight: 700; text-align: center; }
 .fb.bad .fb-continue { background: var(--bad); color: var(--bad-fg); }
 .fb.ok .fb-continue { background: var(--hero); color: var(--hero-fg); }
@@ -19209,7 +19211,7 @@ function verbGymExercise(ex, item, r, force) {
   const box = r.box, tl = TENSE_LABEL[item.tense], fam = VERB_FAMILIES[item.fam] || ["", ""];
   const head = `${esc(item.it)} <span class="hint">· ${esc(tl)}</span>`;
   if (box === 0 && !force) {
-    const ex0 = verbWhy(vgVerb(item), item.tense, vgPersons(item)[0]);
+    const ex0 = verbWhy(vgVerb(item), item.tense, vgPersons(item)[0]), vs0 = pick(verbSentences(item));
     Object.assign(ex, { type: item.step ? "New tense · " + tl : "New verb", typeKey: "intro", kind: "recognition", mode: "vintro", say: item.it,
       promptHtml: `${esc(item.it)}<div class="hint sans">${esc(arr(item.en).join(", "))}</div>`,
       introHtml: (item.step === 0 ? `<p><b>${esc(fam[0])}.</b> ${esc(fam[1])}</p>` : "")
@@ -19217,6 +19219,7 @@ function verbGymExercise(ex, item, r, force) {
         + `<h3>${esc(tl.charAt(0).toUpperCase() + tl.slice(1))}</h3><p class="muted small">${esc(TENSE_USE[item.tense])}</p>`
         + (item.tense === "passato_prossimo" ? `<p class="small">Auxiliary: <b>${item.aux === "e" ? "essere" : "avere"}</b>${item.aux === "e" ? ", so the participle agrees with the subject (-o/-a, -i/-e)" : ", so the participle never changes"}.</p>` : "")
         + vgTableHtml(item, item.tense)
+        + (vs0 ? vsHtml(vs0, "vs-in") : "") // the tense in a sentence (from 9.20)
         + `<p class="muted small" style="margin-top:10px">${ex0}</p>`,
       shownAnswer: item.forms.join(", ") });
     return ex;
@@ -19457,7 +19460,7 @@ function verbListHtml() {
 }
 const verbTenses = (v) => VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
 function verbTablesHtml(v) {
-  return verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)).join("")
+  return verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
     + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "");
 }
 document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this listens on the way down
@@ -20224,6 +20227,7 @@ function renderSession() {
     else if (ex.mode === "flip") title = "Marked as missed";
     else line = "Answer: <b>" + esc(answer) + "</b>";
     if (ex.typeKey === "flashcard" && ex.ctx === undefined) ex.ctx = pick(contextFor(ex.item)) || null; // one sentence per card shown, kept across redraws
+    if (ex.item.type === "vtense" && ex.vs === undefined) { const all = verbSentences(ex.item), own = all.filter(x => x.p === ex.person); ex.vs = pick(own.length ? own : all) || null; } // the tense in a sentence (from 9.20), kept across redraws
     const anim = S.fbShown !== fb; S.fbShown = fb; // the panel slides up once per answer, not on every redraw
     if (anim) S.fbScroll = true; // …and the page moves down so the answer (and a table's corrections) sit just above it
     const flag = progress.flags && progress.flags[flagId(ex)], flagged = flag && !flag.removed;
@@ -20239,6 +20243,7 @@ function renderSession() {
       + (showWhy && info.table ? info.table : "")
       + (showWhy && info.facts ? `<div class="facts">${info.facts}</div>` : "")
       + (ex.typeKey === "flashcard" && ex.ctx ? contextHtml(ex.ctx) : "")
+      + (ex.vs ? vsHtml(ex.vs) : "")
       + ruleBtn(ex, fb)
       + (S.flagOpen
         ? (accept ? `<div class="fb-actions">${accept}</div>` : "") + `<div class="flagbox"><label for="flagNote">What looks wrong? (optional)</label><textarea id="flagNote" class="plain" placeholder="e.g. my answer should also be accepted"></textarea><div class="btnrow end"><button type="button" class="quiet" data-act="flagCancel">Cancel</button><button type="button" data-act="flagSave">Save flag</button></div></div>`
