@@ -545,7 +545,7 @@ async function newTypes(browser, origin) {
     check(L("Verb in a sentence: from box 2 it is typed"), v.mode === "typed" && await page.$("#answer"), JSON.stringify(v));
     await layout(page, L("Verb in a sentence, typed"));
     await page.fill("#answer", "è arrivato"); await page.press("#answer", "Enter"); p = await panel();
-    check(L("Verb in a sentence: the other agreement ending is refused, with the reason"), ok(p, "Not quite") && /agrees with the subject, which here is feminine singular: è arrivata/.test(p.text) && /stamattina points to a finished event/.test(p.text), JSON.stringify(p));
+    check(L("Verb in a sentence: the other agreement ending is refused, with the reason"), ok(p, "Not quite") && /agrees with the subject, which here is feminine singular: è arrivata/.test(p.text) && p.text.includes(v.clue + " points to a finished event"), JSON.stringify(p));
     v = await verb("vg-arrivare-passato_prossimo", 2, "vctx");
     await page.fill("#answer", "è arrivata"); await page.press("#answer", "Enter"); p = await panel();
     check(L("Verb in a sentence: the sentence's own form, typed with Enter, gives Correct"), ok(p, "Correct"), JSON.stringify(p));
