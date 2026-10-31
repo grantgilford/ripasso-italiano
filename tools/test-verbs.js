@@ -134,8 +134,9 @@ const SEED = () => { let s = 2020; Math.random = () => { s = (s + 0x6D2B79F5) | 
   T.check("every right answer is marked right, among the options offered, with the example sentence in the panel", !bad.length, [...new Set(bad)].slice(0, 15).join("\n") + (bad.length > 15 ? `\n… and ${bad.length - 15} more` : ""));
   const never = KINDS.filter(k => !byKind[k]);
   T.check("every kind of Verbs exercise is built", !never.length, "never built: " + never.join(", "));
-  const tenses = await (async () => { const out = {}; for (const key of Object.keys(kinds)) { const [k, t] = key.split(" · "); (out[t] = out[t] || new Set()).add(k); } return out; })();
-  T.check(`every tense is drilled (${Object.keys(tenses).length} tenses)`, Object.keys(tenses).length === 8, JSON.stringify(Object.keys(tenses)));
+  const drilled = new Set(Object.keys(kinds).map(key => key.split(" · ")[1]));
+  const want = new Set(plan.items.map(([id]) => id.replace(/^vg-.*?-(presente|passato_prossimo|imperfetto|futuro|condizionale|imperativo|congiuntivo_presente|congiuntivo_imperfetto)$/, "$1")));
+  T.check(`every tense of the verbs chosen is drilled (${drilled.size} of ${want.size})`, [...want].every(t => drilled.has(t)), "not drilled: " + [...want].filter(t => !drilled.has(t)).join(", "));
   T.check("no script errors", !errors.length, errors.slice(0, 5).join("\n"));
   T.summary();
 })().catch(e => { T.stopped(e); T.summary(); });

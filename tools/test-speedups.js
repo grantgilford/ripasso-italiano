@@ -192,6 +192,7 @@ function REFERENCE() {
       arr(x.en).forEach(e => enForms(String(e)).forEach(f => f.split(" ").forEach(w => { if (w) en.add(w); })));
     }
     for (const v of VERB_GYM) { addIt(v.it); (v.f || []).forEach(t => arr(t).forEach(addIt)); }
+    if (typeof VERB_SENTENCES !== "undefined") for (const v of VERB_GYM) for (const x of VERB_SENTENCES[v.it] || []) { addIt(x[2]); enForms(String(x[3])).forEach(f => f.split(" ").forEach(w => { if (w) en.add(w); })); } // from 9.20, the Verbs section's example sentences
     return { it, en };
   };
   R.glossIndex = () => {
