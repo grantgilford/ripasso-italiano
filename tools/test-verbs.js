@@ -18,7 +18,7 @@
   one, or a script error occurs; and if a kind is never built at all.
 
   Which items:
-    (default)      a seeded sample, quick enough for GitHub's checks (a minute or two): every verb-tense
+    (default)      a seeded sample, quick enough for GitHub's checks (about four minutes at 9.21, growing with the sentences): every verb-tense
                    with an example sentence (VERB_SENTENCES) and 150 more, at least 15 of each tense
     --all          every verb-tense (3,459 as of 9.20): about ten minutes
     --verbs a,b    every tense of the verbs named, every kind at every box
@@ -70,9 +70,10 @@ const SEED = () => { let s = 2020; Math.random = () => { s = (s + 0x6D2B79F5) | 
   console.log(`Verbs test for ${path.basename(file)}: ${plan.items.length} verb-tenses (${sample})`);
 
   // Build and answer, in the page, in batches: each exercise is drawn in the session screen and answered by tapping and typing there.
-  const kinds = {}, bad = [];
+  // Small batches (from 9.21): with 200 verbs' sentences a batch of 40 drew thousands of screens in one call, and the page crashed.
+  const BATCH = 10, kinds = {}, bad = [];
   let answered = 0, withSentence = 0;
-  for (let k = 0; k < plan.items.length; k += 40) {
+  for (let k = 0; k < plan.items.length; k += BATCH) {
     const r = await page.evaluate((batch) => {
       const out = { kinds: {}, bad: [], answered: 0, withSentence: 0 };
       const $ = (sel) => document.querySelector(sel);
@@ -121,7 +122,7 @@ const SEED = () => { let s = 2020; Math.random = () => { s = (s + 0x6D2B79F5) | 
         }
       }
       return out;
-    }, plan.items.slice(k, k + 40));
+    }, plan.items.slice(k, k + BATCH));
     for (const [key, n] of Object.entries(r.kinds)) kinds[key] = (kinds[key] || 0) + n;
     bad.push(...r.bad); answered += r.answered; withSentence += r.withSentence;
   }
