@@ -28,6 +28,12 @@
        the tense, the noun of an article or plural drill, the adjective and noun of an agreement drill, the preposition
        and noun of a merged form, the English of Listen and type, of a transform's answer and of a reply's line. Only
        rule questions, sort, match, numbers and clock times have none, and none of those shows a lone Italian word.
+       From 9.20 also Verb in a sentence and Which tense fits?, which give the verb's meaning.
+    4b. Verbs in a sentence (from 9.20). For every example sentence (VERB_SENTENCES), with every tense started: Verb in
+       a sentence offers no wrong option that is an accepted answer or a form of a tense the sentence lists in also,
+       and each has its reason; for lui/lei and loro only the sentence's own agreement ending is accepted. Which tense
+       fits? offers no accepted answer, no tense in also and no command; its prompt shows neither the English nor a
+       tense's name; typed, a tense in also is accepted. Every clue is in its sentence.
 
   Then in the real app (Playwright and Chromium, with a stand-in Italian voice): the indexes the traps and the confusion
   memory use (NEAR, ANSWERS) are built in idle time after Today, the same as built on the spot; and
@@ -67,7 +73,9 @@ function nodeChecks() {
   const app = loadApp(`buildContent, makeExercise, nearMisses, wordBank, mcMeaning, explainFor, translationsOf, checkAnswer, contextFor,
     normalize, deaccent, enForms, arr, isSideUnit, isFlashUnit, pid, formVariants, VERB_GYM, SLANG_PACK,
     getContent: () => content, getProgress: () => progress, setRandom: f => { Math.random = f; }, setListen: f => { canListen = f; },
-    setConfusions: m => { CONFUSIONS = m; }, confKey, esc, enList`, { html: fs.readFileSync(file, "utf8") });
+    setConfusions: m => { CONFUSIONS = m; }, confKey, esc, enList,
+    VG_TENSES, TENSE_LABEL, verbSentences: typeof verbSentences === "undefined" ? null : verbSentences, vgCtxExercise: typeof vgCtxExercise === "undefined" ? null : vgCtxExercise,
+    vgFitExercise: typeof vgFitExercise === "undefined" ? null : vgFitExercise, vsAccepted: typeof vsAccepted === "undefined" ? null : vsAccepted`, { html: fs.readFileSync(file, "utf8") });
   app.buildContent();
   const content = app.getContent(), { arr, normalize, deaccent, enForms, checkAnswer } = app;
   const grammar = Object.values(content.items).filter(i => !app.isSideUnit(i.unit));
@@ -237,7 +245,7 @@ function nodeChecks() {
     for (const it of Object.values(content.items)) if (it.type === "vtense") progress.items[app.pid(it.id)] = { box: 1, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3, lastRight: 0 }; // every tense started: Change the tense and Which tense? can be built
     app.setListen(() => true);
     const NONE = new Set(["grammar", "sort", "match", "number", "clock"]); // a rule question, a sorting or matching of several words, a number or a time: no one English to give
-    const MEANT = new Set(["conjugation", "article", "plural", "agreement", "preparticle", "listen", "transform", "reply", "vswitch", "vinf", "vtenseid", "vperson"]);
+    const MEANT = new Set(["conjugation", "article", "plural", "agreement", "preparticle", "listen", "transform", "reply", "vswitch", "vinf", "vtenseid", "vperson"].concat(app.verbSentences ? ["vctx", "vfit"] : []));
     const plain = (h) => String(h || "").replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
     const bad = [], kinds = {}, missing = [];
     let n = 0, s = 7;
@@ -263,7 +271,65 @@ function nodeChecks() {
     const counted = Object.entries(kinds).filter(([, v]) => v.meaning).map(([k, v]) => `${k} ${v.meaning}`).join(", ");
     check(`every exercise shows its English, asks for it, or gives it in the answer panel (${n} exercises; with a meaning: ${counted})`, n > 100000 && !missing.length, [...new Set(missing)].slice(0, 10).join("\n"));
     check("every meaning is the item's own English (its glosses, a sentence's English, a reply line's), and none repeats the prompt", !bad.length, [...new Set(bad)].slice(0, 10).join("\n"));
-    check("all twelve kinds that need one give a meaning", [...MEANT].every(k => kinds[k] && kinds[k].meaning === kinds[k].n), JSON.stringify(Object.fromEntries([...MEANT].map(k => [k, kinds[k]]))));
+    check(`all ${MEANT.size === 14 ? "fourteen" : "twelve"} kinds that need one give a meaning`, [...MEANT].every(k => kinds[k] && kinds[k].meaning === kinds[k].n), JSON.stringify(Object.fromEntries([...MEANT].map(k => [k, kinds[k]]))));
+  }
+
+  /* 4b. Verbs in a sentence (from 9.20) */
+  if (app.verbSentences) {
+    section("4b. Verb in a sentence and Which tense fits? (every example sentence)");
+    const progress = app.getProgress(), saved = progress.items;
+    progress.items = {};
+    for (const it of Object.values(content.items)) if (it.type === "vtense") progress.items[app.pid(it.id)] = { box: 3, due: 0, lapses: 0, lastSeen: 0, lastWrong: 0, seenCount: 3, lastRight: 0 }; // every tense started
+    const formsOf = (item, t, p) => { const f = item.allForms[t] && item.allForms[t][p]; return f && f !== "—" ? app.formVariants(f).map(normalize) : []; };
+    const LABELS = Object.values(app.TENSE_LABEL);
+    const bad = [], fitBad = [], clueBad = [];
+    let ctx = 0, fit = 0, sentences = 0, withClue = 0;
+    for (const item of Object.values(content.items)) {
+      if (item.type !== "vtense") continue;
+      for (const s of app.verbSentences(item)) {
+        sentences++;
+        const where = `${item.id} “${s.it}”`, acc = app.vsAccepted(item, s).map(normalize), also = s.also.flatMap(t => formsOf(item, t, s.p));
+        if (!acc.includes(normalize(s.variant))) bad.push(`${where}: the sentence's own form isn't accepted`);
+        if ([2, 5].includes(s.p)) for (const f of app.formVariants(s.form)) if (f !== s.variant && acc.includes(normalize(f))) bad.push(`${where}: the other agreement ending ${f} is accepted, though the subject shows it`);
+        if (s.clue) {
+          withClue++;
+          for (const part of s.clue.split("…").map(x => x.trim()).filter(Boolean)) if (!(" " + normalize(s.it) + " ").includes(" " + normalize(part) + " ")) clueBad.push(`${where}: the clue “${part}” isn't in it`);
+        }
+        for (let k = 0; k < 6; k++) {
+          app.setRandom(seeded(7 + k * 31 + sentences));
+          const ex = { item, note: "" };
+          if (app.vgCtxExercise(ex, item, s, 1)) {
+            ctx++;
+            for (const o of ex.options.filter(o => o !== ex.correct)) {
+              if (acc.includes(normalize(o))) bad.push(`${where}: Verb in a sentence offers ${o}, an accepted answer, as wrong`);
+              if (also.includes(normalize(o))) bad.push(`${where}: Verb in a sentence offers ${o}, a tense the sentence lists in also, as wrong`);
+              if (!ex.optionNotes[o]) bad.push(`${where}: Verb in a sentence's option ${o} has no reason`);
+            }
+          }
+          for (const box of [3, 4]) {
+            const fx = { item, note: "" };
+            if (!app.vgFitExercise(fx, item, s, box)) continue;
+            fit++;
+            const prompt = normalize(fx.promptHtml.replace(/<[^>]+>/g, " ").replace(/&#39;/g, "'"));
+            const hint = prompt.replace(normalize(s.it.split(/\s+/).slice(0, s.at).join(" ")), "").replace(normalize(s.it.split(/\s+/).slice(s.at + s.len).join(" ")), "");
+            if (prompt.includes(normalize(s.en))) fitBad.push(`${where}: Which tense fits? shows the English`);
+            if (LABELS.some(l => hint.includes(normalize(l)))) fitBad.push(`${where}: Which tense fits? names a tense (“${hint}”)`);
+            if (!s.clue) fitBad.push(`${where}: Which tense fits? built without a clue`);
+            if (box === 3) for (const o of fx.options.filter(o => o !== fx.correct)) {
+              const t = fx.optionTenses[o];
+              if (acc.includes(normalize(o))) fitBad.push(`${where}: offers ${o}, an accepted answer, as wrong`);
+              if (also.includes(normalize(o)) || s.also.includes(t)) fitBad.push(`${where}: offers ${o}, a tense listed in also`);
+              if (t === "imperativo" || !t) fitBad.push(`${where}: offers ${o}, not a form of another tense`);
+            }
+            if (box === 4 && also.some(f => !fx.accepted.map(normalize).includes(f))) fitBad.push(`${where}: typed, a form of a tense in also isn't accepted`);
+          }
+        }
+      }
+    }
+    progress.items = saved;
+    check(`Verb in a sentence: no wrong option is an accepted answer or a tense listed in also, each has its reason, and only the sentence's own agreement ending is right for lui/lei and loro (${sentences} sentences, ${ctx} built with options)`, sentences > 100 && ctx > 100 && !bad.length, [...new Set(bad)].slice(0, 10).join("\n"));
+    check(`Which tense fits?: no option is an accepted answer, a tense listed in also or a command; no prompt shows the English or names a tense; typed, a tense in also is accepted (${fit} built)`, fit > 100 && !fitBad.length, [...new Set(fitBad)].slice(0, 10).join("\n"));
+    check(`every clue is in its sentence (${withClue} sentences with a clue)`, withClue > 50 && !clueBad.length, clueBad.slice(0, 10).join("\n"));
   }
 }
 

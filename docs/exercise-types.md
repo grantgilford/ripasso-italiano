@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.16)
+# Exercise types: the catalogue (v9.20)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -45,7 +45,7 @@ Wherever an exercise shows Italian without its English, and the English isn't wh
 | Article, Make it plural / singular | the noun, singular: **zaino:** backpack, rucksack |
 | Agreement | the adjective and the noun: **stanco:** tired · **scuola:** school |
 | Preposition + article | the preposition and the noun: **di:** of, from, 's · **stazione:** station |
-| Which verb?, Which person?, Which tense?, Change the tense (Verbs section) | the verb: **andare:** to go |
+| Which verb?, Which person?, Which tense?, Change the tense, Verb in a sentence, Which tense fits? (Verbs section) | the verb: **andare:** to go (the two sentence drills also show the sentence with its English, from 9.20) |
 | Listen and type | **In English:** the sentence's first English (before 9.16 only after a mistake, as "It means") |
 | Transform (and its New pattern card) | **In English:** the English of the first answer (`en`, from 9.16) |
 | Choose / Write the reply | **Luca:** “the other person's line in English” (`lineEn`, from 9.16) |
@@ -81,6 +81,8 @@ Everything else either shows the English already (typed recall, the sentence typ
 | **Sort the words** (new) | `sort` | sort | R | always | puts each of 3–6 words in one of 2–4 groups (*il / lo / la / l'*; *tu / Lei*; *-chi / -ci*) |
 | **Match the pairs** (new) | `match` | match | R | always | joins each left-hand item to its partner: question → answer, singular → plural, word → meaning |
 | Verbs section drills | `vtable`, `vspot`, `vpick`, `vmeaning`, `vswitch`, `vinf`, `vaux`, `vtenseid`, `vperson` | the Verbs section (`VERB_GYM`) | R and P | by tense ladder | full tables, single forms, pick the form, from English, change the tense, which verb, essere or avere, which tense, which person |
+| **Verb in a sentence** (new, 9.20) | `vctx` | a verb-tense item with an example sentence (`VERB_SENTENCES`) | R, then P | about 15% at box 1 (chosen from four), 12% from box 2 (typed) | fills the blank in the sentence with the form, given the infinitive, person and tense, with the English beneath |
+| **Which tense fits?** (new, 9.20) | `vfit` | a verb-tense item whose sentence has a clue, two or more other tenses started | R, then P | about 12% from box 3 (chosen at box 3, typed from box 4); not for commands | fills the blank given only the infinitive and person, the English hidden: the clue in the sentence decides the tense |
 
 ### The types added in v8.6, in more detail
 
@@ -91,6 +93,15 @@ Everything else either shows the English already (typed recall, the sentence typ
 - **Match the pairs** (`match` items). Two shuffled columns of 4–5; tap one side then the other. A wrong pair flashes with a cross and counts as a slip; matched pairs lock with a number. Any slip makes it "Not quite", naming the slip. The right column can be English (`"right": "en"`). Good for: question → answer, informal → formal, singular → plural, word → meaning, man → woman.
 - **Listen and type** (generated). Plays a unit's sentence in the device's Italian voice; nothing is shown. Built only when an Italian voice exists and Read aloud isn't Off; **Can't listen now** replaces every listening exercise left in the session, without touching progress. One-letter slips are forgiven as in translations, with a note.
 - **Make it plural / singular** (generated). Every noun with full article data gets it, in every grammar unit; 70% of the time towards the plural. The panel explains the article, and the gender switch for *il dito → le dita*.
+
+### The Verbs section's sentence drills (from 9.20)
+
+Each verb-tense item of the first 100 verbs (793 of the 3,459, as of 9.20) has an example sentence in `VERB_SENTENCES` (format and rules in the content guide, The Verbs section). The New verb card, the answer panel after every Verbs exercise and the reference show it; two drills use it:
+
+- **Verb in a sentence** (`vctx`). The sentence with the form blanked (*L'anno scorso le mie amiche ___ in Spagna.*), the hint *andare · loro · passato prossimo*, the English beneath; no speaker on the prompt, which would skip the blank or give the answer away; the answer panel reads the completed sentence. At box 1 four options, the wrong ones as Pick the form builds them (`vgPickOptions`: the classic mistake, the neighbouring tense, other persons), each with its note; from box 2 typed. Accepted: the form the sentence holds, with or without its subject pronoun, and its `alts` form; for *lui/lei* and *loro* the other agreement ending is refused with the reason. It takes 15% at box 1 from the full table's 58%, and 12% from box 2, from the others in proportion.
+- **Which tense fits?** (`vfit`). The same blank with only *andare · noi*; the English and the tense stay hidden until after the answer, so the clue decides. From box 3, for sentences with a clue, never commands, when at least two other tenses are started; the options are the person's forms in two or three of those tenses (never one listed in the sentence's `also`). Box 3 chosen; box 4 and up typed, where a tense in `also` is accepted with a note. The panel names the clue and why the tense chosen doesn't fit. 12% from box 3, from the others in proportion.
+
+Where a tense has no sentence, or neither drill can be built, the choice is drawn again as before. Over the 100 verbs with sentences (measured at 9.20 with a seeded generator), box 1 gives Verb in a sentence about 15% and the full table 43% (59% before); from box 2 Verb in a sentence about 12% and Which tense fits? about 9% (a sentence without a clue, or a command, falls back). The share of typed exercises from box 2 is about 87% (86% before): 87% at box 2, 80% at box 3, where Which tense fits? is chosen, and 89% from box 4, where it is typed. `tools/test-verbs.js` answers every kind of Verbs exercise right through the screen; `tools/test-choices.js` checks the two drills' options and prompts over every sentence.
 
 ## Where the new types could go next
 
@@ -177,4 +188,4 @@ Every new item type touches the same places. In `index.html`:
 7. The glossary (`PRACTICE_TYPES`, `rowHtml`), Look up and the glossary filter (`itemFields`), the summary line, `itemLabel`, the Stats names (`typeName`) and `knownWords` (what the typo rule treats as real words; leave out text that is wrong on purpose).
 8. CSS beside the other session styles: 44 px targets, the ok / bad tokens, never colour alone (a ✓ or ✕ goes with each colour).
 
-Then the tools: a section for it in `tools/check-content.js` (explanations, a note for every wrong option, anything else that can be wrong in the data), a block in `newTypes` in `tools/test-ui.js` (answered right and wrong by tapping, in light and dark at 360 px and at 120% text) plus its fields in the read-aloud `dataWords`, a branch in `runSession` in `tools/test-progress.js` so practice sessions answer it as a learner would, and one in `tools/test-items.js` if it has a new `mode`, so every item of the type is answered right through the screen. Finally the item format in the content guide, the look in the design system, and a row in the table above.
+Then the tools: a section for it in `tools/check-content.js` (explanations, a note for every wrong option, anything else that can be wrong in the data), a block in `newTypes` in `tools/test-ui.js` (answered right and wrong by tapping, in light and dark at 360 px and at 120% text) plus its fields in the read-aloud `dataWords`, a branch in `runSession` in `tools/test-progress.js` so practice sessions answer it as a learner would, and one in `tools/test-items.js` if it has a new `mode`, so every item of the type is answered right through the screen (for a Verbs section drill, `tools/test-verbs.js` builds every kind it can and answers each, so add the new key to its `KINDS`). Finally the item format in the content guide, the look in the design system, and a row in the table above.

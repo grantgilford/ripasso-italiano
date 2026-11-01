@@ -10,7 +10,9 @@
                                               line) and one item per line
     LESSONS                                   one section per line, under its unit's line
     VERB_GYM                                  one verb per line
+    VERB_SENTENCES                            one verb per line, with its example sentences
     ID_ALIASES                                one alias per line
+    ITEM_SECTIONS                             one unit per line
   Only the layout changes: each constant is read as JSON and written back with the same values in
   the same order, and nothing else in the file is touched. Safe to run again at any time: on a file
   already laid out it changes nothing. add-items and edit-items write in the same layout.
