@@ -622,7 +622,8 @@ if (app.VERB_SENTENCES) {
     + " pigro prudente stivali cappotto pioveva auguro cassetto ascensore tango stanchissimo nevica zampa veterinario guanti nevicasse"
     + " sugo piccante marmellata camino condizionata gnocchi hobby erre ottocento"
     + " terrazza sciare tacchi navigatore pandemia ali pareva dentista campeggio scivola trattoria bocciati sospettava burocrazia gladiatori bullismo campanello campanella"
-    + " diciotto preside vaccini zanzara ragno ballerina auguravo pianoforte gita fritta tiramisù ciliegie zampe spaghetti bagnata").split(" "));
+    + " diciotto preside vaccini zanzara ragno ballerina auguravo pianoforte gita fritta tiramisù ciliegie zampe spaghetti bagnata"
+    + " fragole invito era dubitavo carbonara scontato ricomincerei basilico casetta epidemia annoiavo telefonare").split(" "));
   const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
   const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
   const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
