@@ -633,7 +633,8 @@ if (app.VERB_SENTENCES) {
     + " barzelletta gentilezza infermiere anatre vespa gelato vulcano cugine fresche confetti gattino rubinetto caldaia caramelle coinquilino lenzuola asciugamani onomastico scudetto pompieri champagne esige sciocchezza"
     + " chiacchierare mattone stampante sportello preferibile tessera ragni cognata lavagna balena plurali distrazione oroscopo capitano crociera domattina elettricista baffi barbiere pediatra"
     + " novanta tredici soffitta buche doveroso inquina curriculum barbecue salsicce piccioni passanti sponsor quaranta scogli bagnino arcobaleno allergia concorso volontariato emoziona calcetto poltrona"
-    + " studentesse maglioni costanza torte istruttore fastidioso castagne coperchio fagioli tasto tasti ricotta colorati ragù noci graffiti bucare prenotazione aosta carrello ghiacciata infermieri prosecco duramente brodo impasto").split(" "));
+    + " studentesse maglioni costanza torte istruttore fastidioso castagne coperchio fagioli tasto tasti ricotta colorati ragù noci graffiti bucare prenotazione aosta carrello ghiacciata infermieri prosecco duramente brodo impasto"
+    + " ombrellone siccità cuochi stagista chiosco triplo scorciatoia pistacchio commuove conchiglie gradino malinteso animatore pestassero bottoni sarta sarte orlo cucire timidi fortissimo rifugio jeans camerino paesino galline schiaffo abbandonati ritorno pagelle moduli suoceri riciclare fisso furgone stage indiscreto antipasto pedina ginnastica monolocale").split(" "));
   const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
   const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
   const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
@@ -696,7 +697,9 @@ if (app.VERB_SENTENCES) {
     if (persons.size < 4 && !/third person/i.test(v.note || "")) look("Verb sentences: few persons", `${inf}: only ${[...persons].map(p => P6[p]).join(", ")}`);
   }
   count("verbs with sentences", Object.keys(VS).length);
-  if (without.length) look("Verbs without sentences yet", `${without.length} of ${VERB_GYM.length}, from ${without[0]} to ${without[without.length - 1]} (in VERB_GYM order)`);
+  // From 9.24 every verb in VERB_GYM has its sentences, so a verb without them (a new verb, or one whose line was lost) is a
+  // problem, not just worth a look: the New verb card, the answer panel and the two sentence drills all need one
+  if (without.length) problem("Verb sentences: verbs without sentences", `${without.length} of ${VERB_GYM.length}: ${without.join(", ")} (in VERB_GYM order)`);
 }
 
 /* ---------- 10. release notes: CHANGES and CHANGELOG.md ---------- */
