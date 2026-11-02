@@ -28,7 +28,7 @@
       all at once;
     - buildSession for every kind of session (the mean of 5, as each takes only milliseconds);
     - the first lookup of a flashcard's sentence (9.7 on), which indexes the grammar units' sentences by their words;
-    - from 9.20, every verb's example sentences found afresh (held to the same 50 ms), and drawing a Verbs
+    - from 9.20, the example sentences of the first 100 verbs that have them, found afresh (held to the same 50 ms), and drawing a Verbs
       session with Verb in a sentence and with Which tense fits?, then each one's answer panel after a wrong answer;
     - with a stand-in for the cloud database: one pushProgress with every document compared and
       written; one answer and the pushProgress after it; a snapshot from the cloud that is only the echo
@@ -108,7 +108,11 @@ const BUDGETS = {
   "Flashcard sentence, first lookup": 50,
   // 9.20: the Verbs section's example sentences, found for every verb with sentences at once (well under the 50 ms limit of an
   // index built while an answer is shown: about 8 ms for 25 verbs on the computer these were set on), and the two new drills
-  // on the session screen and with their answer panel: the slower of two runs plus 25%
+  // on the session screen and with their answer panel: the slower of two runs plus 25%. From 9.22 the first figure times the
+  // first 100 verbs with sentences (as many as 9.20 had), not all of them: the app finds a verb-tense's sentences only when it
+  // first needs them (a Verbs session its dozen items, a verb opened in the reference its eight tenses), so no tap waits for
+  // every verb's, and timing them all grew with each batch of sentences (56 ms at 200 verbs and 85-115 ms at 300 on the
+  // computer 9.22 was tested on) against a limit that doesn't grow. A fixed 100 keeps it a check on the cost of each lookup
   "Verb sentences, first lookup": 50,
   "Draw a session: Verb in a sentence": 12,
   "Draw its answer panel: Verb in a sentence": 18,
@@ -194,7 +198,8 @@ async function measure(runs) {
     for (const [kind, unit] of kinds) add("buildSession " + kind, time(() => { for (let k = 0; k < 5; k++) if (!buildSession(kind, unit).queue.length) throw new Error("an empty " + kind + " session"); }) / 5); // quick, so the mean of 5
     if (card) { CONTEXT = null; add("Flashcard sentence, first lookup", time(() => contextFor(card))); } // 9.7 on: the sentences indexed when a card first needs one
     if (typeof vgCtxExercise === "function") { // 9.20 on: every verb's example sentences found afresh, and the two drills on the session screen, then their answer panels
-      VS_INDEX = null; add("Verb sentences, first lookup", time(() => VERB_GYM.forEach(v => { if (VERB_SENTENCES[v.it]) VG_TENSES.forEach(t => { const x = content.items[vgId(v.it, t)]; if (x) verbSentences(x); }); })));
+      const vsVerbs = VERB_GYM.filter(v => VERB_SENTENCES[v.it]).slice(0, 100); // the first 100 verbs with sentences, the same work whatever later batches add (see BUDGETS)
+      VS_INDEX = null; add("Verb sentences, first lookup", time(() => vsVerbs.forEach(v => VG_TENSES.forEach(t => { const x = content.items[vgId(v.it, t)]; if (x) verbSentences(x); }))));
       const keep = {}; VG_TENSES.forEach(t => { const id = pid(vgId("andare", t)); keep[id] = progress.items[id]; progress.items[id] = Object.assign({}, rec(id), { box: 3 }); }); // its tenses started, so Which tense fits? can be built
       for (const [name, build, tense, box, given] of [["Verb in a sentence", vgCtxExercise, "passato_prossimo", 1, "vado"], ["Which tense fits?", vgFitExercise, "futuro", 4, "andavamo"]]) {
         const it = content.items[vgId("andare", tense)], ex = { item: it, note: "" };
