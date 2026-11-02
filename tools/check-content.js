@@ -627,7 +627,8 @@ if (app.VERB_SENTENCES) {
     + " gemelli sushi controllore tramonto semafori lockdown asciugamano presidi tondo"
     + " semaforo strisce vaccino formiche soffitto lottavano gesso palline candeline buffo infermiera suocera"
     + " pescatori bollette pioverà gemelle casco brindisi calmo eleganza fulmini insalata pesto"
-    + " disturberai lavastoviglie bambole guasto frigo ricicla drago allegra asciutto vetrina ciclisti").split(" "));
+    + " disturberai lavastoviglie bambole guasto frigo ricicla drago allegra asciutto vetrina ciclisti"
+    + " merende gomito salotto poster bollirà pepe nevicava zucchine melanzane bollente spogliatoi parrucchiere cipolla umidità tosse scacchi lettino ingiusto lavatrice telefonava").split(" "));
   const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
   const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
   const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
