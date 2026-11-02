@@ -697,7 +697,9 @@ if (app.VERB_SENTENCES) {
     if (persons.size < 4 && !/third person/i.test(v.note || "")) look("Verb sentences: few persons", `${inf}: only ${[...persons].map(p => P6[p]).join(", ")}`);
   }
   count("verbs with sentences", Object.keys(VS).length);
-  if (without.length) look("Verbs without sentences yet", `${without.length} of ${VERB_GYM.length}, from ${without[0]} to ${without[without.length - 1]} (in VERB_GYM order)`);
+  // From 9.24 every verb in VERB_GYM has its sentences, so a verb without them (a new verb, or one whose line was lost) is a
+  // problem, not just worth a look: the New verb card, the answer panel and the two sentence drills all need one
+  if (without.length) problem("Verb sentences: verbs without sentences", `${without.length} of ${VERB_GYM.length}: ${without.join(", ")} (in VERB_GYM order)`);
 }
 
 /* ---------- 10. release notes: CHANGES and CHANGELOG.md ---------- */
