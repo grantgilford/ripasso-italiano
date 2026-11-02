@@ -630,7 +630,8 @@ if (app.VERB_SENTENCES) {
     + " disturberai lavastoviglie bambole guasto frigo ricicla drago allegra asciutto vetrina ciclisti"
     + " merende gomito salotto poster bollirà pepe nevicava zucchine melanzane bollente spogliatoi parrucchiere cipolla umidità tosse scacchi lettino ingiusto lavatrice telefonava"
     + " campanile principiante termosifoni tatto capriccio crosta quaderni calze sorellina parcheggerai salatissimo riaprirete"
-    + " barzelletta gentilezza infermiere anatre vespa gelato vulcano cugine fresche confetti gattino rubinetto caldaia caramelle coinquilino lenzuola asciugamani onomastico scudetto pompieri champagne esige sciocchezza").split(" "));
+    + " barzelletta gentilezza infermiere anatre vespa gelato vulcano cugine fresche confetti gattino rubinetto caldaia caramelle coinquilino lenzuola asciugamani onomastico scudetto pompieri champagne esige sciocchezza"
+    + " chiacchierare mattone stampante sportello preferibile tessera ragni cognata lavagna balena plurali distrazione oroscopo capitano crociera domattina elettricista baffi barbiere pediatra").split(" "));
   const STOP = new Set("il lo la i gli le l' un uno una un' di a da in con su per tra fra e o che non si mi ti ci vi ne me te ce ve se del della dei delle dello degli al alla ai alle allo agli dal dalla dai dalle nel nella nei nelle sul sulla sui è ad ed".split(" "));
   const formOf = new Map(); for (const v of VERB_GYM) for (const t of v.f) for (const f of t || []) for (const w of words(f.replace(/\/\S+$/, ""))) if (!formOf.has(normalize(w))) formOf.set(normalize(w), v.it);
   const rank = w => Math.min(...[w, w.replace(/i$/, "o"), w.replace(/i$/, "io"), w.replace(/e$/, "a"), w.replace(/i$/, "e"), w.replace(/a$/, "o"), w.replace(/essa$/, "e"), w.replace(/issim([oaie])$/, "$1"), w.replace(/^\p{L}+'/u, ""), w.replace(/([aei])ss(i|e|imo|ero)$/, "$1re")].map(x => rankOf(x)).concat(formOf.has(w) ? [rankOf(formOf.get(w))] : []));
