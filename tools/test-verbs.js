@@ -18,9 +18,10 @@
   one, or a script error occurs; and if a kind is never built at all.
 
   Which items:
-    (default)      a seeded sample, quick enough for GitHub's checks (about eleven minutes at 9.23, growing with the sentences): every verb-tense
-                   with an example sentence (VERB_SENTENCES) and 150 more, at least 15 of each tense
-    --all          every verb-tense (3,459 as of 9.20): about twelve minutes
+    (default)      a seeded sample, quick enough for GitHub's checks: every verb-tense with an example sentence (VERB_SENTENCES)
+                   and 150 more, at least 15 of each tense. From 9.24 every verb-tense has one, so this is all 3,459, as --all
+                   gives: about eleven minutes
+    --all          every verb-tense (3,459 as of 9.20): about eleven minutes
     --verbs a,b    every tense of the verbs named, every kind at every box
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
