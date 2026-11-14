@@ -19,7 +19,9 @@ concurrency: # a new push to the same branch replaces a run still going
 jobs:
   checks:
     name: Content and browser tests
-    runs-on: ubuntu-latest
+    # Pinned: in November 2026 ubuntu-latest moved to Ubuntu 26.04, where the pinned Playwright (1.56.1) cannot install
+    # Chromium. Move this on when package.json moves to a Playwright that supports the newer image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
