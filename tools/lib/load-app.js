@@ -3,10 +3,11 @@
   (check-content, unit-items, add-items, edit-items, check-new-words, pack-levels, same-content, variety,
   link-sections and test-choices).
 
-  The app's script is the inline <script> holding the boot section (a small start-up snippet in
-  <head> comes first). Everything before the boot section only defines things (the content, the
-  helpers, the screens), so it runs in a sandbox with just enough of a browser stubbed in, and the
-  names asked for are handed back:
+  The app's script is the inline <script> holding the boot section (small start-up snippets come
+  first: the theme, the storage script that defines Store, the error log). Everything before the
+  boot section only defines things (the content, the helpers, the screens), so it runs in a sandbox
+  with just enough of a browser stubbed in, after the storage script (which finds no IndexedDB there
+  and an empty localStorage, so nothing is saved or loaded), and the names asked for are handed back:
 
     const { loadApp } = require("./lib/load-app");
     const app = loadApp("buildContent, getContent: () => content, VERB_GYM");   // index.html beside tools/
@@ -20,12 +21,15 @@ const path = require("path");
 const vm = require("vm");
 
 const BOOT_MARK = "/* ---------- boot ---------- */";
+const STORE_MARK = "/* ---------- storage: the one place saved data is read and written";
 const INDEX = path.join(__dirname, "..", "..", "index.html");
 
 // Every inline <script> in the page (those loaded with src= aside), as text.
 const inlineScripts = (html) => [...html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)].map(m => m[1]);
 // The app's script: the inline one with the boot section, or "" if there is none.
 const appScript = (html) => inlineScripts(html).find(s => s.includes(BOOT_MARK)) || "";
+// The storage script (from 9.26): the inline one that defines Store, or "" in a version before it.
+const storeScript = (html) => inlineScripts(html).find(s => s.includes(STORE_MARK)) || "";
 
 function sandbox() {
   const noop = () => {};
@@ -48,7 +52,10 @@ function loadApp(names, { html, file } = {}) {
   const boot = code.indexOf(BOOT_MARK);
   if (boot < 0) { console.error("Could not find the boot section in the script; the loader needs updating."); process.exit(1); }
   const list = Array.isArray(names) ? names.join(", ") : names;
-  return vm.runInNewContext(code.slice(0, boot) + "\n;({ " + list + " })", sandbox(), { filename: "index.html <script>" });
+  const sb = vm.createContext(sandbox());
+  const store = storeScript(html);
+  if (store) vm.runInContext(store, sb, { filename: "index.html <script> (storage)" });
+  return vm.runInContext(code.slice(0, boot) + "\n;({ " + list + " })", sb, { filename: "index.html <script>" });
 }
 
-module.exports = { BOOT_MARK, INDEX, inlineScripts, appScript, loadApp };
+module.exports = { BOOT_MARK, STORE_MARK, INDEX, inlineScripts, appScript, storeScript, loadApp };

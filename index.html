@@ -10,7 +10,462 @@
 <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1512">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22100%22%20height=%22100%22%20viewBox=%220%200%20100%20100%22%20role=%22img%22%20aria-label=%22ripasso%22%3E%3Crect%20width=%22100%22%20height=%22100%22%20rx=%2223%22%20fill=%22%230F6B4B%22/%3E%3Cpath%20d=%22M31%2032%20L45%2068%22%20stroke=%22%23FFFFFF%22%20stroke-width=%2213%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3Cpath%20d=%22M55%2032%20L69%2068%22%20stroke=%22%23EF4B55%22%20stroke-width=%2213%22%20stroke-linecap=%22round%22%20fill=%22none%22/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="data:image/png;base64,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">
-<script>/* Appearance (Light / Dark / Auto) is a per-device choice in itapp.theme.v1, read here so the first paint already has the right colours. */try{var t=JSON.parse(localStorage.getItem("itapp.theme.v1"));if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].setAttribute("content",t==="dark"?"#0E1512":"#F3F6F4");}}catch(e){}</script>
+<script>/* Appearance (Light / Dark / Auto) is a per-device choice, read here so the first paint already has the right colours: from the note the storage script below keeps for this in localStorage (ripasso.boot.v1, from 9.26, since the saved data itself can't be read this early), or where there is none yet, from itapp.theme.v1 as before. The app sets it again from the saved data as it starts. */try{var h=JSON.parse(localStorage.getItem("ripasso.boot.v1")),t=h&&typeof h==="object"?h.theme:JSON.parse(localStorage.getItem("itapp.theme.v1"));if(t==="light"||t==="dark"){document.documentElement.setAttribute("data-theme",t);var m=document.querySelectorAll('meta[name="theme-color"]');for(var i=0;i<m.length;i++)m[i].setAttribute("content",t==="dark"?"#0E1512":"#F3F6F4");}}catch(e){}</script>
+<script>
+/* ---------- storage: the one place saved data is read and written (from 9.26) ----------
+   Everything Ripasso keeps on this device goes through Store: progress, imported packs and the small per-device
+   values (the itapp.* keys). Nothing else in the page touches localStorage or IndexedDB, so what lies underneath can be
+   changed here (for a native database, say) without touching the rest of the app.
+
+   WHAT THE APP SEES: values under keys, read from memory.
+     Store.ready            a promise, kept when the saved data is in memory (it never fails); the app starts after it
+     Store.get(key)         the value saved under key, or null (read from memory; a fresh copy each time)
+     Store.set(key, value)  saves it: memory at once, the storage straight after; false if this device isn't saving.
+                            For progress, Store.set(key, progress, true) compares every part with what is stored
+                            (the app does this as it is put away); otherwise only the records that changed are written
+     Store.remove(key)      forgets it
+     Store.flush()          a promise, kept when everything set so far is in the storage (true) or couldn't be (false)
+     Store.read(key)        a promise of what the storage itself holds, read afresh (for checks and tests)
+     Store.status()         { backend: "idb" | "local" | "none" (see below), reason and detail (why not "idb"),
+                              moved ({ at, keys, records, days }: the move from localStorage, if this device made one),
+                              lost (when the storage came back empty after the move, else 0), oldCopy (the copy from
+                              before the move is still here), oldChanged (an older version has saved to it since),
+                              failed (the last save didn't land), persisted, writes (transactions so far) }
+     Store.usage()          a promise of { saved, room }: characters saved here, and bytes the device still allows
+     Store.persist()        asks the device to keep this storage when space runs low; a promise of true, false or null
+     Store.oldCopy()        the progress in the copy from before the move, read only when the learner asks to merge it
+     Store.oldCopySeen()    notes that the old copy, as it stands now, has been merged in
+     Store.onChange         set by the app: called with another window's progress after that window saved, to merge it
+     Store.onError          set by the app: called with true or false when saving starts failing or works again
+     Store.onNotice         set by the app: called when status() has something new to show
+
+   WHERE IT IS KEPT. backend says which:
+     "idb"    IndexedDB, database "ripasso", one table "data" of texts (each value is JSON, as text). The usual case.
+              A small value is one row under its own key. Progress is too big to write whole after every answer, so it
+              is kept in parts under "itapp.progress.v1/…": "head" (everything but the records and the daily log),
+              "days_YYYY" (a year of the daily log) and "b000"…"b255" (the item records, by a hash of the item id).
+              A save writes the parts that changed, in one transaction, so a save is all there or not at all.
+     "local"  localStorage, exactly as before 9.26 (the same keys and texts). Used only when IndexedDB can't be used
+              and the data has never been moved to it; status().reason says why ("unavailable" or "failed").
+     "none"   nothing: the data was moved to IndexedDB, and IndexedDB can't be opened now. The app runs without saving
+              and says so, rather than go back to the old copy, which is out of date.
+
+   THE MOVE from localStorage (once per device, before the app starts):
+     1. every itapp.* key is copied into IndexedDB in one transaction (all or nothing), marked "copied";
+     2. it is all read back and compared with the original: each text exactly, progress part by part and as a whole;
+     3. only then is the mark "store.migration" set to "done", in its own transaction.
+   Until the mark says "done", localStorage is the live copy and IndexedDB is not used; after it, IndexedDB is the only
+   live copy. Closing the app at any point before the mark leaves localStorage untouched and the next start does the
+   whole move again. The itapp.* keys in localStorage are never written or removed afterwards: they stay as the copy
+   from before the move, read only when the learner taps "Merge in the copy from before the move" (Store.oldCopy), and
+   looked at, never used, by one check: a few seconds after starting, the old copy's fingerprint (its length and a
+   checksum) is compared with the one taken at the move, and if an older version of the app has saved there since,
+   status().oldChanged says so, so the learner can merge it in.
+
+   ONE KEY IN localStorage IS STILL WRITTEN: "ripasso.boot.v1", { theme, idb }. IndexedDB can't be read before the
+   first paint, so the Appearance choice is copied there for the small script in <head>, and idb (the time of the move)
+   tells a start where IndexedDB won't open that the data lives there (so backend is "none", not "local"). It is a
+   note, never the saved data: the app reads the theme from the storage like everything else.
+
+   TWO WINDOWS (the installed app and a browser tab share this storage). Every save carries a new token in
+   "store.rev" and first checks the token is the one this window last saw. If another window has saved since, the save
+   is dropped, the storage is read again, the app merges the other window's progress with its own (Store.onChange: the
+   newest record of each item wins, as in the cloud sync) and saves the result. A window also looks when it comes
+   back to the screen and when another window says it has saved (BroadcastChannel "ripasso-store").
+
+   A NATIVE DATABASE would replace open(), readAll(), write() and usage() below (and drop the move); the parts of
+   progress could become rows of a table. Nothing outside this script would change. */
+const Store = (() => {
+  "use strict";
+  const PROGRESS = "itapp.progress.v1", THEME = "itapp.theme.v1", OLD_PREFIX = "itapp.", HINT = "ripasso.boot.v1";
+  const DB_NAME = "ripasso", TABLE = "data", MARK = "store.migration", REV = "store.rev", PART = PROGRESS + "/", HEAD = PART + "head", BUCKETS = 256;
+  const FOREIGN = new Error("another window saved first");
+  const api = { onChange: null, onError: null, onNotice: null };
+  let mode = "opening", reason = "", detail = "";
+  let db = null, texts = new Map(), rev, marker = null; // texts: every key's text as the storage holds it, or will once the writes waiting have landed
+  let shadow = null, members = null, lastProgress;      // the records as stored (a copy of each), the ids in each bucket, and the progress last saved
+  let pending = new Map(), writing = null, failed = false, writes = 0;
+  let persisted = null, oldCopy = false, oldChanged = false, chan = null;
+  const alias = new Map(); // key → a text that says the same as the stored one with its keys in another order
+
+  /* ----- small helpers ----- */
+  const ls = { // localStorage, every use guarded (it can be missing or refuse)
+    get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+    set(k, t) { try { localStorage.setItem(k, t); return true; } catch (e) { return false; } },
+    remove(k) { try { localStorage.removeItem(k); } catch (e) { } },
+    keys() { try { const out = []; for (let i = 0; i < localStorage.length; i++) out.push(localStorage.key(i)); return out; } catch (e) { return []; } },
+  };
+  const parse = (t) => { if (!t || typeof t !== "string") return null; try { return JSON.parse(t); } catch (e) { return null; } }; // an empty or damaged text counts as nothing saved
+  const plain = (v) => !!v && typeof v === "object" && !Array.isArray(v);
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  const call = (fn, ...a) => { try { if (fn) return fn(...a); } catch (e) { setTimeout(() => { throw e; }, 0); } }; // the app's own error is reported, without stopping the storage
+  const sameJSON = (a, b) => { // the same JSON value, whatever the order of keys
+    if (a === b) return true;
+    if (!a || !b || typeof a !== "object" || typeof b !== "object" || Array.isArray(a) !== Array.isArray(b)) return false;
+    const ka = Object.keys(a);
+    if (ka.length !== Object.keys(b).length) return false;
+    for (let i = 0; i < ka.length; i++) if (!has(b, ka[i]) || !sameJSON(a[ka[i]], b[ka[i]])) return false;
+    return true;
+  };
+  const hashStep = (h, text, from, to) => { for (let i = from; i < to; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); } return h; };
+  const printOf = (text, h) => text.length + ":" + (h >>> 0);
+  const fingerprint = (text) => text == null ? "none" : printOf(text, hashStep(2166136261, text, 0, text.length)); // a text's length and a checksum
+  const token = () => Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+
+  /* ----- progress in parts ----- */
+  const bucketOf = (id) => hashStep(2166136261, id, 0, id.length) >>> 0 & (BUCKETS - 1);
+  const bucketKey = (n) => PART + "b" + String(n).padStart(3, "0");
+  const yearKey = (day) => PART + "days_" + String(day).slice(0, 4);
+  const isPart = (k) => k.startsWith(PART);
+  const copyRec = (r) => plain(r) ? Object.assign({}, r) : r;
+  const sameRec = (r, s) => r === s || (plain(r) && plain(s) && r.box === s.box && r.due === s.due && r.lapses === s.lapses && r.lastSeen === s.lastSeen
+    && r.lastWrong === s.lastWrong && r.seenCount === s.seenCount && r.lastRight === s.lastRight);
+  const headText = (p, items, days) => { const head = {}; for (const k of Object.keys(p)) if (!(k === "items" && items) && !(k === "days" && days)) head[k] = p[k]; return JSON.stringify({ p: head, items: !!items, days: !!days }); };
+  const REC = ["box", "due", "lapses", "lastSeen", "lastWrong", "seenCount", "lastRight"];
+  function canonRec(r) { // a record with its fields in one order (REC, then any others by name), so the same record always gives the same text
+    if (!plain(r)) return r;
+    const o = {}, keys = Object.keys(r);
+    let n = 0;
+    for (let i = 0; i < REC.length; i++) { const v = r[REC[i]]; if (v !== undefined) { o[REC[i]] = v; n++; } }
+    if (keys.length > n) for (const k of keys.sort()) if (!has(o, k)) o[k] = r[k];
+    return o;
+  }
+  const bucketText = (ids, items) => { const o = Object.create(null); for (const id of [...ids].sort()) o[id] = canonRec(items[id]); return JSON.stringify(o); }; // in order of id, so the same records always give the same text
+  function yearTexts(days) { // the daily log, a text for each year
+    const years = new Map(), out = new Map();
+    for (const d of Object.keys(days)) { const k = yearKey(d); let o = years.get(k); if (!o) years.set(k, o = Object.create(null)); o[d] = days[d]; }
+    for (const [k, o] of years) out.set(k, JSON.stringify(o));
+    return out;
+  }
+  function follow(items) { // from here on, items is what the storage holds: a copy of each record and each bucket's ids are kept, to find what a later save changes
+    shadow = new Map(); members = new Array(BUCKETS);
+    if (!items) return;
+    const ids = Object.keys(items);
+    for (let i = 0; i < ids.length; i++) {
+      const id = ids[i], r = items[id];
+      if (r === undefined) continue;
+      shadow.set(id, copyRec(r));
+      const n = bucketOf(id); (members[n] || (members[n] = new Set())).add(id);
+    }
+  }
+  function partsOf(p) { // every part of progress as text, by key (the move writes these)
+    const out = new Map(), items = plain(p.items) ? p.items : null, days = plain(p.days) ? p.days : null;
+    out.set(HEAD, headText(p, items, days));
+    if (days) for (const [k, t] of yearTexts(days)) out.set(k, t);
+    if (items) {
+      const by = new Array(BUCKETS);
+      for (const id of Object.keys(items)) if (items[id] !== undefined) { const n = bucketOf(id); (by[n] || (by[n] = [])).push(id); }
+      by.forEach((ids, n) => out.set(bucketKey(n), bucketText(ids, items)));
+    }
+    return out;
+  }
+  function join(m, test) { // the objects held in several texts, read as one
+    const inner = [], keys = [];
+    for (const [k, t] of m) if (isPart(k) && test(k.slice(PART.length)) && typeof t === "string") { keys.push(k); if (t.length > 2 && t[0] === "{") inner.push(t.slice(1, -1)); }
+    try { return JSON.parse("{" + inner.join(",") + "}"); }
+    catch (e) { const out = {}; for (const k of keys) { const o = parse(m.get(k)); if (plain(o)) Object.assign(out, o); } return out; } // a damaged part is left out, the rest kept
+  }
+  const isBucket = (name) => /^b\d{3}$/.test(name), isYear = (name) => name.startsWith("days_");
+  function assemble(m) { // progress put together from its parts in m, or undefined if m holds none
+    if (!m.has(HEAD) && ![...m.keys()].some(isPart)) return undefined;
+    const h = parse(m.get(HEAD)), whole = plain(h) && plain(h.p);
+    const p = whole ? h.p : { v: 2 }; // a damaged head: the records and the log are still read
+    if (whole ? h.items : true) p.items = join(m, isBucket);
+    if (whole ? h.days : true) p.days = join(m, isYear);
+    return p;
+  }
+  function differs(k, t) { // does text t say something other than what is stored under k? The same values in another order of keys (as another window may have written them) are not a change
+    const cur = texts.get(k);
+    if (cur === undefined) return true;
+    if (cur === t || alias.get(k) === t) return false;
+    if (sameJSON(parse(cur), parse(t))) { alias.set(k, t); return false; }
+    return true;
+  }
+  function progressChanges(p, full) { // what saving p changes in the storage, as key → text (null: remove). Only the records that differ from the copy kept are looked up, unless full
+    const out = new Map(), put = (k, t) => { if (texts.get(k) !== t) out.set(k, t); }, drop = (k) => { if (texts.has(k)) out.set(k, null); };
+    const say = (k, t) => { if (differs(k, t)) out.set(k, t); }; // the head and the log: written only when they say something else
+    const items = plain(p.items) ? p.items : null, days = plain(p.days) ? p.days : null;
+    say(HEAD, headText(p, items, days));
+    drop(PROGRESS);
+    const years = days ? yearTexts(days) : new Map();
+    for (const [k, t] of years) say(k, t);
+    for (const k of texts.keys()) if (isPart(k) && isYear(k.slice(PART.length)) && !years.has(k)) out.set(k, null);
+    const dirty = new Set();
+    if (!items || full || !shadow) { follow(items); for (let n = 0; n < BUCKETS; n++) dirty.add(n); }
+    else {
+      const ids = Object.keys(items);
+      let seen = 0, added = 0;
+      for (let i = 0; i < ids.length; i++) {
+        const id = ids[i], r = items[id];
+        if (r === undefined) continue;
+        const s = shadow.get(id);
+        if (s === undefined) { added++; shadow.set(id, copyRec(r)); const n = bucketOf(id); (members[n] || (members[n] = new Set())).add(id); dirty.add(n); }
+        else { seen++; if (!sameRec(r, s)) { shadow.set(id, copyRec(r)); dirty.add(bucketOf(id)); } }
+      }
+      if (seen + added < shadow.size) for (const id of [...shadow.keys()]) if (!has(items, id) || items[id] === undefined) { // records removed (a reset, an undo, a record moved to another id)
+        shadow.delete(id); const n = bucketOf(id); if (members[n]) members[n].delete(id); dirty.add(n);
+      }
+    }
+    for (const n of dirty) { const ids = members[n]; if (ids && ids.size) put(bucketKey(n), bucketText(ids, items)); else drop(bucketKey(n)); }
+    return out;
+  }
+
+  /* ----- IndexedDB ----- */
+  const req = (r) => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error || new Error("request failed")); });
+  const done = (tx) => new Promise((ok, no) => { tx.oncomplete = () => ok(); tx.onabort = tx.onerror = () => no(tx.error || new Error("transaction stopped")); });
+  const commit = (tx) => { try { if (tx.commit) tx.commit(); } catch (e) { } }; // sooner than waiting for the browser to notice the transaction is finished
+  const writeTx = (d) => { try { return d.transaction(TABLE, "readwrite", { durability: "strict" }); } catch (e) { if (e && e.name === "TypeError") return d.transaction(TABLE, "readwrite"); throw e; } }; // strict: on the disk before it counts as saved
+  function openDB() {
+    return new Promise((ok, no) => {
+      let r, late = false;
+      try { r = indexedDB.open(DB_NAME, 1); } catch (e) { no(e); return; }
+      const timer = setTimeout(() => { late = true; no(new Error("IndexedDB did not open in time")); }, 8000);
+      r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(TABLE)) r.result.createObjectStore(TABLE); };
+      r.onerror = () => { clearTimeout(timer); no(r.error || new Error("IndexedDB did not open")); };
+      r.onsuccess = () => {
+        clearTimeout(timer);
+        const d = r.result;
+        if (late) { d.close(); return; }
+        d.onversionchange = () => { d.close(); if (db === d) db = null; }; // a later version of the app wants to change the database: let it
+        d.onclose = () => { if (db === d) db = null; };                   // the browser closed it: opened again at the next save
+        ok(d);
+      };
+    });
+  }
+  async function readAll(d) { // every row, as key → text
+    const s = d.transaction(TABLE, "readonly").objectStore(TABLE);
+    const [keys, values] = await Promise.all([req(s.getAllKeys()), req(s.getAll())]);
+    const m = new Map();
+    keys.forEach((k, i) => { if (typeof k === "string" && typeof values[i] === "string") m.set(k, values[i]); });
+    return m;
+  }
+  function adopt(m) { rev = m.get(REV); m.delete(REV); texts = m; marker = parse(m.get(MARK)); shadow = null; members = null; alias.clear(); } // m is now what the storage holds
+  async function write(batch) { // one transaction: the batch and a new token, only if no other window has saved since this one last looked
+    if (!db) db = await openDB();
+    const tx = writeTx(db), s = tx.objectStore(TABLE), next = token();
+    let foreign = false;
+    const seen = s.get(REV);
+    seen.onsuccess = () => { if (seen.result !== rev) { foreign = true; try { tx.abort(); } catch (e) { } } else commit(tx); };
+    for (const [k, t] of batch) if (t === null) s.delete(k); else s.put(t, k);
+    s.put(next, REV);
+    try { await done(tx); } catch (e) { throw foreign ? FOREIGN : e; }
+    rev = next; writes++;
+    if (chan) try { chan.postMessage({ rev }); } catch (e) { }
+  }
+
+  /* ----- the move from localStorage ----- */
+  async function migrate(d) { // returns every row as the storage holds it afterwards; throws (with step) if the copy can't be made or doesn't match
+    const src = new Map(), skipped = [], want = new Map();
+    for (const k of ls.keys()) if (k.startsWith(OLD_PREFIX)) {
+      const t = ls.get(k);
+      if (!t) continue;
+      try { src.set(k, { text: t, value: JSON.parse(t) }); } catch (e) { skipped.push(k); } // a text that can't be read was never loaded by the app either: it stays where it is
+    }
+    const old = src.get(PROGRESS), inParts = !!old && plain(old.value);
+    for (const [k, s] of src) if (k === PROGRESS && inParts) for (const [pk, pt] of partsOf(s.value)) want.set(pk, pt); else want.set(k, s.text);
+    let other = false;
+    const tx = writeTx(d), st = tx.objectStore(TABLE), m0 = st.get(MARK);
+    m0.onsuccess = () => {
+      const m = parse(m0.result);
+      if (plain(m) && m.state === "done") { other = true; return; } // another window finished the move first
+      st.clear();
+      for (const [k, t] of want) st.put(t, k);
+      st.put(JSON.stringify({ state: "copied", at: Date.now() }), MARK);
+      commit(tx);
+    };
+    await done(tx);
+    const back = await readAll(d);
+    if (other || (parse(back.get(MARK)) || {}).state === "done") return back;
+    const fail = (what) => { throw Object.assign(new Error("the copy did not match the original (" + what + ")"), { step: "check" }); };
+    for (const [k, t] of want) if (back.get(k) !== t) fail(k);
+    for (const k of back.keys()) if (k !== MARK && !want.has(k)) fail("an extra row, " + k);
+    if (inParts && !sameJSON(assemble(back), old.value)) fail("progress put back together");
+    const count = (o) => plain(o) ? Object.keys(o).length : 0;
+    const mark = { state: "done", at: Date.now(), from: src.size ? "localStorage" : "none", keys: src.size, records: inParts ? count(old.value.items) : 0, days: inParts ? count(old.value.days) : 0, fp: fingerprint(old ? old.text : null), skipped };
+    const tx2 = writeTx(d), st2 = tx2.objectStore(TABLE), m2 = st2.get(MARK);
+    let final = JSON.stringify(mark);
+    m2.onsuccess = () => { const m = parse(m2.result); if (plain(m) && m.state === "done") final = m2.result; else st2.put(final, MARK); commit(tx2); };
+    await done(tx2);
+    back.set(MARK, final);
+    return back;
+  }
+  async function markLost(d, movedAt) { // the move was made, and the storage has come back empty: said plainly (status().lost), never mended from the old copy by itself
+    const tx = writeTx(d), st = tx.objectStore(TABLE), m0 = st.get(MARK);
+    m0.onsuccess = () => { if (!parse(m0.result)) st.put(JSON.stringify({ state: "done", at: Date.now(), from: "none", lost: Date.now(), moved: movedAt }), MARK); commit(tx); };
+    await done(tx);
+    return readAll(d);
+  }
+
+  /* ----- the note in localStorage for the first paint ----- */
+  function hint(patch) {
+    const cur = parse(ls.get(HINT)), next = Object.assign({}, plain(cur) ? cur : {}, patch);
+    if (!plain(cur) || Object.keys(next).some(k => next[k] !== cur[k])) ls.set(HINT, JSON.stringify(next));
+  }
+  const themeOf = (v) => v === "light" || v === "dark" ? v : "auto";
+
+  /* ----- starting ----- */
+  async function open() {
+    const h = parse(ls.get(HINT)), moved = plain(h) && h.idb ? h.idb : 0;
+    let isDone = false, step = "open";
+    try {
+      db = await openDB();
+      let m = await readAll(db), mark = parse(m.get(MARK));
+      if (plain(mark) && mark.state === "done") isDone = true;
+      else if (moved && !mark) { step = "read"; m = await markLost(db, moved); isDone = true; }
+      else { step = "move"; m = await migrate(db); isDone = true; }
+      adopt(m);
+      mode = "idb";
+    } catch (e) {
+      if (db) { try { db.close(); } catch (x) { } db = null; }
+      texts = new Map(); marker = null;
+      detail = String((e && e.message) || e || "");
+      if (moved || isDone) { mode = "none"; reason = "closed"; }
+      else { mode = "local"; reason = step === "open" ? "unavailable" : "failed"; }
+    }
+    if (mode === "idb") {
+      hint({ theme: themeOf(parse(texts.get(THEME))), idb: (marker && (marker.moved || marker.at)) || Date.now() });
+      oldCopy = ls.keys().includes(PROGRESS);
+      listen();
+      if (oldCopy && marker && marker.fp) setTimeout(checkOldCopy, 4000);
+    }
+    return api;
+  }
+  function listen() { // other windows: told when this one saves, and looked at when they say they have, or this one comes back to the screen
+    try { chan = new BroadcastChannel("ripasso-store"); chan.onmessage = (e) => { if (e.data && e.data.rev !== rev) refresh(); }; } catch (e) { chan = null; }
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+    window.addEventListener("pageshow", (e) => { if (e.persisted) refresh(); });
+  }
+  function checkOldCopy() { // has an older version of the app saved to the old copy since the move? Its text is only measured, a piece at a time
+    const text = ls.get(PROGRESS);
+    if (text == null) { oldCopy = false; return; }
+    let h = 2166136261, i = 0;
+    const step = () => {
+      const to = Math.min(text.length, i + 200000);
+      h = hashStep(h, text, i, to); i = to;
+      if (i < text.length) { setTimeout(step, 0); return; }
+      const was = oldChanged;
+      oldChanged = !!marker && printOf(text, h) !== (marker.seen || marker.fp);
+      if (oldChanged !== was) call(api.onNotice);
+    };
+    step();
+  }
+
+  /* ----- saving ----- */
+  function queue(changes) {
+    if (!changes.size) return;
+    for (const [k, t] of changes) { pending.set(k, t); alias.delete(k); if (t === null) texts.delete(k); else texts.set(k, t); }
+    pump();
+  }
+  function setFailed(f) { if (f !== failed) { failed = f; call(api.onError, !f); } }
+  function pump() { // one transaction at a time; whatever is set meanwhile goes in the next
+    if (writing || !pending.size || mode !== "idb") return;
+    const batch = pending; pending = new Map();
+    const again = () => { for (const [k, t] of pending) batch.set(k, t); pending = batch; }; // the batch goes back, under whatever was set since
+    writing = (async () => {
+      try { await write(batch); setFailed(false); }
+      catch (e) {
+        if (e === FOREIGN) { try { await reload(batch); } catch (x) { again(); setFailed(true); } return; }
+        if (db) { try { db.close(); } catch (x) { } db = null; } // once more, on a new connection
+        try { await write(batch); setFailed(false); }
+        catch (x) { if (x === FOREIGN) { try { await reload(batch); } catch (y) { again(); setFailed(true); } } else { again(); detail = String((x && x.message) || x || ""); setFailed(true); } }
+      }
+    })().then(() => { writing = null; if (!failed) pump(); });
+  }
+  async function reload(mine) { // another window has saved: the storage is read again, its progress merged with this window's by the app, and this window's small values set again
+    if (!db) db = await openDB();
+    adopt(await readAll(db));
+    const theirs = assemble(texts);
+    follow(theirs && plain(theirs.items) ? theirs.items : null);
+    const keep = new Map();
+    for (const m of [mine || new Map(), pending]) for (const [k, t] of m) if (!isPart(k) && k !== PROGRESS && k !== MARK) keep.set(k, t);
+    pending = new Map();
+    for (const [k, t] of keep) if (texts.get(k) === (t === null ? undefined : t)) keep.delete(k);
+    queue(keep);
+    if (api.onChange) call(api.onChange, theirs === undefined ? parse(texts.get(PROGRESS)) : theirs);
+    else if (plain(lastProgress)) queue(progressChanges(lastProgress, true));
+    call(api.onNotice);
+  }
+  function refresh() { // looks whether another window has saved since this one last looked
+    if (mode !== "idb" || writing) return; // a save under way finds out for itself
+    writing = (async () => {
+      try { if (!db) db = await openDB(); const now = await req(db.transaction(TABLE, "readonly").objectStore(TABLE).get(REV)); if (now !== rev) await reload(null); } catch (e) { }
+    })().then(() => { writing = null; if (!failed) pump(); });
+  }
+
+  /* ----- what the app calls ----- */
+  api.ready = null;
+  api.get = (key) => {
+    if (mode === "local") return parse(ls.get(key));
+    if (mode !== "idb") return null;
+    if (key === PROGRESS) { const p = assemble(texts); if (p !== undefined) { follow(plain(p.items) ? p.items : null); return p; } }
+    return parse(texts.get(key));
+  };
+  api.set = (key, value, full) => {
+    const text = JSON.stringify(value);
+    if (text === undefined) return api.remove(key);
+    if (mode === "local") return ls.set(key, text);
+    if (mode !== "idb") return false;
+    if (key === PROGRESS && plain(value)) { lastProgress = value; queue(progressChanges(value, full)); }
+    else {
+      const changes = new Map();
+      if (texts.get(key) !== text) changes.set(key, text);
+      if (key === PROGRESS) { lastProgress = undefined; shadow = null; members = null; for (const k of texts.keys()) if (isPart(k)) changes.set(k, null); }
+      queue(changes);
+    }
+    if (key === THEME) hint({ theme: themeOf(value) });
+    return !failed;
+  };
+  api.remove = (key) => {
+    if (mode === "local") { ls.remove(key); return true; }
+    if (mode !== "idb") return false;
+    const changes = new Map();
+    if (texts.has(key)) changes.set(key, null);
+    if (key === PROGRESS) { lastProgress = undefined; shadow = null; members = null; for (const k of texts.keys()) if (isPart(k)) changes.set(k, null); }
+    queue(changes);
+    if (key === THEME) hint({ theme: "auto" });
+    return !failed;
+  };
+  api.flush = async () => {
+    if (mode !== "idb") return mode === "local";
+    for (let i = 0; i < 50; i++) { pump(); if (!writing) break; await writing; }
+    return !failed && !pending.size;
+  };
+  api.read = async (key) => {
+    if (mode === "local") return parse(ls.get(key));
+    if (mode !== "idb") return null;
+    await api.flush();
+    if (!db) db = await openDB();
+    const m = await readAll(db);
+    if (key === PROGRESS) { const p = assemble(m); if (p !== undefined) return p; }
+    return parse(m.get(key));
+  };
+  api.status = () => ({ backend: mode, reason, detail,
+    moved: mode === "idb" && marker && marker.from === "localStorage" ? { at: marker.at, keys: marker.keys || 0, records: marker.records || 0, days: marker.days || 0 } : null,
+    lost: mode === "idb" && marker && marker.lost ? marker.lost : 0, oldCopy, oldChanged, failed, persisted, writes });
+  api.usage = async () => {
+    let saved = 0, room = null;
+    if (mode === "local") { for (const k of ls.keys()) saved += k.length + (ls.get(k) || "").length; room = Math.max(0, 5242880 - saved); }
+    else if (mode === "idb") {
+      for (const [k, t] of texts) saved += k.length + t.length;
+      try { const e = await navigator.storage.estimate(); if (e && e.quota) room = Math.max(0, e.quota - (e.usage || 0)); } catch (e) { }
+    }
+    return { saved, room };
+  };
+  api.persist = async () => {
+    try { persisted = navigator.storage && navigator.storage.persist ? !!((await navigator.storage.persisted()) || (await navigator.storage.persist())) : null; } catch (e) { persisted = null; }
+    return persisted;
+  };
+  api.oldCopy = () => mode === "idb" ? parse(ls.get(PROGRESS)) : null;
+  api.oldCopySeen = () => {
+    if (mode !== "idb" || !plain(marker)) return;
+    marker = Object.assign({}, marker, { seen: fingerprint(ls.get(PROGRESS)) });
+    oldChanged = false;
+    queue(new Map([[MARK, JSON.stringify(marker)]]));
+  };
+  api.ready = open();
+  return api;
+})();
+</script>
 <style>
 /* Ripasso Italiano. The look is set out in docs/design-system.md. */
 @font-face { font-family: "Bricolage Grotesque"; src: url(data:font/woff2;base64,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) format("woff2"); font-weight: 500 700; font-style: normal; font-display: swap; }
@@ -577,7 +1032,7 @@ details > summary { cursor: pointer; }
 </head>
 <body>
 <main id="app"></main>
-<script>/* Problems the app noticed (from 9.19): each script error and unhandled rejection is kept on this device in itapp.errors.v1, the last 20, never synced or sent (Your data lists them, to report). Set up before the app's script, so an error while it starts is kept too; every read and write guarded. */(function(){var K="itapp.errors.v1";function note(m,at){try{var s="",v="",l=null,t=Date.now();try{s=String(S.screen||"")}catch(e){}try{v=String(APP_VERSION)}catch(e){}m=String(m==null?"":m).slice(0,300);at=String(at||"").replace(/[a-z][\w+.-]*:\/\/[^\s)]*\/([^\/\s)]*)/gi,"$1").slice(0,120);try{l=JSON.parse(localStorage.getItem(K))}catch(e){}if(!Array.isArray(l))l=[];var last=l[l.length-1];if(last&&last.m===m&&last.at===at&&last.screen===s&&last.v===v){last.n=(last.n||1)+1;last.t=t}else l.push({m:m,at:at,screen:s,v:v,t:t});localStorage.setItem(K,JSON.stringify(l.slice(-20)))}catch(e){}}addEventListener("error",function(e){if(e&&e.message)note(e.message,(e.filename?e.filename+":":"")+e.lineno+":"+e.colno)});addEventListener("unhandledrejection",function(e){var r=e&&e.reason;note(r&&r.message?(r.name?r.name+": ":"")+r.message:r,r&&r.stack?String(r.stack).split("\n").slice(1,2).join("").trim():"")})})();</script>
+<script>/* Problems the app noticed (from 9.19): each script error and unhandled rejection is kept on this device under itapp.errors.v1, the last 20, never synced or sent (Your data lists them, to report). Set up before the app's script, so an error while it starts is kept too; each is noted as it happens and saved through Store (the storage script in <head>) once the saved data is in memory; every read and write guarded. */(function(){var K="itapp.errors.v1";function note(m,at){try{var s="",v="",t=Date.now();try{s=String(S.screen||"")}catch(e){}try{v=String(APP_VERSION)}catch(e){}m=String(m==null?"":m).slice(0,300);at=String(at||"").replace(/[a-z][\w+.-]*:\/\/[^\s)]*\/([^\/\s)]*)/gi,"$1").slice(0,120);Store.ready.then(function(){try{var l=Store.get(K);if(!Array.isArray(l))l=[];var last=l[l.length-1];if(last&&last.m===m&&last.at===at&&last.screen===s&&last.v===v){last.n=(last.n||1)+1;last.t=t}else l.push({m:m,at:at,screen:s,v:v,t:t});Store.set(K,l.slice(-20))}catch(e){}})}catch(e){}}addEventListener("error",function(e){if(e&&e.message)note(e.message,(e.filename?e.filename+":":"")+e.lineno+":"+e.colno)});addEventListener("unhandledrejection",function(e){var r=e&&e.reason;note(r&&r.message?(r.name?r.name+": ":"")+r.message:r,r&&r.stack?String(r.stack).split("\n").slice(1,2).join("").trim():"")})})();</script>
 <script>
 'use strict';
 /* =========================================================
@@ -17881,8 +18336,7 @@ let progress = defaultProgress();
 let packs = {};      // imported packs by pack id
 let content = null;  // merged content
 
-function lsGet(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+// Saved data is read and written only through Store (the storage script in <head>): Store.get(key), Store.set(key, value).
 
 function cleanSettings(s) { const d = defaultProgress().settings, out = {}; for (const k of Object.keys(d)) out[k] = (s && s[k] !== undefined) ? s[k] : d[k]; return out; }
 /* The record guard. Every item record that comes from storage passes through checkRec: the browser copy when it loads, a
@@ -17919,8 +18373,8 @@ function guardItems(items) { // { items, repaired, skipped }: the records that p
   return out;
 }
 function loadLocal() { // true when what is saved needs saving again: nothing saved yet, the old format, settings tidied or records repaired
-  const p = lsGet(LS_PROGRESS);
-  const k = lsGet(LS_PACKS);
+  const p = Store.get(LS_PROGRESS);
+  const k = Store.get(LS_PACKS);
   if (k && typeof k === "object") packs = k;
   if (!(p && (p.v === 1 || p.v === 2))) return true;
   progress = Object.assign(defaultProgress(), p, { v: 2, flags: p.flags || {}, settings: cleanSettings(p.settings) });
@@ -17936,6 +18390,7 @@ function loadLocal() { // true when what is saved needs saving again: nothing sa
    is loaded or progress is reset, after the first snapshot from the cloud): the next push then compares every document,
    as before 9.4, and so does the push when the app is put away. */
 let DIRTY = null;
+function setSaveFailed(f) { if (f !== !!S.saveFailed) { S.saveFailed = f; if (S.screen === "home") render(); } } // Today warns while the device refuses to save
 function markDirty(name) { if (DIRTY) DIRTY.add(name); }
 const markItem = (id) => markDirty(shardName(id));
 const markDay = (d) => markDirty("days_" + String(d).slice(0, 4));
@@ -17943,8 +18398,7 @@ function saveProgress(touch = true) {
   COUNTS = null; // whatever changed, the counts on Today, Units, Stats and You are worked out again
   markDirty("meta");
   if (touch) progress.updatedAt = now();
-  const ok = lsSet(LS_PROGRESS, progress);
-  if (ok !== !S.saveFailed) { S.saveFailed = !ok; if (S.screen === "home") render(); } // Today warns while the device refuses to save
+  setSaveFailed(!Store.set(LS_PROGRESS, progress)); // only the records that changed are written (Store); a save refused later says so through Store.onError
   scheduleSync();
 }
 
@@ -20239,7 +20693,7 @@ function lastTypes() {
   if (LAST_TYPES) return LAST_TYPES;
   LAST_TYPES = new Map();
   try {
-    const v = lsGet(LS_LASTTYPE);
+    const v = Store.get(LS_LASTTYPE);
     if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "string") { LAST_TYPES.delete(p[0]); LAST_TYPES.set(p[0], p[1]); }
   } catch (e) { LAST_TYPES = new Map(); }
   return LAST_TYPES;
@@ -20250,7 +20704,7 @@ function noteType(ex) { // an answered exercise on a grammar item: remembered as
     const m = lastTypes(), id = pid(ex.item.id);
     m.delete(id); m.set(id, ex.typeKey);
     while (m.size > LAST_CAP) m.delete(m.keys().next().value);
-    lsSet(LS_LASTTYPE, [...m]);
+    Store.set(LS_LASTTYPE, [...m]);
   } catch (e) { }
 }
 /* Confusion memory (from 9.7). When a wrong answer is another item's right answer (cosa typed for "house", or the meaning of
@@ -20266,7 +20720,7 @@ function confusions() {
   if (CONFUSIONS) return CONFUSIONS;
   CONFUSIONS = new Map();
   try {
-    const v = lsGet(LS_CONFUSIONS);
+    const v = Store.get(LS_CONFUSIONS);
     if (Array.isArray(v)) for (const p of v) if (Array.isArray(p) && typeof p[0] === "string" && typeof p[1] === "string" && p[0] && p[1] && p[0] !== p[1] && Number.isInteger(p[2]) && p[2] > 0) {
       const k = confKey(p[0], p[1]), was = CONFUSIONS.get(k);
       CONFUSIONS.delete(k); CONFUSIONS.set(k, k.split("\n").concat(Math.min(9999, p[2] + (was ? was[2] : 0))));
@@ -20281,7 +20735,7 @@ function noteConfusion(a, b, d = 1) { // items a and b mixed up once more (d = -
     const m = confusions(), k = confKey(x, y), n = Math.min(9999, ((m.get(k) || [])[2] || 0) + d);
     m.delete(k); if (n > 0) m.set(k, k.split("\n").concat(n));
     while (m.size > CONF_CAP) m.delete(m.keys().next().value);
-    lsSet(LS_CONFUSIONS, [...m.values()]);
+    Store.set(LS_CONFUSIONS, [...m.values()]);
     return Math.max(0, n);
   } catch (e) { return 0; }
 }
@@ -20533,7 +20987,7 @@ function logo(size) { return `<svg class="ico logo" width="${size}" height="${si
 // Appearance: Light, Dark or Auto (the phone's setting). Kept per device in its own key, never in progress, so it neither syncs nor touches the progress formats.
 const LS_THEME = "itapp.theme.v1";
 const THEME_BG = { light: "#F3F6F4", dark: "#0E1512" };
-function themePref() { const v = lsGet(LS_THEME); return v === "light" || v === "dark" ? v : "auto"; }
+function themePref() { const v = Store.get(LS_THEME); return v === "light" || v === "dark" ? v : "auto"; }
 function applyTheme(v) {
   try {
     const root = document.documentElement;
@@ -20541,13 +20995,13 @@ function applyTheme(v) {
     document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.setAttribute("content", THEME_BG[v] || THEME_BG[/dark/.test(m.getAttribute("media") || "") ? "dark" : "light"]));
   } catch (e) { }
 }
-function setTheme(v) { lsSet(LS_THEME, v); applyTheme(v); render(); }
+function setTheme(v) { Store.set(LS_THEME, v); applyTheme(v); render(); }
 // What's new: after the app's version changes, Today shows the new version's CHANGES (beside APP_VERSION) until Got it is tapped,
 // in every copy. The version last seen is kept per device in its own key, never in progress, like Appearance, so it neither syncs
 // nor touches the progress formats. A device with no progress yet starts with the current version seen (see boot): nothing is new to it.
 const LS_SEEN = "itapp.seen.v1";
-const whatsNewDue = () => !S.newSeen && !!CHANGES && lsGet(LS_SEEN) !== APP_VERSION;
-function markSeen() { S.newSeen = true; lsSet(LS_SEEN, APP_VERSION); } // remembered for this visit even if the device refuses to save
+const whatsNewDue = () => !S.newSeen && !!CHANGES && Store.get(LS_SEEN) !== APP_VERSION;
+function markSeen() { S.newSeen = true; Store.set(LS_SEEN, APP_VERSION); } // remembered for this visit even if the device refuses to save
 /* Read aloud: the Italian is spoken by the device's own voice (the browser's speech synthesis), only when a speaker is tapped;
    nothing is recorded or downloaded and nothing plays by itself. The setting (Off · Normal · Slow) is kept per device in its own key,
    never in progress, like Appearance, since each phone has its own voices. Where the browser can't speak (the Android WebView inside
@@ -20557,7 +21011,7 @@ const SAY_RATE = { normal: 0.9, slow: 0.65 };
 const SAY_SAMPLE = "Ciao! Come stai?"; // read when Normal or Slow is chosen, so the speed can be heard
 const TTS = (() => { try { return window.speechSynthesis && window.SpeechSynthesisUtterance ? window.speechSynthesis : null; } catch (e) { return null; } })();
 let sayVoice = null, sayListed = false, sayNow = null; // the Italian voice; whether the device has listed its voices; what is being read
-function audioPref() { const v = lsGet(LS_AUDIO); return v === "off" || v === "slow" ? v : "normal"; }
+function audioPref() { const v = Store.get(LS_AUDIO); return v === "off" || v === "slow" ? v : "normal"; }
 const sayVoiceOk = () => !!TTS && !(sayListed && !sayVoice);
 function pickVoice() {
   let vs = []; try { vs = TTS.getVoices() || []; } catch (e) { }
@@ -20569,7 +21023,7 @@ function pickVoice() {
   sayVoice = it.find(v => lang(v) === "it-it" && v.localService) || it.find(v => lang(v) === "it-it") || it.find(v => v.localService) || it[0] || null;
 }
 function applySay() { try { document.documentElement.classList.toggle("nosay", !sayVoiceOk() || audioPref() === "off"); } catch (e) { } }
-function setAudio(v) { lsSet(LS_AUDIO, v); applySay(); render(); if (v !== "off") speak(SAY_SAMPLE); }
+function setAudio(v) { Store.set(LS_AUDIO, v); applySay(); render(); if (v !== "off") speak(SAY_SAMPLE); }
 // The text a speaker reads, as one or more phrases: a note in brackets is skipped, the first of two endings or words is read
 // (andato/a, fa'/fai), and an arrow, a dash between two speakers or a slash between phrases becomes a pause. Only phrases with letters are read.
 function speakable(s) {
@@ -21017,7 +21471,7 @@ function boxTag(id) { const r = rec(id); return r.box === 0 ? "" : ` <span class
 /* ---------- lessons ---------- */
 const LS_READ = "itapp.reading.v1"; // per-device: the lesson section last read in each unit
 let readCache = null;
-const readMap = () => readCache || (readCache = lsGet(LS_READ) || {});
+const readMap = () => readCache || (readCache = Store.get(LS_READ) || {});
 function lessonOf(u) { return (u && (u.lesson || LESSONS[u.id])) || null; }
 function refTab(u) { return lessonOf(u) && S.refTab !== "glossary" ? "lesson" : "glossary"; }
 const plainText = (s) => String(s || "").replace(/\[\[[^\]|]*\|?([^\]]*)\]\]/g, "$1").replace(/\*+/g, "");
@@ -21144,7 +21598,7 @@ window.addEventListener("scroll", () => { // remember the section being read, pe
     let idx = -1; secs.forEach((el, i) => { if (el.getBoundingClientRect().top < 140) idx = i; });
     if (idx < 0) return;
     if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 8) idx = 999; // reached the end
-    const r = readMap(); if (r[S.refUnit] !== idx) { r[S.refUnit] = idx; lsSet(LS_READ, r); }
+    const r = readMap(); if (r[S.refUnit] !== idx) { r[S.refUnit] = idx; Store.set(LS_READ, r); }
   });
 }, { passive: true });
 function markLessonChip() { // select the chip of the section in view and keep it visible in its row
@@ -21348,12 +21802,40 @@ function renderSettings() {
       row("verbNewPerSession", "New verbs and tenses per session", [[1, "1"], [2, "2"], [3, "3"], [5, "5"], [8, "8"]]),
       row("verbUnlockBox", "A verb's next tense opens at", [[5, "Box 5 (tense learned)"], [4, "Box 4 (sooner)"], [3, "Box 3 (much sooner)"]], "The box the tense before it has to reach.")]);
 }
+/* Your data's Storage card (from 9.26): where this device keeps what is saved (Store.status()), how much is saved and how
+   much room is left (Store.usage(), asked for as the screen is drawn and filled in when it answers), whether the phone has
+   agreed to keep it, when it was moved from the older storage, and, while the copy from before the move is still on the
+   device, the button that merges it in. */
+const sizeText = (n) => n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" : n >= 1048576 ? (n / 1048576).toFixed(n >= 10485760 ? 0 : 1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB";
+const storeWhy = (st) => st.reason === "failed" ? "The move to this device's database (IndexedDB) couldn't be completed and checked." : "This device's database (IndexedDB) isn't available here.";
+const storeUseText = () => { const u = S.storeUse; return u ? `${sizeText(u.saved)} saved` + (u.room != null ? `, with room for about ${sizeText(u.room)} more.` : ".") : ""; };
+function askStoreUse() { // at most once every few seconds; the line is filled in where it stands, without drawing the screen again
+  if (now() - (S.storeAsked || 0) < 3000) return;
+  S.storeAsked = now();
+  Store.usage().then(u => { S.storeUse = u; const el = document.getElementById("store-use"); if (el) el.textContent = storeUseText(); });
+}
+function storageHtml() {
+  const st = Store.status();
+  askStoreUse();
+  const where = st.backend === "idb" ? "Saved in this device's database (IndexedDB)."
+    : st.backend === "local" ? `Saved in the browser's older storage, as before version 9.26. ${storeWhy(st)} Ripasso will try again each time it opens.`
+    : "Not saving: this device's database (IndexedDB), where your progress is kept, couldn't be opened. Close Ripasso completely, then open it again.";
+  const kept = !HOSTED || st.backend !== "idb" ? "" : S.persisted === true ? " The phone has agreed to keep it even when space runs low." : S.persisted === false ? " The phone hasn't yet agreed to keep it when space runs low; installing the app usually fixes that." : "";
+  const n = (k, one, many) => k.toLocaleString("en-GB") + " " + (k === 1 ? one : many);
+  return `<section class="card dsec" id="sec-storage"><h2>Storage</h2>
+  <p class="muted">${esc(where + kept)} <span id="store-use">${esc(storeUseText())}</span></p>
+  ${st.moved ? `<p class="small muted">Moved here from the browser's older storage on ${esc(dateText(st.moved.at))}: ${n(st.moved.records, "record", "records")} and ${n(st.moved.days, "day", "days")} of log, checked against the original before the switch.</p>` : ""}
+  ${st.lost ? `<p class="small">This device's storage came back empty on ${esc(dateText(st.lost))}. A backup file, or the copy from before the move, brings your progress back.</p>` : ""}
+  ${st.oldCopy ? `<p class="small muted">The copy from before the move is still on this device, untouched.${st.oldChanged ? " An older version of Ripasso has saved to it since." : ""} Merging it in keeps the newest record of each item, so it can't undo anything newer.</p>
+  <div class="btnrow"><button type="button" data-act="mergeOld">Merge in the copy from before the move</button></div>` : ""}</section>`;
+}
 function renderData() {
   const packList = BUILTIN_PACKS.map(b => ({ pack: b.pack, units: b.units.length, items: b.items.length, builtin: true })).concat(Object.values(packs).map(p => ({ pack: p.pack, units: (p.units || []).length, items: (p.items || []).length })));
   const fl = Object.entries(progress.flags || {}).filter(([, f]) => !f.removed).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
   const unreported = unreportedFlags(), acc = acceptedList(), errs = appErrors();
   return screenHead("Your data", { back: "you", backLabel: "You" }) + `
   <section class="card dsec" id="sec-sync"><h2>Sync</h2><p class="muted">${esc(syncDetail())}</p>${S.report ? `<div class="report" role="status">${esc(S.report)}</div>` : ""}</section>
+  ${storageHtml()}
   <section class="card dsec" id="sec-flags"><h2>Flagged items</h2>` + (fl.length ? `<p class="small muted">${fl.length} item${fl.length === 1 ? "" : "s"} flagged. Report a flag to send it to the project, so the item can be checked and fixed for everyone; nothing is sent until you choose how.</p><div>` + fl.map(([k, f]) => `<div class="frow stack"><div><div>${esc(f.prompt || f.id)}</div><div class="small muted">${esc([(content.unitById[f.unit] || {}).title || f.unit, f.expected && "expected " + f.expected, f.given && "you gave " + f.given].filter(Boolean).join(" · "))}</div>${f.note ? `<div class="small">${esc(f.note)}</div>` : ""}${f.reportedAt ? `<div class="small rp-done">${icon("tick", 16, 2.4)}<span>Reported on ${esc(dateText(f.reportedAt))}</span></div>` : ""}</div><div class="frow-b"><button type="button" data-reportflag="${esc(k)}">Report</button><button type="button" class="quiet" data-unflag="${esc(k)}">Remove</button></div></div>`).join("") + `</div>`
       + (unreported.length > 1 ? `<div class="btnrow"><button type="button" class="primary" data-act="reportFlags">Report all ${unreported.length}${unreported.length < fl.length ? " not yet reported" : ""}</button></div>` : "")
       : `<p class="small muted">None yet. Use Flag this item under any answer that looks wrong.</p>`) + `</section>
@@ -21457,12 +21939,12 @@ const acceptedList = () => Object.keys(progress.synonyms || {}).filter(id => con
 const LS_ERRORS = "itapp.errors.v1", ERRORS_CAP = 20; // written by the small script before this one (an error while this one starts is kept too)
 function appErrors() { // the errors kept on this device, oldest first, as { m: message, at: place in the code, screen, v: version, t: time, n: times in a row }
   try {
-    const v = lsGet(LS_ERRORS);
+    const v = Store.get(LS_ERRORS);
     return Array.isArray(v) ? v.filter(e => e && typeof e === "object" && typeof e.m === "string" && Number.isFinite(e.t)).slice(-ERRORS_CAP)
       .map(e => ({ m: e.m, at: String(e.at || ""), screen: String(e.screen || ""), v: String(e.v || ""), t: e.t, n: Number.isInteger(e.n) && e.n > 1 ? e.n : 1 })) : [];
   } catch (e) { return []; }
 }
-function clearErrors() { try { localStorage.removeItem(LS_ERRORS); } catch (e) { } }
+function clearErrors() { Store.remove(LS_ERRORS); }
 const errorLine = (e) => [stamp(e.t), e.v && "version " + e.v, e.screen && "on " + e.screen, e.m, e.at, e.n > 1 && e.n + " times"].filter(Boolean).join(" · ");
 function appReport(note) {
   const errs = appErrors(), last = errs[errs.length - 1]; // the screen: the one the learner came to Your data from, or the last error's
@@ -21643,7 +22125,7 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   root.querySelectorAll("[data-removepack]").forEach(b => b.onclick = () => {
     const id = b.dataset.removepack;
     if (!confirm(`Remove pack "${id}"? Progress on its items is kept but hidden.`)) return;
-    delete packs[id]; lsSet(LS_PACKS, packs); buildContent(); syncPackDelete(id); render();
+    delete packs[id]; Store.set(LS_PACKS, packs); buildContent(); syncPackDelete(id); render();
   });
   root.querySelectorAll("[data-act]").forEach(b => b.onclick = () => action(b.dataset.act));
   root.querySelectorAll("[data-useg]").forEach(b => b.onclick = () => { S.unitSeg = b.dataset.useg; render(); });
@@ -21746,7 +22228,7 @@ function action(a) {
       if (problems.length) { S.report = "Pack not loaded. Problems:\n- " + problems.join("\n- "); render(); return; }
       const replaced = obj.items.filter(i => content.items[i.id]).length;
       obj.importedAt = now();
-      packs[obj.pack] = obj; lsSet(LS_PACKS, packs); buildContent(); syncPackWrite(obj);
+      packs[obj.pack] = obj; Store.set(LS_PACKS, packs); buildContent(); syncPackWrite(obj);
       S.report = `Loaded pack "${obj.pack}": ${obj.units.length} unit(s), ${obj.items.length} item(s)` + (replaced ? `, ${replaced} replaced existing item(s)` : "") + ".";
       render(); break;
     }
@@ -21758,6 +22240,18 @@ function action(a) {
     case "backupLater": setBackupInfo({ snooze: now() + 3 * 864e5 }); render(); break;
     case "welcomeDone": setBackupInfo({ welcomed: true }); render(); break;
     case "newSeen": markSeen(); render(); break;
+    case "reloadApp": location.reload(); break;
+    case "storeSeen": S.storeSeen = true; render(); break;
+    case "oldLater": S.oldLater = true; render(); break;
+    case "mergeOld": { // the copy from before the move to IndexedDB, merged in as a backup file is: only ever when asked
+      const obj = Store.oldCopy();
+      S.screen = "data"; S.exportText = null;
+      if (!obj || (obj.v !== 1 && obj.v !== 2) || typeof obj.items !== "object") { S.report = "The copy from before the move couldn't be read."; render(); break; }
+      const g = guardItems(obj.items);
+      progress = mergeProgress(progress, Object.assign({}, obj, { items: g.items })); DIRTY = null; buildContent(); saveProgress();
+      Store.oldCopySeen();
+      S.report = "The copy from before the move is merged in: for each item, the newest record is kept." + damageNote(g); render(); break;
+    }
     case "again": if (session && session.finished) { S.flash = null; startSession(session.kind, session.kind === "continue" ? undefined : session.unitId); } break; // the summary's Another round: the same kind (and unit)
     case "stay": S.leaveAsk = false; render(); break;
     case "rule": { const q = current(), at = q && itemSection(q.ex.item.id); if (at) showRule(at.unit, at.index); break; }
@@ -21892,7 +22386,7 @@ let db = null, dbState = "checking", syncTimer = null, lastPushed = {}, writing 
 function syncLabel() { return { checking: "", off: "Saved on this device", on: "Synced", error: "Sync error, saved locally" }[dbState] || ""; }
 function syncDetail() {
   return { checking: "Checking for cloud sync…",
-    off: S.standalone ? "This copy keeps your progress on this device only (cloud sync works only inside claude.ai). Make a backup now and then, to keep a copy or move your progress to another device." + (S.persisted === true ? " The phone has agreed to keep this storage even when space runs low." : S.persisted === false && HOSTED ? " The phone hasn't yet agreed to keep this storage when space runs low; installing the app usually fixes that." : "") : "Progress is saved in this browser only. Cloud sync isn't available in this view, so use Export progress to move it to another device.",
+    off: S.standalone ? "This copy keeps your progress on this device only (cloud sync works only inside claude.ai). Make a backup now and then, to keep a copy or move your progress to another device." : "Progress is saved in this browser only. Cloud sync isn't available in this view, so use Export progress to move it to another device.",
     on: "Progress is saved in this browser and synced to your Claude account, so it follows you across devices.",
     error: "Cloud sync hit an error; progress is still saved in this browser." }[dbState];
 }
@@ -21973,7 +22467,7 @@ function mergeInto(p, b) { // mergeProgress(p, b), worked out in p: true when p 
 function adoptRemote(remote) {
   if (!mergeInto(progress, remote)) return false;
   canonicalizeProgress(); fixCurrentUnit(); COUNTS = null;
-  lsSet(LS_PROGRESS, progress);
+  Store.set(LS_PROGRESS, progress);
   if (S.screen !== "session") render();
   return true;
 }
@@ -22031,13 +22525,13 @@ async function initSync() {
         let changed = false;
         snap.docs.forEach(d => { const p = d.data(); if (p && p.pack && (!packs[p.pack] || (p.importedAt || 0) > (packs[p.pack].importedAt || 0))) { packs[p.pack] = p; changed = true; } });
         for (const p of Object.values(packs)) if (!snap.docs.some(d => (d.data() || {}).pack === p.pack)) syncPackWrite(p);
-        if (changed) { lsSet(LS_PACKS, packs); buildContent(); }
+        if (changed) { Store.set(LS_PACKS, packs); buildContent(); }
       } catch (e) { console.warn("packs read failed", e); }
-      if (!lsGet("itapp.migratedV1")) { // one-time merge of the old single progress document
+      if (!Store.get("itapp.migratedV1")) { // one-time merge of the old single progress document
         try {
           const old = await db.doc("progress/main").get();
           if (old.exists && old.data() && old.data().v === 1) adoptRemote(old.data());
-          lsSet("itapp.migratedV1", true);
+          Store.set("itapp.migratedV1", true);
         } catch (e) { console.warn("old progress read failed", e); }
       }
       db.collection("flags").onSnapshot(snap => {
@@ -22084,8 +22578,8 @@ async function downloadProgress() {
 const IN_CLAUDE = !!(window.claude && window.claude.use);
 const HOSTED = !IN_CLAUDE && "serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost");
 const LS_BACKUP = "itapp.backup.v1"; // per device, never synced: { at: last backup, snooze: no reminder before, welcomed: the first-run card was dismissed }
-const backupInfo = () => lsGet(LS_BACKUP) || {};
-function setBackupInfo(o) { lsSet(LS_BACKUP, Object.assign(backupInfo(), o)); }
+const backupInfo = () => Store.get(LS_BACKUP) || {};
+function setBackupInfo(o) { Store.set(LS_BACKUP, Object.assign(backupInfo(), o)); }
 function markBackedUp() { setBackupInfo({ at: now(), snooze: 0 }); }
 const isInstalled = () => !!(window.matchMedia && (matchMedia("(display-mode: standalone)").matches || matchMedia("(display-mode: fullscreen)").matches));
 function ago(t) {
@@ -22107,14 +22601,18 @@ const backupNow = () => shareProgress();
 
 // Ask the phone to keep this app's storage even when space runs low (installed apps are usually allowed).
 function protectStorage() {
-  if (!(navigator.storage && navigator.storage.persist)) return;
-  navigator.storage.persisted().then(p => p || navigator.storage.persist()).then(p => { S.persisted = !!p; if (S.screen === "data") render(); }).catch(() => { });
+  Store.persist().then(p => { if (p !== null) { S.persisted = p; if (S.screen === "data") render(); } });
 }
 
 // One card at a time on Today, the most urgent first: progress couldn't be saved, an update, the first-run welcome, a backup reminder, What's new.
 function noticeHtml() {
   const card = (id, ic, title, text, buttons) => `<section class="card notice" id="${id}" aria-labelledby="${id}-t"><h2 class="label notice-h" id="${id}-t">${icon(ic, 20, 2)}<span>${title}</span></h2><p class="small muted">${text}</p><div class="btnrow">${buttons}</div></section>`;
+  const st = Store.status(); // where saved data is kept: said here whenever it isn't the usual place, or something needs doing
+  if (st.backend === "none") return card("n-store", "info", "Saved progress couldn't be opened", "This device's storage didn't open, so your progress isn't showing and nothing you do now will be saved. Your progress is still there: close Ripasso completely, then open it again.", `<button type="button" class="primary" data-act="reloadApp">Try again</button>`);
   if (S.saveFailed) return card("n-save", "info", "Progress couldn't be saved", "This device refused to save your latest answers. Back up now so nothing is lost, then free some space on the phone.", `<button type="button" class="primary" data-act="backupNow">Back up now</button>`);
+  if (st.lost && !Object.keys(progress.items).length) return card("n-store", "info", "Saved progress wasn't found", "This device's storage has come back empty. " + (st.oldCopy ? "A copy from before the move to the new storage is still on this device, and a backup file can be loaded too." : "Load a backup file to bring your progress back."), `<button type="button" class="primary" data-go="data" data-to="sec-storage">Open Your data</button>`);
+  if (st.oldChanged && !S.oldLater) return card("n-store", "info", "Progress saved by an older version", "An older version of Ripasso has saved progress on this device since the move to the new storage. Merge it in so none of it is lost: for each item, the newest record is kept.", `<button type="button" class="primary" data-act="mergeOld">Merge it in</button><button type="button" data-act="oldLater">Later</button>`);
+  if (st.backend === "local" && !S.storeSeen) return card("n-store", "info", "Saving the older way", `${storeWhy(st)} So your progress is being saved in the browser's older storage, as before, where room is limited. Ripasso will try the new storage again each time it opens.`, `<button type="button" class="primary" data-act="storeSeen">Got it</button>`);
   if (S.update && !S.updateLater) return card("n-update", "review", `Ripasso ${esc(S.update.version || "")} is ready`, "A new version has been downloaded. Updating takes a second and keeps all your progress.", `<button type="button" class="primary" data-act="applyUpdate">${S.applying ? "Updating…" : "Update now"}</button><button type="button" data-act="updateLater">Later</button>`);
   const news = whatsNewDue() ? card("n-new", "sparkle", `What's new in ${esc(APP_VERSION)}`, esc(CHANGES), `<button type="button" class="primary" data-act="newSeen">Got it</button>`) : ""; // in every copy
   if (!HOSTED) return news;
@@ -22179,7 +22677,7 @@ function syncHistory() {
   else if (!want && navGuard) { navGuard = false; navSkip++; history.back(); }
 }
 window.addEventListener("popstate", () => {
-  if (!BACK_ON) return;
+  if (!BACK_ON || !STARTED) return;
   if (navSkip) { navSkip--; return; }
   navGuard = false;
   goBack();
@@ -22199,20 +22697,45 @@ function leaveSheetHtml() {
   <h2 class="label" id="leave-t">Leave this session?</h2><p class="small muted" id="leave-d">The answers you've given so far are already saved.</p>
   <div class="btnrow"><button type="button" class="primary" data-act="stay">Keep practising</button><button type="button" data-go="quit">Leave</button></div></div></div>`;
 }
-document.addEventListener("visibilitychange", () => { if (document.hidden) { clearTimeout(syncTimer); pushProgress(true); } }); // every document compared, in case a change went unmarked
+/* Put away or closed (a phone may close an app without warning once it is out of sight): every part of progress is compared
+   with what the storage holds and anything that differs is written (each answer was saved as it was given, so usually
+   nothing), then every cloud document is compared, in case a change went unmarked. Nothing before the app has started. */
+let STARTED = false;
+function putAway() { if (!STARTED) return; Store.set(LS_PROGRESS, progress, true); Store.flush(); }
+document.addEventListener("visibilitychange", () => { if (document.hidden) { putAway(); clearTimeout(syncTimer); pushProgress(true); } });
+window.addEventListener("pagehide", putAway);
+/* Another window of Ripasso (the installed app and a browser tab share the storage) has saved: Store has read the storage
+   again and hands over that window's progress, which is merged with this one's as a copy from the cloud is (the newest
+   record of each item wins), and the result saved. The small per-device values are read again when next needed. */
+Store.onChange = (theirs) => {
+  if (!STARTED) return;
+  LAST_TYPES = null; CONFUSIONS = null; readCache = null;
+  applyTheme(themePref()); applySay();
+  const k = Store.get(LS_PACKS);
+  if (k && typeof k === "object" && canon(k) !== canon(packs)) { packs = k; buildContent(); }
+  const merged = !!theirs && typeof theirs === "object" && adoptRemote(theirs);
+  Store.set(LS_PROGRESS, progress); // whatever this window has that the storage lacks
+  if (merged) scheduleSync(); else if (S.screen !== "session") render();
+};
+Store.onError = (ok) => setSaveFailed(!ok);
+Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "data")) render(); };
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.25";
 const CHANGES = "The Verbs section grows from 437 to 500 verbs: 63 new everyday ones such as ripassare, indossare and scommettere, each with its full table and an example sentence for every tense."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
-applyTheme(themePref());
-const tidied = loadLocal();
-if (lsGet(LS_SEEN) == null && !Object.keys(progress.items).length) lsSet(LS_SEEN, APP_VERSION); // a new device: no What's new
-if (buildContent() || tidied) saveProgress(false); // saved again only if loading it changed it
-render();
-initSync();
-initInstall();
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.screen === "home") fitTip(); }); // the tip card is measured again once the fonts are in
+function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
+  applyTheme(themePref());
+  const tidied = loadLocal();
+  STARTED = true;
+  if (Store.get(LS_SEEN) == null && !Object.keys(progress.items).length) Store.set(LS_SEEN, APP_VERSION); // a new device: no What's new
+  if (buildContent() || tidied) saveProgress(false); // saved again only if loading it changed it
+  render();
+  initSync();
+  initInstall();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (S.screen === "home") fitTip(); }); // the tip card is measured again once the fonts are in
+}
+Store.ready.then(boot);
 </script>
 </body>
 </html>
