@@ -17,16 +17,16 @@
   missing from the options, the panel's example sentence is missing where the tense has one, or a
   script error occurs; and if a kind is never built at all.
 
-  Then, once for each kind in each tense (from 9.26), the same exercise is answered wrong through the
+  Then, once for each kind in each tense (from 9.27), the same exercise is answered wrong through the
   screen (a wrong option tapped, nonsense typed, a table filled with nonsense): it must be marked wrong,
   the panel must say "Not quite", show the right answer and explain it.
 
   How much:
-    (default)      every verb-tense (3,954 at 9.26), each kind it can give answered once: about four
-                   minutes. Until 9.26 each kind was answered once at every box (158,397 exercises,
+    (default)      every verb-tense (3,954 at 9.27), each kind it can give answered once: about four
+                   minutes. Until 9.27 each kind was answered once at every box (158,397 exercises,
                    eleven to thirteen minutes, and more with every batch of verbs); tools/test-course.js
                    now checks every exercise at every box without the screen, in seconds.
-    --all          every verb-tense, each kind at every box, as before 9.26: the exhaustive run
+    --all          every verb-tense, each kind at every box, as before 9.27: the exhaustive run
     --verbs a,b    every tense of the verbs named, every kind at every box
     --shard K/M    only the K-th of M equal parts of the verb-tenses (to run the parts side by side)
 

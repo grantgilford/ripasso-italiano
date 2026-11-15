@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
-  The other-browsers test: the app in Firefox and WebKit (Safari's engine), from 9.26.
+  The other-browsers test: the app in Firefox and WebKit (Safari's engine), from 9.27.
 
   Usage:  node tools/test-browsers.js [--browsers firefox,webkit,chromium] [--require] [path/to/index.html]
 

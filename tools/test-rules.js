@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
-  The rules test: the learning rules, case by case (from 9.26).
+  The rules test: the learning rules, case by case (from 9.27).
 
   Usage:  node tools/test-rules.js [path/to/index.html] [--no-browser]
 

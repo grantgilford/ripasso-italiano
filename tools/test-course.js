@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
-  The course sweep: every exercise of every item, built and checked without a browser (from 9.26).
+  The course sweep: every exercise of every item, built and checked without a browser (from 9.27).
 
   Usage:  node tools/test-course.js [path/to/index.html] [--repeats 4] [--units u01,fc03,vb] [--seed 1]
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /*
-  Test the tests: would the suites notice if the app broke? (from 9.26)
+  Test the tests: would the suites notice if the app broke? (from 9.27)
 
-  Usage:  node tools/test-the-tests.js [--only id,id] [--suite test-rules.js] [--jobs 3] [--list] [--no-speed] [--keep]
+  Usage:  node tools/test-the-tests.js [--only id,id] [--suite test-rules.js] [--jobs 3] [--list] [--no-speed] [--keep] [--out DIR]
 
   A test that passes says little unless it can fail. This holds a list of small faults, each a single
   exact replacement of text in a copy of index.html (the real file is never touched) with the suite
@@ -16,7 +16,7 @@
                 fault needs writing again
 
   and exits with code 1 unless every fault is caught. Run it by hand after changing a suite, and
-  after changing the code a fault touches; a scheduled workflow (.github/workflows/test-the-tests.yml)
+  after changing the code a fault touches; a scheduled workflow (.github/workflows/weekly.yml)
   runs it weekly, not on every pull request, since it runs the suites some forty times (about a quarter
   of an hour with --jobs 3).
 
@@ -29,6 +29,7 @@
   --jobs     how many suites run at once (3 by default; browser suites slow each other down)
   --no-speed leave out the faults the speed test must catch (on a computer whose speed varies)
   --keep     keep the broken copies (in the system's temporary folder) to look at
+  --out DIR  keep them, and each suite's output, in DIR
 */
 "use strict";
 const fs = require("fs");
@@ -40,7 +41,7 @@ const ROOT = path.join(__dirname, "..");
 const args = process.argv.slice(2);
 const opt = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
 const ONLY = (opt("--only") || "").split(",").filter(Boolean), SUITE = opt("--suite"), JOBS = Number(opt("--jobs") || 3);
-const LIST = args.includes("--list"), KEEP = args.includes("--keep"), NO_SPEED = args.includes("--no-speed");
+const LIST = args.includes("--list"), KEEP = args.includes("--keep") || !!opt("--out"), NO_SPEED = args.includes("--no-speed");
 
 /* The faults. id: a short name; what: the fault in plain words; find → put: the one replacement (find must be in index.html
    exactly once); suite and args: what to run on the broken copy (its path is added); expect: text of the check that must fail. */
@@ -151,10 +152,14 @@ const FAULTS = [
   { id: "verb-table-checks-wrong-cell", what: "a verb table checks every cell against the io form",
     find: `const res = v.trim() ? checkAnswer(v, ex.accepted[p], { typos: false }) : { ok: false };`, put: `const res = v.trim() ? checkAnswer(v, ex.accepted[0], { typos: false }) : { ok: false };`,
     suite: "test-verbs.js", args: ["--verbs", "parlare"], expect: "every right answer is marked right" },
+  // ---- other browsers (test-browsers.js; in Chromium where Firefox and WebKit aren't installed)
+  { id: "backup-file-not-read", what: "choosing a backup file on Your data does nothing",
+    find: `const prf = document.getElementById("progressFile"); if (prf) prf.onchange = `, put: `const prf = document.getElementById("progressFile"); if (prf) prf.onclick = `,
+    suite: "test-browsers.js", expect: "a backup file chosen on Your data is merged in" },
   // ---- speed (test-perf.js); left out with --no-speed
   { id: "idle-work-in-long-slices", what: "work done while the phone is idle runs in slices of up to 400 ms",
     find: `const end = Date.now() + Math.max(5, Math.min(25, d && d.timeRemaining ? d.timeRemaining() : 25));`, put: `const end = Date.now() + 400;`,
-    suite: "test-perf.js", expect: "" },
+    suite: "test-perf.js", expect: "figure(s) over budget" },
 ];
 
 function run(fault, dir) {
@@ -191,7 +196,8 @@ function run(fault, dir) {
   if (LIST) { for (const f of FAULTS) console.log(`${f.id.padEnd(30)} ${f.suite.padEnd(18)} ${f.what}`); return; }
   const suites = [...new Set(FAULTS.map(f => f.suite))];
   console.log(`Test the tests: ${faults.length} fault${faults.length === 1 ? "" : "s"}, each in its own copy of index.html, ${JOBS} at a time`);
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "ripasso-faults-"));
+  const dir = opt("--out") ? path.resolve(opt("--out")) : fs.mkdtempSync(path.join(os.tmpdir(), "ripasso-faults-"));
+  fs.mkdirSync(dir, { recursive: true });
   const results = new Array(faults.length);
   let next = 0;
   const t0 = Date.now();

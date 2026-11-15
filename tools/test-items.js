@@ -17,7 +17,7 @@
   be marked right, with the right answer among the options offered. Listen and type needs a voice, so
   it isn't built here; tools/test-ui.js covers it.
 
-  Then, once for each kind of exercise in each unit (from 9.26), the same exercise is answered wrong
+  Then, once for each kind of exercise in each unit (from 9.27), the same exercise is answered wrong
   through the screen: a wrong option tapped, nonsense typed, a card marked Missed, the wrong word
   tapped, the words sorted and matched wrongly. It must be marked wrong, the panel must say "Not
   quite" (a card: "Marked as missed"), show the right answer, and explain it.

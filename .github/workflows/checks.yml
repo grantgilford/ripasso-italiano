@@ -1,7 +1,11 @@
-# The automatic checks: on every pull request, and on every push to main (a merge), GitHub runs the
-# content check and the browser tests on index.html. A red cross on the pull request means one of
-# them failed; open the run to see which step and why. The speed test (tools/test-perf.js) is left out,
-# because the shared computers GitHub runs this on vary in speed; run it with npm test instead.
+# The automatic checks: on every pull request, and on every push to main (a merge), GitHub runs the content check and
+# every test on index.html, each as its own job, side by side, so each has its own tick or cross and the whole run takes
+# as long as the slowest (about five minutes) rather than their sum. A red cross on the pull request means that suite
+# failed: open the job to see which check and why; its whole output is also attached to the run (test-output).
+#
+# Each job runs its suite through the runner (tools/run-tests.js), which also fails a suite that passes with fewer checks
+# than tools/check-counts.json records. The speed job times main's index.html and this one on the same computer and
+# fails when a figure is over 40% slower (the fixed budgets in tools/test-perf.js are for npm test on your own computer).
 name: Checks
 
 on:
@@ -17,12 +21,64 @@ concurrency: # a new push to the same branch replaces a run still going
   cancel-in-progress: true
 
 jobs:
-  checks:
-    name: Content and browser tests
-    # Pinned: in November 2026 ubuntu-latest moved to Ubuntu 26.04, where the pinned Playwright (1.56.1) cannot install
-    # Chromium. Move this on when package.json moves to a Playwright that supports the newer image.
-    runs-on: ubuntu-24.04
-    timeout-minutes: 40 # a run takes about 23 minutes (the Verbs test over half of it)
+  suite:
+    name: ${{ matrix.title }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false # every suite runs to its end, so one run shows every problem
+      matrix:
+        include:
+          # browsers: what Playwright must install for the suite ("" for the suites that run in Node alone)
+          - { suite: check-content, title: "Content check", browsers: "" }
+          - { suite: test-reports, title: "Reports", browsers: "" }
+          - { suite: test-course, title: "Course sweep (every exercise, no browser)", browsers: "" }
+          - { suite: test-rules, title: "Learning rules", browsers: "chromium" }
+          - { suite: test-storage, title: "Storage", browsers: "chromium", args: "--require-old" }
+          - { suite: test-progress, title: "Progress safety", browsers: "chromium" }
+          - { suite: test-ui, title: "Interface", browsers: "chromium" }
+          - { suite: test-install, title: "Installed copy", browsers: "chromium" }
+          - { suite: test-speedups, title: "Speed-ups", browsers: "chromium" }
+          - { suite: test-sessions, title: "Sessions", browsers: "chromium" }
+          - { suite: test-choices, title: "Choices", browsers: "chromium" }
+          - { suite: test-items, title: "Items (a sample of the course, through the screen)", browsers: "chromium" }
+          - { suite: test-verbs, title: "Verbs (through the screen)", browsers: "chromium" }
+          - { suite: test-browsers, title: "Other browsers (Firefox, WebKit)", browsers: "firefox webkit", args: "--require" }
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Playwright (${{ matrix.browsers }})
+        if: ${{ matrix.browsers != '' }}
+        run: |
+          npm ci
+          npx playwright install --with-deps ${{ matrix.browsers }}
+
+      # The storage test updates from, and goes back to, the version before the move to IndexedDB: its index.html comes
+      # from the tag v9.25, which a shallow checkout doesn't have. With --require-old the test fails without it.
+      - name: Fetch the tag v9.25
+        if: ${{ matrix.suite == 'test-storage' }}
+        run: git fetch --depth 1 origin tag v9.25
+
+      - name: ${{ matrix.title }} (tools/${{ matrix.suite }}.js)
+        run: node tools/run-tests.js ${{ matrix.suite }} --verbose -- ${{ matrix.args }}
+
+      - name: Keep the suite's output
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-${{ matrix.suite }}
+          path: test-output/
+          retention-days: 14
+
+  speed:
+    name: Speed (against main, on the same computer)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
 
@@ -32,60 +88,25 @@ jobs:
           cache: npm
 
       - name: Install Playwright with Chromium
-        id: setup
         run: |
           npm ci
           npx playwright install --with-deps chromium
 
-      # Each check runs even when an earlier one failed, so one run shows every problem; the job fails if any does.
-      - name: Content check (tools/check-content.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/check-content.js
-
-      - name: Reports test (tools/test-reports.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-reports.js
-
-      - name: Rules test (tools/test-rules.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-rules.js
-
-      - name: Course sweep (tools/test-course.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-course.js
-
-      # The storage test updates from, and goes back to, the version before the move to IndexedDB: its index.html comes
-      # from the tag v9.25, which a shallow checkout doesn't have (without it that section is skipped with a note).
-      - name: Storage test (tools/test-storage.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+      # The index.html to compare with: the pull request's base, or on main the commit before the push.
+      - name: Fetch the index.html before this change
         run: |
-          git fetch --depth 1 origin tag v9.25 || echo "could not fetch the tag v9.25"
-          node tools/test-storage.js
+          git fetch --depth 1 origin ${{ github.event.pull_request.base.sha || github.event.before }}
+          git show FETCH_HEAD:index.html > "$RUNNER_TEMP/before.html"
 
-      - name: Progress safety test (tools/test-progress.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-progress.js
+      - name: Speed test (tools/test-perf.js --against)
+        run: |
+          mkdir -p test-output
+          node tools/test-perf.js --against "$RUNNER_TEMP/before.html" 2>&1 | tee test-output/test-perf.log
 
-      - name: Interface test (tools/test-ui.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-ui.js
-
-      - name: Installed-copy test (tools/test-install.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-install.js
-
-      - name: Speed-ups test (tools/test-speedups.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-speedups.js
-
-      - name: Session test (tools/test-sessions.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-sessions.js
-
-      - name: Choices test (tools/test-choices.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-choices.js
-
-      - name: Verbs test (tools/test-verbs.js)
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: node tools/test-verbs.js
+      - name: Keep the output
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-test-perf
+          path: test-output/
+          retention-days: 14

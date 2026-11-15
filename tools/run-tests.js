@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
-  The runner: every suite, one after another, with a table at the end (npm test, from 9.26).
+  The runner: every suite, one after another, with a table at the end (npm test, from 9.27).
 
   Usage:  node tools/run-tests.js [suite …] [--no-speed] [--no-browser] [--times 5] [--verbose]
                                   [--update-counts] [-- arguments for the suites]

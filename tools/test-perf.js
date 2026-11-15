@@ -148,7 +148,7 @@ const NEW_BUDGETS = args.includes("--new-budgets");
 const valued = (name) => args.includes(name) ? args[args.indexOf(name) + 1] : null;
 const AGAINST = valued("--against"), JSON_OUT = valued("--json");
 const file = path.resolve(args.find((a, i) => !a.startsWith("--") && !["--against", "--json"].includes(args[i - 1])) || path.join(__dirname, "..", "index.html"));
-/* --against other.html (from 9.26; how GitHub runs it): the fixed budgets mean nothing on a computer of another speed, so
+/* --against other.html (from 9.27; how GitHub runs it): the fixed budgets mean nothing on a computer of another speed, so
    both files are timed here, turn and turn about (the other, this one, the other, this one), each figure's quicker turn
    is taken, and the test fails when a figure of this file is more than 40% slower than the other's and at least 3 ms
    slower (figures of a millisecond or two differ by more than 40% from one run to the next). */

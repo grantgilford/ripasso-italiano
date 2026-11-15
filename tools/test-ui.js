@@ -158,7 +158,7 @@ async function openApp(browser, origin, { width, height, scheme, init, touch, pe
 }
 const screen = page => page.evaluate("S.screen");
 const listedUnits = page => page.$$eval(".ulist > *", es => es.map(e => e.dataset.upick || e.querySelector("[data-unit]")?.dataset.unit)); // the units on Units, in order
-/* Waiting (from 9.26): never for a length of time, always for the thing waited for. settle: the screen has been drawn
+/* Waiting (from 9.27): never for a length of time, always for the thing waited for. settle: the screen has been drawn
    again (two frames) and nothing on it is still moving (the answer panel sliding up, a sheet opening) and, after an answer, the panel's Continue can be tapped. until: a
    condition asked again and again until it holds (false if it never does, so the check that follows fails and says why). */
 const settle = (page) => page.evaluate(() => new Promise(done => { const still = () => document.getAnimations().every(a => a.playState !== "running") && (typeof S === "undefined" || !S.feedback || Date.now() - (S.answeredAt || 0) > 350); /* …and Continue is live: the app ignores it for a moment after an answer, against a double tap */ let n = 0; const look = () => { if (++n >= 2 && (still() || n > 240)) done(); else requestAnimationFrame(look); }; requestAnimationFrame(look); }));
@@ -182,7 +182,7 @@ async function layout(page, label, { zoomOnly } = {}) {
       const rc = el.getBoundingClientRect();
       if (rc.height < 43.5 || rc.width < 43.5) out.small.push(`${el.tagName.toLowerCase()} “${(el.textContent || el.getAttribute("aria-label") || el.id).trim().slice(0, 24)}” ${Math.round(rc.width)}×${Math.round(rc.height)}`);
     }
-    /* Contrast (from 9.26): every piece of text against what is behind it, from the computed colours. Body text needs
+    /* Contrast (from 9.27): every piece of text against what is behind it, from the computed colours. Body text needs
        4.5:1; large text (24 px, or 18.66 px bold) 3:1, as WCAG has it. Colours with some transparency are laid over what
        is beneath; text on a picture or a gradient, and controls that are switched off, are left out. */
     const rgba = (c) => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[,/ ]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
