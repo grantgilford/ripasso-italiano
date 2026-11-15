@@ -100,11 +100,11 @@ const BUDGETS = {
   // the sync figures, set at 9.4 (dirty tracking and the record-by-record merge) in the same way; the push after an echo
   // takes well under a millisecond, so its budget leaves room for the timer's own granularity
   "pushProgress (fake db)": 94,
-  "adoptRemote (fake db)": 107, // 9.26: was 166 (see below)
+  "adoptRemote (fake db)": 140, // 9.26: was 166 (see below)
   "pushProgress after an answer": 23,
   "Snapshot: the echo of own writes": 43,
   "pushProgress after the echo": 3,
-  "Snapshot: another device's changes": 108, // 9.26: was 160 (see below)
+  "Snapshot: another device's changes": 160,
   // 9.7: meaning choices no longer list the whole course for every choice, so "buildSession unit" and "buildSession hard"
   // took about 60% and 50% of 9.6's time on the same computer; their budgets were lowered in the same proportion. The first
   // lookup of a flashcard's sentence indexes the grammar units' sentences while the answer panel is drawn, so it is held to
@@ -123,15 +123,16 @@ const BUDGETS = {
   "Draw a session: Which tense fits?": 10,
   "Draw its answer panel: Which tense fits?": 15,
   // 9.26: saved data moved to IndexedDB behind Store. Saving progress now writes only the parts that changed, so a merge
-  // from the cloud, which ends by saving, takes about 60% of 9.25's time on the same computer: the budgets of "adoptRemote"
-  // and "Snapshot: another device's changes" were lowered to the slowest of four runs plus 25%. New figures, set the same
-  // way: when the saved data is in memory after a reload (the database opened and every row read, while the browser is
-  // still reading the app's own script); saving one answer (saveProgress() itself, which holds up the screen, and until the
-  // storage has it); and every part of progress compared with what is stored, as when the app is put away
-  "Saved data in memory": 530,
-  "Save an answer": 18,
-  "Save an answer: in the storage": 21,
-  "Put away: everything compared": 63,
+  // from the cloud, which ends by saving, is quicker: "adoptRemote" took 75–112 ms over six runs where 9.25 took 139 on
+  // the same computer, and its budget was lowered to the slowest of them plus 25% ("Snapshot: another device's changes"
+  // varied too much between runs, 77–129 ms, to lower). New figures, set the same way from six runs, two of them on a
+  // slower afternoon: when the saved data is in memory after a reload (the database opened and every row read, while the
+  // browser is still reading the app's own script); saving one answer (saveProgress() itself, which holds up the screen,
+  // and until the storage has it); and every part of progress compared with what is stored, as when the app is put away
+  "Saved data in memory": 820,
+  "Save an answer": 21,
+  "Save an answer: in the storage": 24,
+  "Put away: everything compared": 76,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work, and no
