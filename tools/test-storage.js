@@ -23,7 +23,8 @@
     6. Saving: an answer is on the disk once it is saved (the browser is crashed and opened again), and putting the app
        away writes whatever was changed without being saved.
     7. Two windows on one storage (the installed app and a browser tab): each merges the other's saves before its own,
-       nothing is lost or written twice, and two windows opening for the first time after the update both end up moved.
+       nothing is lost or written twice, they settle and stop writing (also when one holds a day as cards: 0 and the
+       other without cards, from 9.27), and two windows opening for the first time after the update both end up moved.
     8. Start-up: the theme is right before the page body exists, and nothing is drawn before the saved data is in memory.
     9. The version before (9.25, from the tag v9.25 or --old; skipped with a note where the tag hasn't been fetched:
        git fetch origin tag v9.25): updating keeps everything; going back shows the progress as it was at the move, and
