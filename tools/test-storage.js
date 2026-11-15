@@ -570,9 +570,32 @@ const SPY = `(() => { const P = Storage.prototype, log = window.__ls = { get: []
       check("A's answers and B's later one are all in the storage: B merged A's saves before its own", ids.slice(700, 703).every((id, k) => (inStore.items[id] || {}).lastSeen === tA[k]) && (inStore.items[ids[710]] || {}).lastSeen === tB && Object.keys(inStore.items).length === 604, String(Object.keys(inStore.items).length));
       check("…with A's flag and B's setting", !!inStore.flags["flag-a"] && inStore.settings.goal === 75);
       check("…and both windows now show the same progress", (await records(a)) === 604 && (await records(b)) === 604 && (await a.evaluate("progress.settings.goal")) === 75 && !!(await b.evaluate(() => progress.flags["flag-a"])));
-      const w = [await a.evaluate(() => Store.status().writes), await b.evaluate(() => Store.status().writes)], rev = (await storedRows(a))["store.rev"];
-      await pause(1500);
-      check("…and settle: neither goes on writing", (await a.evaluate(() => Store.status().writes)) === w[0] && (await b.evaluate(() => Store.status().writes)) === w[1] && (await storedRows(a))["store.rev"] === rev);
+      // They settle: once each has taken the other's last save, neither writes again. The last exchange may still be under
+      // way when the progress already matches (this check failed now and then while it took the writes at that moment
+      // and waited a fixed second and a half), so: wait until a whole second passes with no write and the same token, and
+      // allow that exchange a few writes, no more. Two windows that answered each other for ever would never get there.
+      const writes = async () => [await a.evaluate(() => Store.status().writes), await b.evaluate(() => Store.status().writes), (await storedRows(a))["store.rev"]].join(" ");
+      const w0 = (await writes()).split(" ").slice(0, 2).map(Number);
+      let quiet = false, last = await writes();
+      for (const end = Date.now() + 15000; Date.now() < end && !quiet;) { await pause(1000); const now = await writes(); quiet = now === last; last = now; }
+      const w1 = last.split(" ").slice(0, 2).map(Number), more = w1[0] - w0[0] + w1[1] - w0[1];
+      let why = quiet ? `${more} more writes before they settled` : "still writing after 15 seconds: " + last;
+      if (!quiet) { // what they go on writing, and where their progress differs
+        const spy = (p) => p.evaluate(() => new Promise(done => { const put = IDBObjectStore.prototype.put, keys = []; IDBObjectStore.prototype.put = function (v, k) { keys.push(k + " = " + String(v).slice(0, 90)); return put.apply(this, arguments); }; setTimeout(() => { IDBObjectStore.prototype.put = put; done(keys.slice(0, 12)); }, 2500); }));
+        const [ka, kb] = await Promise.all([spy(a), spy(b)]);
+        const pa = await a.evaluate(() => JSON.parse(JSON.stringify(progress))), pb = await b.evaluate(() => JSON.parse(JSON.stringify(progress)));
+        const diff = Object.keys(Object.assign({}, pa, pb)).filter(k => JSON.stringify(pa[k]) !== JSON.stringify(pb[k])).map(k => k === "items" || k === "days" || k === "flags" ? k + ": " + Object.keys(Object.assign({}, pa[k], pb[k])).filter(i => JSON.stringify(pa[k][i]) !== JSON.stringify(pb[k][i])).slice(0, 4).map(i => `${i} A ${JSON.stringify(pa[k][i])} B ${JSON.stringify(pb[k][i])}`).join("; ") : `${k}: A ${JSON.stringify(pa[k])} B ${JSON.stringify(pb[k])}`);
+        why += `\nin 2.5 s window A wrote: ${ka.join(" | ") || "nothing"}\nwindow B wrote: ${kb.join(" | ") || "nothing"}\ntheir progress differs in: ${diff.join(" || ") || "nothing"}`;
+      }
+      check("…and settle: neither goes on writing", quiet && more <= 4, why);
+      // The same day in two forms (9.27): an undo leaves the day's cards as 0 where the other window has none. The merge
+      // calls the two the same, and each window used to keep its own form and write it back at the other, without end.
+      await a.evaluate(async () => { const d = today(); d.cards = 0; saveProgress(); await Store.flush(); });
+      await b.evaluate(async () => { const d = today(); delete d.cards; saveProgress(); await Store.flush(); });
+      let calm = false, was = await writes();
+      for (const end = Date.now() + 15000; Date.now() < end && !calm;) { await pause(1000); const now = await writes(); calm = now === was; was = now; }
+      const forms = [await a.evaluate(() => JSON.stringify(progress.days[dayKey(now())])), await b.evaluate(() => JSON.stringify(progress.days[dayKey(now())]))];
+      check("a day held as cards: 0 in one window and without cards in the other: they settle on one form, and stop writing", calm && forms[0] === forms[1], calm ? forms.join(" / ") : "still writing after 15 seconds: " + forms.join(" / "));
       // told at once: B hears of A's save without saving anything itself
       await a.evaluate(async () => { setTheme("light"); await Store.flush(); });
       const tA2 = await answer(a, ids[720]); await flushed(a);

@@ -108,6 +108,9 @@ const FAULTS = [
   { id: "storage-bucket-hash-changed", what: "the browser copy's records go to different buckets",
     find: `>>> 0 & (BUCKETS - 1);`, put: `>>> 1 & (BUCKETS - 1);`,
     suite: "test-storage.js", expect: "each record in the bucket its id hashes to" },
+  { id: "two-windows-never-settle", what: "two windows holding a day in two forms (cards: 0, or none) write it back and forth without end", // the bug fixed in 9.27
+    find: `    else if (plain && !sameData(da, m)) p.days[d] = m; //`, put: `    //`,
+    suite: "test-storage.js", expect: "they settle on one form, and stop writing" },
   // ---- the interface (test-ui.js)
   { id: "chip-under-44px", what: "a lesson's chips are 40 px high, under the 44 px a finger needs",
     find: `.chip { flex: none; max-width: 270px; min-height: 44px;`, put: `.chip { flex: none; max-width: 270px; min-height: 40px;`,
