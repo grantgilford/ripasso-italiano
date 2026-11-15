@@ -22450,7 +22450,7 @@ function syncPackDelete(id) { if (!db) return; db.doc("packs/" + id.replace(/[^\
    and never drawn mid-session. Each document it changes is marked for the next push. */
 const sameData = (a, b) => a === b || (!!a && !!b && typeof a === "object" && typeof b === "object" && Array.isArray(a) === Array.isArray(b)
   && Object.keys(a).length === Object.keys(b).length && Object.keys(a).every(k => k in b && sameData(a[k], b[k]))); // the same JSON value, whatever the order of keys
-function mergeInto(p, b) { // mergeProgress(p, b), worked out in p: true when p changed
+function mergeInto(p, b, plain) { // mergeProgress(p, b), worked out in p: true when p changed (plain: from another window over the same storage, see the days)
   b = b || {};
   let changed = false, meta = false;
   const resetAt = Math.max(p.resetAt || 0, b.resetAt || 0);
@@ -22464,7 +22464,8 @@ function mergeInto(p, b) { // mergeProgress(p, b), worked out in p: true when p 
   const bd = b.days || {};
   for (const d of Object.keys(bd)) {
     const da = p.days[d], m = mergeDay(da, bd[d]);
-    if (!da || !sameData(mergeDay(da), m)) { p.days[d] = m; markDay(d); changed = true; } // a day the same in all but form (cards: 0 or none) is left as it is
+    if (!da || !sameData(mergeDay(da), m)) { p.days[d] = m; markDay(d); changed = true; }
+    else if (plain && !sameData(da, m)) p.days[d] = m; // a day the same in all but form (cards: 0 or none) is no change, and from the cloud it is left as it is; from another window this copy takes the plain form (9.27), since two windows over one storage each kept its own form and wrote it back at the other, without end
   }
   const bf = b.flags || {};
   p.flags = p.flags || {};
@@ -22482,8 +22483,8 @@ function mergeInto(p, b) { // mergeProgress(p, b), worked out in p: true when p 
   if (meta) markDirty("meta");
   return changed || meta;
 }
-function adoptRemote(remote) {
-  if (!mergeInto(progress, remote)) return false;
+function adoptRemote(remote, plain) {
+  if (!mergeInto(progress, remote, plain)) return false;
   canonicalizeProgress(); fixCurrentUnit(); COUNTS = null;
   Store.set(LS_PROGRESS, progress);
   if (S.screen !== "session") render();
@@ -22731,7 +22732,7 @@ Store.onChange = (theirs) => {
   applyTheme(themePref()); applySay();
   const k = Store.get(LS_PACKS);
   if (k && typeof k === "object" && canon(k) !== canon(packs)) { packs = k; buildContent(); }
-  const merged = !!theirs && typeof theirs === "object" && adoptRemote(theirs);
+  const merged = !!theirs && typeof theirs === "object" && adoptRemote(theirs, true);
   Store.set(LS_PROGRESS, progress); // whatever this window has that the storage lacks
   if (merged) scheduleSync(); else if (S.screen !== "session") render();
 };
@@ -22740,7 +22741,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.27";
-const CHANGES = "Two pieces of small text are now easier to read: the unit label on Today's green card in the dark theme, and the second line of some wide buttons in the light theme. Nothing else has changed."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "With the app open in two windows at once, they could keep saving the same day back and forth without end; they now settle at once. Two pieces of small text are also easier to read: the unit label on Today's card in the dark theme and the second line of some wide buttons."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());
