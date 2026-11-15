@@ -4,6 +4,9 @@
   lot of practice saved, on a CPU about as fast as a mid-range phone's.
 
   Usage:  node tools/test-perf.js [path/to/index.html] [--new-budgets] [--headed]
+          node tools/test-perf.js [path/to/index.html] --against path/to/other/index.html
+          (--against: no budgets; both files timed on this computer, failing when a figure is over 40% slower than the
+          other file's. GitHub runs it so, against main's index.html: see AGAINST below.)
 
   Opens the real app in Chromium (Playwright) at 390 × 844 with the CPU slowed 4× (the DevTools
   setting Emulation.setCPUThrottlingRate), saves about 6,600 progress records (spread over the
@@ -142,7 +145,14 @@ const FIXED = { "Idle work: longest slice": 50, "Flashcard sentence, first looku
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
 const NEW_BUDGETS = args.includes("--new-budgets");
-const file = path.resolve(args.find(a => !a.startsWith("--")) || path.join(__dirname, "..", "index.html"));
+const valued = (name) => args.includes(name) ? args[args.indexOf(name) + 1] : null;
+const AGAINST = valued("--against"), JSON_OUT = valued("--json");
+const file = path.resolve(args.find((a, i) => !a.startsWith("--") && !["--against", "--json"].includes(args[i - 1])) || path.join(__dirname, "..", "index.html"));
+/* --against other.html (from 9.26; how GitHub runs it): the fixed budgets mean nothing on a computer of another speed, so
+   both files are timed here, turn and turn about (the other, this one, the other, this one), each figure's quicker turn
+   is taken, and the test fails when a figure of this file is more than 40% slower than the other's and at least 3 ms
+   slower (figures of a millisecond or two differ by more than 40% from one run to the next). */
+const SLOWER = 1.4, AT_LEAST_MS = 3;
 const CPU_SLOWDOWN = 4, RUNS = 7, RELOADS = 3;
 const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefined' && S.screen === 'home'";
 
@@ -259,7 +269,7 @@ async function measure(runs) {
 const median = (xs) => { const s = xs.slice().sort((a, b) => a - b); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
 const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
 
-(async () => {
+if (AGAINST) compare(); else (async () => {
   const server = await serveApp(file);
   const origin = "http://127.0.0.1:" + server.address().port;
   const browser = await chromium.launch({ headless: !HEADED });
@@ -334,6 +344,7 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
       if (bad) over++;
       console.log(`  ${name.padEnd(w)}${fmt(ms).padStart(8)}${(budget > 0 ? String(budget) : "none").padStart(9)}   ${bad ? (budget > 0 ? "OVER" : "NO BUDGET") : "ok"}`);
     }
+    if (JSON_OUT) { require("fs").writeFileSync(JSON_OUT, JSON.stringify({ version, figures, errors })); over = errors.length; } // --against: the budgets are not this computer's
     if (errors.length) { over++; console.log("\n  FAIL script errors:\n    " + errors.slice(0, 5).join("\n    ")); }
     if (NEW_BUDGETS) {
       console.log("\nThis run's figures plus 25%, as a BUDGETS table:\nconst BUDGETS = {");
@@ -350,3 +361,36 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
   }
   process.exit(over ? 1 : 0);
 })();
+
+function compare() {
+  const fs = require("fs"), os = require("os"), { spawnSync } = require("child_process");
+  const other = path.resolve(AGAINST), dir = fs.mkdtempSync(path.join(os.tmpdir(), "ripasso-perf-"));
+  const turn = (f, n) => {
+    const out = path.join(dir, n + ".json");
+    const r = spawnSync(process.execPath, [__filename, f, "--json", out], { encoding: "utf8" });
+    if (!fs.existsSync(out)) { console.log(r.stdout + r.stderr); console.log(`\n  FAIL the speed test stopped on ${f}`); process.exit(1); }
+    return JSON.parse(fs.readFileSync(out, "utf8"));
+  };
+  const runs = { other: [], this: [] };
+  for (let k = 0; k < 2; k++) { runs.other.push(turn(other, "other" + k)); runs.this.push(turn(file, "this" + k)); }
+  fs.rmSync(dir, { recursive: true, force: true });
+  const best = (rs, name) => Math.min(...rs.map(r => r.figures[name]).filter(x => x != null));
+  const names = Object.keys(runs.this[0].figures), w = Math.max(...names.map(n => n.length)) + 2;
+  console.log(`Speed test, this file (version ${runs.this[0].version}) against ${path.relative(process.cwd(), other) || other} (version ${runs.other[0].version}) on this computer:`);
+  console.log(`each timed twice, turn and turn about; the quicker of each figure's two medians, in milliseconds. A figure fails when it is over ${Math.round((SLOWER - 1) * 100)}% and ${AT_LEAST_MS} ms slower.\n`);
+  console.log("  " + "".padEnd(w) + "other".padStart(8) + "this".padStart(8) + "change".padStart(9));
+  let over = 0, shared = 0;
+  for (const name of names) {
+    const a = best(runs.other, name), b = best(runs.this, name);
+    if (!Number.isFinite(a)) { console.log(`  ${name.padEnd(w)}${"—".padStart(8)}${fmt(b).padStart(8)}${"".padStart(9)}   new`); continue; }
+    shared++;
+    const bad = name !== "Idle work: longest slice" ? b > a * SLOWER && b - a >= AT_LEAST_MS : b > Math.max(50, a * SLOWER); // a slice of idle work is a limit: over 50 ms, and slower than the other
+    if (bad) over++;
+    console.log(`  ${name.padEnd(w)}${fmt(a).padStart(8)}${fmt(b).padStart(8)}${((b >= a ? "+" : "") + Math.round(100 * (b - a) / a) + "%").padStart(9)}   ${bad ? "SLOWER" : "ok"}`);
+  }
+  const errors = runs.this.flatMap(r => r.errors);
+  if (errors.length) { over++; console.log("\n  FAIL script errors:\n    " + errors.slice(0, 5).join("\n    ")); }
+  if (!shared) { over++; console.log("\n  FAIL no figure could be compared"); }
+  console.log(over ? `\n${over} figure(s) over ${Math.round((SLOWER - 1) * 100)}% slower than the other file's.` : `\nAll ${shared} figures are within ${Math.round((SLOWER - 1) * 100)}% of the other file's.`);
+  process.exit(over ? 1 : 0);
+}

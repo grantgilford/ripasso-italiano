@@ -3,7 +3,8 @@
   Storage test for index.html (from 9.26, when saved data moved from localStorage to IndexedDB behind Store, the storage
   script in <head>).
 
-  Usage:  node tools/test-storage.js [path/to/index.html] [--old path/to/9.25/index.html] [--headed]
+  Usage:  node tools/test-storage.js [path/to/index.html] [--old path/to/9.25/index.html] [--require-old] [--headed]
+          (--require-old: fail, rather than skip section 9 with a note, when 9.25's index.html can't be had; GitHub runs it so)
 
   Opens the real app, and the storage script on its own, in a headless browser (Playwright + Chromium) and checks:
 
@@ -663,7 +664,8 @@ const SPY = `(() => { const P = Storage.prototype, log = window.__ls = { get: []
 
     /* 9. The version before */
     section("9. The version before (9.25): updating, going back, and updating again");
-    if (!oldHtml) console.log("  note 9.25's index.html isn't in this checkout, so this section is skipped: fetch its tag (git fetch origin tag v9.25) or pass --old path/to/index.html");
+    if (!oldHtml && args.includes("--require-old")) check("9.25's index.html is here, so updating from it and going back to it can be tested (--require-old)", false, "the tag v9.25 isn't in this checkout: git fetch origin tag v9.25, or pass --old path/to/index.html");
+    else if (!oldHtml) console.log("  note 9.25's index.html isn't in this checkout, so this section is skipped: fetch its tag (git fetch origin tag v9.25) or pass --old path/to/index.html");
     else {
       const context = await newContext();
       await seedLocal(context, deviceTexts(someProgress(700)));
