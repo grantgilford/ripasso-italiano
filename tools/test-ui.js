@@ -102,7 +102,9 @@
 */
 "use strict";
 const path = require("path");
-const { loadPlaywright, serveApp, checks } = require("./lib/browser");
+const { loadPlaywright, serveApp, checks, stored, save, saveText, storedRows } = require("./lib/browser");
+// The saved progress as the storage holds it, part by part, as one text: the same text means nothing in it was written.
+const savedProgress = async (page) => JSON.stringify(Object.entries(await storedRows(page) || {}).filter(([k]) => k.startsWith("itapp.progress.v1")).sort());
 
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
@@ -126,7 +128,8 @@ function seedProgress() {
   const days = {};
   for (let d = 0; d < 10; d++) days[dayKey(T - d * D)] = { xp: d ? 40 : 12, new: 5, t: { all: [20, 23] } };
   const flags = { "g-u01-02": { id: "g-u01-02", unit: "u01", exercise: "Grammar", prompt: "Sono can mean:", given: "", expected: "x", note: "", createdAt: T, updatedAt: T } };
-  localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items, days, flags, currentUnit: "u05", settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T }));
+  Store.set("itapp.progress.v1", { v: 2, items, days, flags, currentUnit: "u05", settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T });
+  return Store.flush(); // stored before the page is loaded again
 }
 
 async function openApp(browser, origin, { width, height, scheme, init, touch, permissions }) {
@@ -635,7 +638,7 @@ async function reports(browser, origin) {
     check(L("…and nothing else (no progress, settings or other flags)"), u && safe(u.report), u && u.report);
     check(L("the link opened nothing here: the page stayed, with no new tab and nothing loaded from outside"), page.url() === start && context.pages().length === 1 && !page.outside.length, page.outside.join());
     k = await sheet();
-    check(L("the sheet then says GitHub has opened, and the flag is marked reported"), k && /GitHub has opened with the report filled in/.test(k.state) && await page.evaluate(() => { const f = progress.flags[flagId(current().ex)]; return f.reportedAt > 0 && JSON.parse(localStorage.getItem("itapp.progress.v1")).flags[flagId(current().ex)].reportedAt === f.reportedAt; }), k && k.state);
+    check(L("the sheet then says GitHub has opened, and the flag is marked reported"), k && /GitHub has opened with the report filled in/.test(k.state) && await page.evaluate(() => { const f = progress.flags[flagId(current().ex)]; return f.reportedAt > 0 && Store.get("itapp.progress.v1").flags[flagId(current().ex)].reportedAt === f.reportedAt; }), k && k.state);
     await tap(page, '[data-act="rpClose"]');
     check(L("Close closes it, leaving the session as it was, and the panel says Flagged and reported"), !(await sheet()) && (await page.evaluate(() => JSON.stringify({ pos: session.pos, answered: session.answered, fb: [S.feedback.ok, S.feedback.given] }))) === before && await page.evaluate(() => /Flagged and reported\./.test(document.querySelector(".fb-actions").textContent) && ![...app.children].some(c => c.inert)));
 
@@ -718,12 +721,12 @@ async function reports(browser, origin) {
     await page.evaluate(() => { const b = content.byUnit.fc01[5]; progress.synonyms[b.id] = ["another answer"]; saveProgress(); render(); });
     await toData("sec-answers");
     const acc = await page.evaluate(() => [...document.querySelectorAll("#sec-answers [data-suggest]")].map(b => b.closest(".frow").textContent));
-    const stored = await page.evaluate(() => normEn("a learner's own answer")); // kept as answers are compared: "a" and "to" left off, small letters
-    check(L("Your data lists the accepted answers, each with Suggest"), acc.length === 2 && acc.some(t => t.includes("→ " + stored)) && acc.some(t => /another answer/.test(t)), JSON.stringify(acc));
+    const asKept = await page.evaluate(() => normEn("a learner's own answer")); // kept as answers are compared: "a" and "to" left off, small letters
+    check(L("Your data lists the accepted answers, each with Suggest"), acc.length === 2 && acc.some(t => t.includes("→ " + asKept)) && acc.some(t => /another answer/.test(t)), JSON.stringify(acc));
     await tap(page, `[data-suggest="${card.id}"]`);
     urls = await opened(); await tap(page, '[data-act="rpGithub"]');
     u = linkOf((await opened()).slice(-1)[0]); f = fieldsOf(u.report);
-    check(L("Suggest sends that answer as a missing answer"), u.template === "missing-answer.yml" && f.item === card.id && f.given === stored, JSON.stringify(f));
+    check(L("Suggest sends that answer as a missing answer"), u.template === "missing-answer.yml" && f.item === card.id && f.given === asKept, JSON.stringify(f));
     await tap(page, '[data-act="rpClose"]');
     await tap(page, '[data-act="suggestAll"]');
     await tap(page, '[data-act="rpGithub"]');
@@ -733,7 +736,7 @@ async function reports(browser, origin) {
     await layout(page, L("Your data, accepted answers"));
 
     // 5. App problems: the problems the app noticed, Report and Clear, and Report an app problem
-    await page.evaluate(() => { const T = Date.now(); localStorage.setItem("itapp.errors.v1", JSON.stringify([1, 2, 3].map(n => ({ m: "TypeError: test problem " + n, at: "index.html:100:" + n, screen: "units", v: APP_VERSION, t: T - (4 - n) * 1000, n: n === 3 ? 3 : undefined })))); S.screen = "you"; render(); }); // kept oldest first, as the app keeps them
+    await page.evaluate(() => { const T = Date.now(); Store.set("itapp.errors.v1", [1, 2, 3].map(n => ({ m: "TypeError: test problem " + n, at: "index.html:100:" + n, screen: "units", v: APP_VERSION, t: T - (4 - n) * 1000, n: n === 3 ? 3 : undefined }))); S.screen = "you"; render(); }); // kept oldest first, as the app keeps them
     await tap(page, '.srow[data-to="sec-problems"]');
     check(L("You → Report a problem opens Your data at Problems the app noticed (3)"), (await screen(page)) === "data" && /Problems the app noticed \(3\)/.test(await page.textContent("#sec-problems")) && await page.evaluate(() => { const t = document.getElementById("sec-problems").getBoundingClientRect().top; return t >= -1 && t < 120; }));
     await layout(page, L("Your data, problems"));
@@ -745,7 +748,7 @@ async function reports(browser, origin) {
     check(L("…its link opens app-problem.yml with the browser and the three errors, newest first"), u.template === "app-problem.yml" && u.title.startsWith(`app · ${V} · `) && f.kind === "app problem" && /Chrome \d+/.test(f.browser) && f.errors.split("\n").length === 3 && /test problem 3 · index\.html:100:3 · 3 times$/.test(f.errors.split("\n")[0]) && f.screen === "units" && safe(u.report), JSON.stringify(f));
     await tap(page, '[data-act="rpClose"]');
     await tap(page, '[data-act="clearErrors"]');
-    check(L("Clear empties the list, on this device"), /Problems the app noticed \(0\)/.test(await page.textContent("#sec-problems")) && (await page.evaluate(() => localStorage.getItem("itapp.errors.v1"))) === null);
+    check(L("Clear empties the list, on this device"), /Problems the app noticed \(0\)/.test(await page.textContent("#sec-problems")) && (await stored(page, "itapp.errors.v1")) === null);
     await tap(page, '[data-act="reportApp"]');
     check(L("Report an app problem with nothing written asks for a description first"), !(await sheet()) && /First write what looks or works wrong/.test(await page.textContent("#sec-problems")) && await page.evaluate(() => document.activeElement.id === "problemNote"));
     await page.evaluate(() => { S.screen = "rules"; render(); S.screen = "you"; render(); S.screen = "data"; S.scrollTo = "sec-problems"; render(); });
@@ -797,8 +800,8 @@ async function reports(browser, origin) {
   /* Problems the app noticed: script errors and unhandled rejections kept on the device (itapp.errors.v1), the last 20 */
   {
     const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light" });
-    const kept = () => page.evaluate(() => JSON.parse(localStorage.getItem("itapp.errors.v1")));
-    const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
+    const kept = () => stored(page, "itapp.errors.v1");
+    const progressBefore = await savedProgress(page);
     await page.evaluate(() => { setTimeout(() => { throw new TypeError("a test error"); }); });
     await page.waitForTimeout(100);
     let e = await kept(), V = await page.evaluate("APP_VERSION");
@@ -815,15 +818,16 @@ async function reports(browser, origin) {
     await page.waitForTimeout(150);
     e = await kept();
     check("Errors: the same error again and again is kept once, with how many times", /the same error/.test(e[19].m) && e[19].n === 3 && !/the same error/.test(e[18].m), JSON.stringify(e.slice(-2)));
-    check("Errors: saved progress is untouched, and they are not part of progress (so never synced) or a backup", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore && await page.evaluate(() => !/test error|errors\.v1/.test(JSON.stringify(progress)) && !/test error/.test(backupText())));
-    await page.evaluate(() => localStorage.setItem("itapp.errors.v1", "{damaged"));
+    check("Errors: saved progress is untouched, and they are not part of progress (so never synced) or a backup", (await savedProgress(page)) === progressBefore && await page.evaluate(() => !/test error|errors\.v1/.test(JSON.stringify(progress)) && !/test error/.test(backupText())));
+    await saveText(page, "itapp.errors.v1", "{damaged"); // a row that can't be read, as the app next opens
+    await page.reload(); await page.waitForFunction(ready);
     await page.evaluate(() => { S.screen = "data"; render(); });
     check("Errors: a damaged list counts as none, and Your data still draws", /Problems the app noticed \(0\)/.test(await page.textContent("#sec-problems")));
     await page.evaluate(() => { setTimeout(() => { throw new Error("after the damage"); }); }); await page.waitForTimeout(100);
     e = await kept();
     check("Errors: …and keeping one starts a new list", e && e.length === 1 && /after the damage/.test(e[0].m));
     const n = page.errors.length;
-    await page.evaluate(() => { Storage.prototype.setItem = function () { throw new Error("QuotaExceededError"); }; setTimeout(() => { throw new Error("storage refused"); }); });
+    await page.evaluate(() => { IDBObjectStore.prototype.put = function () { throw new DOMException("no room", "QuotaExceededError"); }; setTimeout(() => { throw new Error("storage refused"); }); });
     await page.waitForTimeout(100);
     check("Errors: a device that refuses to store them simply forgets, with no further error", page.errors.length === n + 1 && (await kept()).length === 1);
     await context.close();
@@ -972,12 +976,12 @@ async function readAloud(browser, origin) {
   if (process.env.VERBOSE) console.log("         prompts with a speaker: " + r.types);
 
   // the setting: Off · Normal · Slow
-  const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
+  const progressBefore = await savedProgress(page);
   await tap(page, '.tab[data-go="you"]');
   check("Read aloud: You has Off · Normal · Slow, with Normal chosen", await page.$('[data-audio="normal"][aria-pressed="true"]') && await page.$('[data-audio="off"]') && await page.$('[data-audio="slow"]') && !(await page.$("#readaloud-row .srow-hint")));
   await clearSaid(page); await tap(page, '[data-audio="slow"]');
   s1 = await said(page);
-  check("Read aloud: choosing Slow reads a sample, slowly, and is kept in itapp.audio.v1", s1.length === 1 && s1.every(x => x.rate === 0.65) && (await page.evaluate(() => localStorage.getItem("itapp.audio.v1"))) === '"slow"', JSON.stringify(s1));
+  check("Read aloud: choosing Slow reads a sample, slowly, and is kept in itapp.audio.v1", s1.length === 1 && s1.every(x => x.rate === 0.65) && (await stored(page, "itapp.audio.v1")) === "slow", JSON.stringify(s1));
   await page.reload(); await page.waitForFunction(ready);
   await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
   await clearSaid(page); await page.evaluate(() => document.querySelector(".lex .lit [data-say]").click());
@@ -987,7 +991,7 @@ async function readAloud(browser, origin) {
   check("Read aloud: Off hides every speaker", (await visible(page, ".say, [data-say]")) === 0 && (await page.$$("[data-say]")).length > 0 && await page.evaluate(() => document.documentElement.classList.contains("nosay")));
   await tap(page, '.tab[data-go="you"]'); await tap(page, '[data-audio="normal"]');
   check("Read aloud: Normal brings them back", (await page.evaluate(() => document.documentElement.classList.contains("nosay"))) === false);
-  check("Read aloud: saved progress is untouched, and the setting is not part of it, so it never syncs", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore && !(await page.evaluate(() => JSON.stringify(progress))).includes("audio"));
+  check("Read aloud: saved progress is untouched, and the setting is not part of it, so it never syncs", (await savedProgress(page)) === progressBefore && !(await page.evaluate(() => JSON.stringify(progress))).includes("audio"));
   check("Read aloud: no script errors", !page.errors.length, page.errors.join("\n"));
   await context.close();
 
@@ -1080,7 +1084,7 @@ async function readAloud(browser, origin) {
       check("Choosing a unit: after leaving Units, the current unit's card is open again", (await open()) === "u05");
       await tap(page, '.ulist [data-upick="u02"]');
       await tap(page, '.ucard [data-unit="u02"]');
-      const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("itapp.progress.v1")).currentUnit);
+      const saved = (await stored(page, "itapp.progress.v1")).currentUnit;
       check("Choosing a unit: Practise starts that unit and makes it the current unit, saved at once", (await screen(page)) === "session" && (await page.evaluate("session.unitId")) === "u02" && (await page.evaluate("progress.currentUnit")) === "u02" && saved === "u02", saved);
       await tap(page, '[data-go="quit"]');
       check("Choosing a unit: back on Today, the Continue card shows that unit", (await screen(page)) === "home" && (await heroChip()) === "Unit 2");
@@ -1115,21 +1119,21 @@ async function readAloud(browser, origin) {
     /* Appearance */
     {
       const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light" });
-      const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
+      const progressBefore = await savedProgress(page);
       const bg = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
       check("Appearance: Auto is the default and follows the phone", (await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === null && (await bg()) === "rgb(243, 246, 244)");
       await tap(page, '.tab[data-go="you"]');
       await tap(page, '[data-appearance="dark"]');
       check("Appearance: Dark switches to the dark colours", (await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "dark" && (await bg()) === "rgb(14, 21, 18)" && await page.$('[data-appearance="dark"][aria-pressed="true"]'));
-      check("Appearance: the choice is kept in itapp.theme.v1 on this device", (await page.evaluate(() => localStorage.getItem("itapp.theme.v1"))) === '"dark"');
+      check("Appearance: the choice is kept in itapp.theme.v1 on this device", (await stored(page, "itapp.theme.v1")) === "dark");
       await page.reload(); await page.waitForFunction(ready);
       check("Appearance: Dark survives a reload, with the browser bar colour to match", (await bg()) === "rgb(14, 21, 18)" && (await page.evaluate(() => [...document.querySelectorAll('meta[name="theme-color"]')].every(m => m.content === "#0E1512"))));
       await tap(page, '.tab[data-go="you"]');
       await tap(page, '[data-appearance="light"]');
       check("Appearance: Light switches back to the light colours", (await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === "light" && (await bg()) === "rgb(243, 246, 244)");
       await tap(page, '[data-appearance="auto"]');
-      check("Appearance: Auto hands the choice back to the phone", (await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === null && (await page.evaluate(() => localStorage.getItem("itapp.theme.v1"))) === '"auto"');
-      check("Appearance: saved progress is untouched", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore);
+      check("Appearance: Auto hands the choice back to the phone", (await page.evaluate(() => document.documentElement.getAttribute("data-theme"))) === null && (await stored(page, "itapp.theme.v1")) === "auto");
+      check("Appearance: saved progress is untouched", (await savedProgress(page)) === progressBefore);
       check("Appearance: it is not part of progress, so it never syncs", !(await page.evaluate(() => JSON.stringify(progress))).includes("theme"));
       check("Appearance: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
@@ -1227,12 +1231,12 @@ async function readAloud(browser, origin) {
     {
       const { page, context } = await openApp(browser, origin, { width: 360, height: 740, scheme: "dark" });
       const card = () => page.evaluate(() => { const c = document.getElementById("n-new"); return c ? { title: c.querySelector(".notice-h").textContent, text: c.querySelector("p").textContent, notices: document.querySelectorAll(".notice").length } : null; });
-      const seen = () => page.evaluate(() => JSON.parse(localStorage.getItem("itapp.seen.v1")));
+      const seen = () => stored(page, "itapp.seen.v1");
       const reload = async () => { await page.reload(); await page.waitForFunction(ready); };
       const v = await page.evaluate("APP_VERSION"), changes = await page.evaluate("CHANGES");
       check("What's new: a new device starts with this version seen, so Today shows no card", !(await card()) && (await seen()) === v, JSON.stringify(await seen()));
-      const progressBefore = await page.evaluate(() => localStorage.getItem("itapp.progress.v1"));
-      await page.evaluate(() => localStorage.setItem("itapp.seen.v1", JSON.stringify("9.0-old"))); await reload();
+      const progressBefore = await savedProgress(page);
+      await save(page, "itapp.seen.v1", "9.0-old"); await reload();
       const c = await card();
       check("What's new: after the version changes, Today shows What's new in this version with its CHANGES, as its only notice", c && c.title === `What's new in ${v}` && c.text === changes && c.notices === 1, JSON.stringify(c));
       check("What's new: the Continue card is still on Today", !!(await page.$('.hero[data-start="continue"]')));
@@ -1243,16 +1247,16 @@ async function readAloud(browser, origin) {
       check("What's new: Got it dismisses it and remembers this version", !(await card()) && (await seen()) === v, JSON.stringify(await seen()));
       await reload();
       check("What's new: …for good, on this device", !(await card()));
-      await page.evaluate(() => localStorage.removeItem("itapp.seen.v1")); await reload();
+      await save(page, "itapp.seen.v1", null); await reload();
       check("What's new: a device with progress from before 9.1 (no key yet) gets the card too", !!(await card()));
-      check("What's new: saved progress is untouched", (await page.evaluate(() => localStorage.getItem("itapp.progress.v1"))) === progressBefore);
+      check("What's new: saved progress is untouched", (await savedProgress(page)) === progressBefore);
       check("What's new: it is not part of progress, so it never syncs", await page.evaluate(() => !/9\.0-old|itapp\.seen/.test(JSON.stringify(progress)) && !Object.keys(progress).some(k => /seen/i.test(k)) && !Object.keys(progress.settings).some(k => /seen/i.test(k))));
       check("What's new: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
     }
     { // not installed-copy code, so the copy in claude.ai shows it too
       const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light", init: () => { window.claude = { use: async () => null }; } });
-      await page.evaluate(() => localStorage.setItem("itapp.seen.v1", JSON.stringify("9.0-old")));
+      await save(page, "itapp.seen.v1", "9.0-old");
       await page.reload(); await page.waitForFunction(ready);
       check("What's new: inside claude.ai, Today shows it too", !!(await page.$("#n-new")) && (await page.evaluate("IN_CLAUDE")));
       await layout(page, "What's new, in claude.ai at 390×844");

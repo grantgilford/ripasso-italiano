@@ -35,7 +35,7 @@
 */
 "use strict";
 const path = require("path");
-const { loadPlaywright, serveApp, checks } = require("./lib/browser");
+const { loadPlaywright, serveApp, checks, stored, storedRows } = require("./lib/browser");
 const { seedProgress } = require("./lib/seed");
 
 const args = process.argv.slice(2);
@@ -452,16 +452,21 @@ async function openApp(browser, origin, { seed = false, init = null } = {}) {
     /* 5. Start-up */
     section("5. Start-up: saved again only if loading changed the progress");
     {
-      const spy = () => { const set = Storage.prototype.setItem; window.__writes = []; Storage.prototype.setItem = function (k, v) { window.__writes.push(k); return set.call(this, k, v); }; };
-      const { page, context } = await openApp(browser, origin, { seed: true, init: spy });
-      check("progress saved in order is not written again at start-up", !(await page.evaluate("__writes")).includes("itapp.progress.v1"), (await page.evaluate("__writes")).join(", "));
-      await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("itapp.progress.v1")); const alias = Object.keys(ID_ALIASES)[0]; p.items[alias] = { box: 3, due: 1, lapses: 0, lastSeen: 1, lastWrong: 0, seenCount: 1, lastRight: 1 }; localStorage.setItem("itapp.progress.v1", JSON.stringify(p)); });
+      // "store.rev" is a token the storage writes anew with every save: unchanged means nothing was written.
+      const K = "itapp.progress.v1", rev = async () => (await storedRows(page))["store.rev"];
+      const { page, context } = await openApp(browser, origin, { seed: true });
+      const rev0 = await rev();
       await page.reload(); await page.waitForFunction(ready);
-      const moved = await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("itapp.progress.v1")); return { written: __writes.includes("itapp.progress.v1"), gone: !p.items[Object.keys(ID_ALIASES)[0]] }; });
+      check("progress saved in order is not written again at start-up", (await rev()) === rev0 && (await page.evaluate(() => Store.status().writes)) === 0, JSON.stringify(await page.evaluate(() => Store.status())));
+      await page.evaluate(async (K) => { const p = Store.get(K); const alias = Object.keys(ID_ALIASES)[0]; p.items[alias] = { box: 3, due: 1, lapses: 0, lastSeen: 1, lastWrong: 0, seenCount: 1, lastRight: 1 }; Store.set(K, p); await Store.flush(); }, K);
+      const rev1 = await rev();
+      await page.reload(); await page.waitForFunction(ready);
+      const moved = { written: (await rev()) !== rev1, gone: !(await stored(page, K)).items[await page.evaluate(() => Object.keys(ID_ALIASES)[0])] };
       check("progress with a record under an old id is written again, the record moved", moved.written && moved.gone, JSON.stringify(moved));
-      await page.evaluate(() => { const p = JSON.parse(localStorage.getItem("itapp.progress.v1")); delete p.settings.verbUnlockBox; localStorage.setItem("itapp.progress.v1", JSON.stringify(p)); });
+      await page.evaluate(async (K) => { const p = Store.get(K); delete p.settings.verbUnlockBox; Store.set(K, p); await Store.flush(); }, K);
+      const rev2 = await rev();
       await page.reload(); await page.waitForFunction(ready);
-      check("progress with a setting missing is written again, with the setting", await page.evaluate(() => __writes.includes("itapp.progress.v1") && JSON.parse(localStorage.getItem("itapp.progress.v1")).settings.verbUnlockBox === 5));
+      check("progress with a setting missing is written again, with the setting", (await rev()) !== rev2 && (await stored(page, K)).settings.verbUnlockBox === 5);
       check("start-up: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
     }

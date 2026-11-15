@@ -212,7 +212,8 @@ const Store = (() => {
 
   /* ----- IndexedDB ----- */
   const req = (r) => new Promise((ok, no) => { r.onsuccess = () => ok(r.result); r.onerror = () => no(r.error || new Error("request failed")); });
-  const done = (tx) => new Promise((ok, no) => { tx.oncomplete = () => ok(); tx.onabort = tx.onerror = () => no(tx.error || new Error("transaction stopped")); });
+  const done = (tx) => new Promise((ok, no) => { tx.oncomplete = () => ok(); tx.onabort = tx.onerror = () => no(tx.failure || tx.error || new Error("transaction stopped")); });
+  const inTx = (tx, fn) => () => { try { fn(); } catch (e) { tx.failure = e; try { tx.abort(); } catch (x) { } } }; // a request's callback: whatever goes wrong in it stops the transaction, and done() says why
   const commit = (tx) => { try { if (tx.commit) tx.commit(); } catch (e) { } }; // sooner than waiting for the browser to notice the transaction is finished
   const writeTx = (d) => { try { return d.transaction(TABLE, "readwrite", { durability: "strict" }); } catch (e) { if (e && e.name === "TypeError") return d.transaction(TABLE, "readwrite"); throw e; } }; // strict: on the disk before it counts as saved
   function openDB() {
@@ -245,7 +246,7 @@ const Store = (() => {
     const tx = writeTx(db), s = tx.objectStore(TABLE), next = token();
     let foreign = false;
     const seen = s.get(REV);
-    seen.onsuccess = () => { if (seen.result !== rev) { foreign = true; try { tx.abort(); } catch (e) { } } else commit(tx); };
+    seen.onsuccess = inTx(tx, () => { if (seen.result !== rev) { foreign = true; tx.abort(); } else commit(tx); });
     for (const [k, t] of batch) if (t === null) s.delete(k); else s.put(t, k);
     s.put(next, REV);
     try { await done(tx); } catch (e) { throw foreign ? FOREIGN : e; }
@@ -265,14 +266,14 @@ const Store = (() => {
     for (const [k, s] of src) if (k === PROGRESS && inParts) for (const [pk, pt] of partsOf(s.value)) want.set(pk, pt); else want.set(k, s.text);
     let other = false;
     const tx = writeTx(d), st = tx.objectStore(TABLE), m0 = st.get(MARK);
-    m0.onsuccess = () => {
+    m0.onsuccess = inTx(tx, () => {
       const m = parse(m0.result);
       if (plain(m) && m.state === "done") { other = true; return; } // another window finished the move first
       st.clear();
       for (const [k, t] of want) st.put(t, k);
       st.put(JSON.stringify({ state: "copied", at: Date.now() }), MARK);
       commit(tx);
-    };
+    });
     await done(tx);
     const back = await readAll(d);
     if (other || (parse(back.get(MARK)) || {}).state === "done") return back;
@@ -284,14 +285,14 @@ const Store = (() => {
     const mark = { state: "done", at: Date.now(), from: src.size ? "localStorage" : "none", keys: src.size, records: inParts ? count(old.value.items) : 0, days: inParts ? count(old.value.days) : 0, fp: fingerprint(old ? old.text : null), skipped };
     const tx2 = writeTx(d), st2 = tx2.objectStore(TABLE), m2 = st2.get(MARK);
     let final = JSON.stringify(mark);
-    m2.onsuccess = () => { const m = parse(m2.result); if (plain(m) && m.state === "done") final = m2.result; else st2.put(final, MARK); commit(tx2); };
+    m2.onsuccess = inTx(tx2, () => { const m = parse(m2.result); if (plain(m) && m.state === "done") final = m2.result; else st2.put(final, MARK); commit(tx2); });
     await done(tx2);
     back.set(MARK, final);
     return back;
   }
   async function markLost(d, movedAt) { // the move was made, and the storage has come back empty: said plainly (status().lost), never mended from the old copy by itself
     const tx = writeTx(d), st = tx.objectStore(TABLE), m0 = st.get(MARK);
-    m0.onsuccess = () => { if (!parse(m0.result)) st.put(JSON.stringify({ state: "done", at: Date.now(), from: "none", lost: Date.now(), moved: movedAt }), MARK); commit(tx); };
+    m0.onsuccess = inTx(tx, () => { if (!parse(m0.result)) st.put(JSON.stringify({ state: "done", at: Date.now(), from: "none", lost: Date.now(), moved: movedAt }), MARK); commit(tx); });
     await done(tx);
     return readAll(d);
   }
@@ -328,6 +329,7 @@ const Store = (() => {
       listen();
       if (oldCopy && marker && marker.fp) setTimeout(checkOldCopy, 4000);
     }
+    try { performance.mark("ripasso-store-ready"); } catch (e) { } // for the speed test: when the saved data was in memory
     return api;
   }
   function listen() { // other windows: told when this one saves, and looked at when they say they have, or this one comes back to the screen
@@ -352,7 +354,7 @@ const Store = (() => {
 
   /* ----- saving ----- */
   function queue(changes) {
-    if (!changes.size) return;
+    if (!changes.size) { if (failed) pump(); return; } // nothing new: what failed before is tried again
     for (const [k, t] of changes) { pending.set(k, t); alias.delete(k); if (t === null) texts.delete(k); else texts.set(k, t); }
     pump();
   }
@@ -401,13 +403,12 @@ const Store = (() => {
     return parse(texts.get(key));
   };
   api.set = (key, value, full) => {
-    const text = JSON.stringify(value);
-    if (text === undefined) return api.remove(key);
-    if (mode === "local") return ls.set(key, text);
+    if (value === undefined) return api.remove(key);
+    if (mode === "local") return ls.set(key, JSON.stringify(value));
     if (mode !== "idb") return false;
-    if (key === PROGRESS && plain(value)) { lastProgress = value; queue(progressChanges(value, full)); }
+    if (key === PROGRESS && plain(value)) { lastProgress = value; queue(progressChanges(value, full)); } // never made into one text: only its changed parts
     else {
-      const changes = new Map();
+      const changes = new Map(), text = JSON.stringify(value);
       if (texts.get(key) !== text) changes.set(key, text);
       if (key === PROGRESS) { lastProgress = undefined; shadow = null; members = null; for (const k of texts.keys()) if (isPart(k)) changes.set(k, null); }
       queue(changes);

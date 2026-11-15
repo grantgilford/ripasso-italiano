@@ -18,20 +18,21 @@
     6. A new device with an empty browser gets all its progress from the cloud.
     7. Every item id that has ever had progress still exists or is aliased
        (the list is tools/item-ids.txt; --update-ids adds new ids to it).
-    8. Room: with a record for every item in the course, each cloud document
-       stays under 200 KB (the limit is 256 KB) and the browser copy under the
-       4 MB line (BROWSER_LINE, our own margin under the browser's 5 MiB; see
-       docs/storage-room.md). Both sizes are printed, with how many more
-       records fit under the line, and a note when fewer than 2,000 do (time
-       for option 3 in docs/storage-room.md).
-       8b. The line itself is safe: with the app's other keys at their caps
-       and made-up records (standing in for items not written yet) taking the
-       browser copy to just under 4 MB, loading keeps every record, the
-       browser agrees to save it, it loads back intact after a reload, every
-       cloud document stays under 200 KB, and at least 0.5 MB of the
-       browser's 5 MiB is still free. The total of every key, the room left
-       and the time of one save with the CPU slowed 4× are printed (the time
-       is recorded, not held to a budget).
+    8. Room: with a record for every item in the course, moved from the old
+       storage (localStorage) as the app first opens, everything is saved in
+       IndexedDB and reads back record for record, and each cloud document
+       stays under 200 KB (the limit is 256 KB). From 9.26 the cloud
+       documents are what sets the room (docs/storage-room.md): the test
+       prints how many more records fit before the largest reaches 200 KB,
+       with a note when fewer than 2,000 do, the size of the saved copy, and
+       what the same progress would take in localStorage, where a device
+       without IndexedDB still saves it.
+       8b. A course far bigger than the old storage could hold: made-up
+       records (standing in for items not written yet) take the largest cloud
+       document to about 190 KB, with the app's other keys at their caps;
+       everything is saved, loads back intact after a reload and reaches the
+       cloud, every document under 200 KB. The time of one save with the CPU
+       slowed 4× is printed (recorded, not held to a budget).
     9. Damaged records (a box out of range, numbers written as text, negatives,
        nulls, records that aren't records) are repaired or left out: in the
        browser copy, in a backup file (which says how many) and in the cloud's
@@ -49,7 +50,8 @@
        progress, the cloud and backups, and leave the saved progress exactly
        as it was.
 
-  The storage formats are written out here by hand, not borrowed from the app,
+  The storage formats are written out by hand (the cloud's here, the browser
+  copy's in tools/lib/browser.js, which reads the database itself), not borrowed from the app,
   so a change to either format makes this test fail until a migration is
   written and the test is updated with it. Changes nothing in index.html.
   Exits with code 1 if any check fails.
@@ -57,7 +59,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const { loadPlaywright, serveApp, checks } = require("./lib/browser");
+const { loadPlaywright, serveApp, checks, stored, storedRows } = require("./lib/browser");
 
 const args = process.argv.slice(2);
 const UPDATE_IDS = args.includes("--update-ids");
@@ -84,15 +86,16 @@ const unpackRec = a => Object.fromEntries(REC_FIELDS.map((k, i) => [k, a[i] || 0
 const results = checks(), { check, section } = results;
 const KB = 1024, MB = 1024 * 1024, kb = n => (n / KB).toFixed(1) + " KB", mb = n => (n / MB).toFixed(2) + " MB";
 
-/* ---------- room in the browser copy (section 8) ----------
-   BROWSER_LINE is our own safety line for the browser copy of progress (itapp.progress.v1), not the browser's limit:
-   Chromium, which Chrome on Android uses, lets a site keep about 5 MiB of text in localStorage (BROWSER_LIMIT, 5,242,240
-   characters, keys and values together), shared by every key the site saves, imported packs (itapp.packs.v1) included.
-   Raised from 3 MB to 4 MB in November 2026; docs/storage-room.md says why, and what to do when the room runs short. */
-const BROWSER_LINE = 4 * MB;
-const BROWSER_LIMIT = 5242240; // characters, as first measured (v9.18); Chromium 153 allows exactly 5 MiB, 5,242,880, so this is the lower figure
-const SPARE_MIN = 0.5 * MB;    // section 8b: with every key full and the browser copy just under the line, at least this much of the limit is left
-const ROOM_NOTE = 2000;        // records: when fewer than this fit under the line (about two 1,000-card vocab packs), section 8 says it's time for option 3
+/* ---------- room (section 8) ----------
+   From 9.26 the browser copy is kept in IndexedDB, which the device lets grow to gigabytes, so it no longer sets the
+   room. What does is the cloud copy (claude.ai only): 16 shard documents, each limited to 256 KB. CLOUD_LINE is our own
+   line under that limit; docs/storage-room.md says what to do when the room under it runs short. A device with no
+   IndexedDB still saves in localStorage, which holds about 5 MiB of text (LOCAL_LIMIT): section 8 prints what the same
+   progress takes there, and a note once it comes within half a megabyte. */
+const CLOUD_LINE = 200 * KB;
+const CLOUD_TARGET = 190 * KB; // section 8b: made-up records until the largest cloud document is about this size
+const LOCAL_LIMIT = 5242880;   // characters localStorage holds in Chromium (5 MiB), keys and values together
+const ROOM_NOTE = 2000;        // records: when fewer than this fit under the cloud line (about two 1,000-card vocab packs), section 8 says so
 const CPU_SLOWDOWN = 4;        // as tools/test-perf.js, about as fast as a mid-range phone
 const canon = o => JSON.stringify(o, (k, v) => v && typeof v === "object" && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(x => [x, v[x]])) : v);
 const same = (a, b) => canon(a) === canon(b); // ignores the order of keys
@@ -150,35 +153,40 @@ async function newPage(browser, origin, { storage = null, cloud = null } = {}) {
   await page.waitForFunction("typeof content !== 'undefined' && content && S.screen === 'home'");
   return { page, context };
 }
-const stored = (page, key = LS_PROGRESS) => page.evaluate(k => JSON.parse(localStorage.getItem(k) || "null"), key);
+// stored(page, key): what the storage holds under key (progress by default), read from the database itself and put
+// together by the format written out by hand in tools/lib/browser.js.
+const progressRows = async (page) => JSON.stringify(Object.entries(await storedRows(page) || {}).filter(([k]) => k.startsWith(LS_PROGRESS)).sort()); // the saved progress, part by part, as text
 async function settleSync(page) {
   await page.waitForFunction("dbState === 'on' || dbState === 'off' || dbState === 'error'", null, { timeout: 15000 });
   await page.waitForTimeout(2500); // the app pushes changes 1.5 s after the last one
 }
-// How long one saveProgress() takes with the CPU slowed as tools/test-perf.js slows it: the median of `runs` saves, the
-// slowest, the part of each spent making the text (JSON.stringify), and whether the browser agreed to every save. Each
-// save is timed on its own, half a second after the last (as answers come seconds apart), so it doesn't wait on the
-// browser still writing the one before; two untimed saves come first, since the first after loading vary most.
+// How long saving one answer takes with the CPU slowed as tools/test-perf.js slows it: the median of `runs` saves of one
+// changed record: saveProgress() itself (the part that holds up the screen), the slowest, how long until the storage has
+// it (Store.flush()), and whether every save landed. Each is timed on its own, half a second after the last (as answers
+// come seconds apart); two untimed saves come first, since the first after loading vary most.
 async function timeSave(page, runs = 7) {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: CPU_SLOWDOWN });
-  const save = [], text = [];
+  const save = [], landed = [];
   let ok = true;
   for (let i = 0; i < runs + 2; i++) {
     await page.waitForTimeout(500);
-    const t = await page.evaluate(() => {
-      let t0 = performance.now(); JSON.stringify(progress); const text = performance.now() - t0;
-      t0 = performance.now(); saveProgress(); return { text, save: performance.now() - t0, ok: !S.saveFailed };
-    });
+    const t = await page.evaluate(async (i) => {
+      const id = Object.keys(progress.items)[i * 97], r = progress.items[id];
+      progress.items[id] = Object.assign({}, r, { lastSeen: (r.lastSeen || 0) + 1 }); markItem(id); // one record changed, as by an answer
+      const t0 = performance.now(); saveProgress(); const save = performance.now() - t0;
+      const ok = await Store.flush();
+      return { save, landed: performance.now() - t0, ok: ok && !S.saveFailed };
+    }, i);
     ok = ok && t.ok;
-    if (i >= 2) { save.push(t.save); text.push(t.text); }
+    if (i >= 2) { save.push(t.save); landed.push(t.landed); }
   }
   await cdp.send("Emulation.setCPUThrottlingRate", { rate: 1 });
   await cdp.detach();
   const mid = a => a.slice().sort((x, y) => x - y)[a.length >> 1];
-  return { ms: mid(save), max: Math.max(...save), text: mid(text), ok, runs };
+  return { ms: mid(save), max: Math.max(...save), landed: mid(landed), ok, runs };
 }
-const saveTime = t => `${Math.round(t.ms)} ms (median of ${t.runs}, slowest ${Math.round(t.max)} ms; ${Math.round(t.text)} ms of it making the text)`;
+const saveTime = t => `${Math.round(t.ms)} ms (median of ${t.runs}, slowest ${Math.round(t.max)} ms), and it is in the storage ${Math.round(t.landed)} ms after the answer`;
 
 /* ---------- drive a practice session through the screen, as a learner would ---------- */
 async function runSession(page, start, maxSteps = 200) {
@@ -454,11 +462,12 @@ async function runSession(page, start, maxSteps = 200) {
     }
 
     /* 8. Room */
-    section("8. Room: a record for every item in the course fits");
+    section("8. Room: a record for every item in the course is saved, reads back and fits the cloud");
     let worst = null; // section 8's worst case, which 8b builds on
     {
       // Every record the course can hold (an alias's old id and a shared exercise's copies hold none of their own), each
       // with figures as long as they get, two years of daily log using 15 kinds of exercise a day, and the seed's flags.
+      // It starts in localStorage, as a device updating from before 9.26 has it, so opening the app moves it.
       const ids = [...new Set(info.items.map(i => canonicalOf(i[0])))];
       const worstRec = { box: 7, due: T + 60 * DAY, lapses: 12, lastSeen: T - 1, lastWrong: T - DAY, seenCount: 123, lastRight: T - 1 };
       const items = Object.fromEntries(ids.map(id => [id, Object.assign({}, worstRec)]));
@@ -468,34 +477,43 @@ async function runSession(page, start, maxSteps = 200) {
       const cloud = makeCloud();
       const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: big }, cloud });
       await settleSync(page);
-      const saved = await page.evaluate(() => { saveProgress(); return !S.saveFailed; }); // saved once more, as after an answer
-      const lsSize = await page.evaluate(k => localStorage.getItem(k).length, LS_PROGRESS);
+      const st = await page.evaluate(() => Store.status());
+      check(`the app keeps it in IndexedDB, moved from the old storage with all ${ids.length} records checked`, st.backend === "idb" && !!st.moved && st.moved.records === ids.length && st.moved.days === 730, JSON.stringify(st));
+      const saved = await page.evaluate(async () => { saveProgress(); return (await Store.flush()) && !S.saveFailed; }); // saved once more, as after an answer
+      const use = await page.evaluate(() => Store.usage()), asText = await page.evaluate(() => JSON.stringify(progress).length + "itapp.progress.v1".length);
+      const inStore = await stored(page), rows = await storedRows(page);
+      const lost = ids.filter(id => !recEq(inStore.items[id], worstRec));
       const sizes = [...cloud.docs.entries()].filter(([k]) => k.startsWith("progress2/")).map(([k, v]) => [k.slice(10), Buffer.byteLength(JSON.stringify(v))]).sort((a, b) => b[1] - a[1]);
       const shards = sizes.filter(([k]) => /^s\d\d$/.test(k)), others = sizes.filter(([k]) => !/^s\d\d$/.test(k));
       const inCloud = shards.reduce((n, [k]) => n + Object.keys(cloud.docs.get("progress2/" + k).items).length, 0);
-      const perRec = (JSON.stringify(items).length - 2) / ids.length; // what one more record adds to the browser copy
-      const room = Math.max(0, Math.floor((BROWSER_LINE - lsSize) / perRec));
-      console.log(`         ${ids.length} records: largest shard ${shards[0][0]} ${kb(shards[0][1])}, smallest ${kb(shards[shards.length - 1][1])}; largest other document ${others[0][0]} ${kb(others[0][1])}; browser copy ${mb(lsSize)}, room under the ${BROWSER_LINE / MB} MB line for about ${room} more records`);
-      if (room < ROOM_NOTE) console.log(`  note fewer than ${ROOM_NOTE.toLocaleString("en-GB")} more records (about two 1,000-card vocab packs) fit under the ${BROWSER_LINE / MB} MB line: it's time for option 3 in docs/storage-room.md (records saved as short arrays under a new key)`);
+      const perRec = shards[0][1] / Object.keys(cloud.docs.get("progress2/" + shards[0][0]).items).length; // what one more record adds to its shard
+      const room = Math.max(0, Math.floor((CLOUD_LINE - shards[0][1]) / perRec) * 16); // the shards fill evenly: when the largest has room for n more, the course has room for about 16 n
+      const partRows = Object.keys(rows).filter(k => k.startsWith(LS_PROGRESS + "/")), biggest = Math.max(...partRows.map(k => rows[k].length));
+      console.log(`         ${ids.length} records: the saved copy is ${mb(use.saved)} in ${partRows.length} rows (the largest ${kb(biggest)}), and the device allows about ${use.room == null ? "?" : (use.room / 1073741824).toFixed(1) + " GB"} more`);
+      console.log(`         in the cloud: largest shard ${shards[0][0]} ${kb(shards[0][1])}, smallest ${kb(shards[shards.length - 1][1])}; largest other document ${others[0][0]} ${kb(others[0][1])}; room under the ${CLOUD_LINE / KB} KB line for about ${room} more records`);
+      console.log(`         in localStorage, where a device without IndexedDB saves it, the same progress is ${mb(asText)} of about ${(LOCAL_LIMIT / MB).toFixed(0)} MB`);
+      if (room < ROOM_NOTE) console.log(`  note fewer than ${ROOM_NOTE.toLocaleString("en-GB")} more records (about two 1,000-card vocab packs) fit under the ${CLOUD_LINE / KB} KB line of a cloud document: see docs/storage-room.md (more shards, which needs a migration)`);
+      if (asText > LOCAL_LIMIT - 0.5 * MB) console.log(`  note a full course no longer fits localStorage with half a megabyte to spare: a device without IndexedDB would be refused its saves near the end of the course (Today says so, and offers a backup)`);
+      check(`all ${ids.length} records are in the storage, each as it was`, Object.keys(inStore.items).length === ids.length && !lost.length, `${Object.keys(inStore.items).length} stored; ${lost.length} changed or missing: ${lost.slice(0, 5).join(", ")}`);
+      check("…with the daily log, flags and settings", same(inStore.days, big.days) && same(inStore.flags, big.flags) && same(inStore.settings, await page.evaluate("progress.settings")));
+      check("…and the storage agreed to every save", saved);
       check(`all ${ids.length} records reach the cloud`, inCloud === ids.length, `${inCloud} in the cloud`);
-      check(`the largest shard document stays under 200 KB (${kb(shards[0][1])}, ${shards[0][0]}; the limit is 256 KB)`, shards[0][1] < 200 * KB);
-      check(`every other cloud document stays under 200 KB too (largest ${others[0][0]}, ${kb(others[0][1])})`, others[0][1] < 200 * KB);
-      check(`the browser copy stays under the ${BROWSER_LINE / MB} MB line (${mb(lsSize)})`, lsSize < BROWSER_LINE);
-      check("…and the browser agreed to save it", saved);
+      check(`the largest shard document stays under ${CLOUD_LINE / KB} KB (${kb(shards[0][1])}, ${shards[0][0]}; the limit is 256 KB)`, shards[0][1] < CLOUD_LINE);
+      check(`every other cloud document stays under ${CLOUD_LINE / KB} KB too (largest ${others[0][0]}, ${kb(others[0][1])})`, others[0][1] < CLOUD_LINE);
       const t = await timeSave(page);
-      console.log(`         one saveProgress() of this copy takes ${saveTime(t)} with the CPU slowed ${CPU_SLOWDOWN}×`);
+      console.log(`         saving one answer in this copy takes ${saveTime(t)}, with the CPU slowed ${CPU_SLOWDOWN}×`);
+      check("…and every timed save landed", t.ok);
       check("no script errors", !page.__errors, page.__errors);
       await context.close();
-      worst = { big, worstRec, lsSize, records: ids.length };
+      worst = { big, worstRec, records: ids.length, largest: shards[0][1] };
     }
 
-    /* 8b. The line itself is safe */
-    section(`8b. Room: a browser copy just under the ${BROWSER_LINE / MB} MB line, with every other key full, still saves, reloads and syncs`);
+    /* 8b. Far more than the old storage could hold */
+    section("8b. Room: a course far bigger than the old storage could hold, with every other key full, still saves, reloads and syncs");
     {
       // The app's other keys at their caps, each as long as it gets: the last kind of exercise for 2,000 grammar items and
       // 500 mix-ups between words, under the longest ids; 20 problems the app noticed, each at the length the app cuts it to;
-      // and the per-device settings as a learner who has read every lesson would have them. No imported packs
-      // (itapp.packs.v1), since Grant doesn't import any; they would share the same space.
+      // and the per-device settings as a learner who has read every lesson would have them. No imported packs.
       const longest = (mode, n) => [...new Set(info.items.filter(i => i[2] === mode).map(i => canonicalOf(i[0])))].sort((a, b) => b.length - a.length || a.localeCompare(b)).slice(0, n);
       const typeKeys = ["conjugation", "preparticle", "translate", "transform", "cloze", "recall", "spot", "reply"];
       const words = longest("flashcards", 1000);
@@ -513,29 +531,25 @@ async function runSession(page, start, maxSteps = 200) {
         "itapp.errors.v1": Array.from({ length: 20 }, (_, k) => ({ m: errMsg, at: errAt, screen: "session", v: info.version, t: T - (20 - k) * 3600e3, n: 999 })),
       };
       const caps = `${otherKeys["itapp.lasttype.v1"].length} last kinds, ${otherKeys["itapp.confusions.v1"].length} mix-ups, ${otherKeys["itapp.errors.v1"].length} problems`;
-      // Section 8's worst case, plus worst-case records under made-up ids (standing in for items not written yet) until the
-      // browser copy is just under the line. Each adds exactly its "id":{…}, to the saved text.
-      const recText = JSON.stringify(worst.worstRec), target = BROWSER_LINE - KB, extra = {};
-      let size = worst.lsSize;
-      for (let k = 0; ; k++) {
-        const id = "zz-future-" + String(k).padStart(5, "0"), add = JSON.stringify(id).length + recText.length + 2;
-        if (size + add > target) break;
-        extra[id] = Object.assign({}, worst.worstRec); size += add;
-      }
-      const extraIds = Object.keys(extra), total = worst.records + extraIds.length;
+      // Section 8's worst case, plus worst-case records under made-up ids (standing in for items not written yet), as many
+      // as take the largest cloud document from its size in section 8 to about CLOUD_TARGET.
+      const extraIds = Array.from({ length: Math.floor(worst.records * (CLOUD_TARGET / worst.largest - 1)) }, (_, k) => "zz-future-" + String(k).padStart(5, "0"));
+      const extra = Object.fromEntries(extraIds.map(id => [id, Object.assign({}, worst.worstRec)])), total = worst.records + extraIds.length;
       const full = Object.assign({}, worst.big, { items: Object.assign({}, worst.big.items, extra) });
+      const asText = JSON.stringify(full).length;
       const cloud = makeCloud();
-      const { page, context } = await newPage(browser, origin, { storage: Object.assign({ [LS_PROGRESS]: full }, otherKeys), cloud });
+      const { page, context } = await newPage(browser, origin, { cloud }); // a new device; then everything is saved as the app saves it, and the app opened again
+      await page.evaluate(async ([p, keys, k]) => { Store.set(k, p); for (const [key, v] of Object.entries(keys)) Store.set(key, v); await Store.flush(); }, [full, otherKeys, LS_PROGRESS]);
+      await page.reload();
+      await page.waitForFunction("typeof content !== 'undefined' && content && S.screen === 'home'");
       await settleSync(page);
       check("cloud sync switched on", (await page.evaluate("dbState")) === "on");
       const kept = await page.evaluate(ids => ({ n: Object.keys(progress.items).length, missing: ids.filter(id => !progress.items[id]) }), extraIds);
       check(`loading keeps all ${total} records, the ${extraIds.length} under made-up ids among them`, kept.n === total && !kept.missing.length, `${kept.n} records loaded; missing ${kept.missing.slice(0, 5).join(", ")}`);
-      const saved = await page.evaluate(k => { saveProgress(); return { ok: !S.saveFailed, landed: localStorage.getItem(k) === JSON.stringify(progress) }; }, LS_PROGRESS);
-      const lsSize = await page.evaluate(k => localStorage.getItem(k).length, LS_PROGRESS);
-      check(`the browser copy is just under the ${BROWSER_LINE / MB} MB line (${mb(lsSize)}, ${kb(BROWSER_LINE - lsSize)} under)`, lsSize < BROWSER_LINE && lsSize > BROWSER_LINE - 16 * KB, `${lsSize} characters`);
-      check("the browser agrees to save it (saveProgress() leaves no S.saveFailed), and the saved text is the app's progress", saved.ok && saved.landed, JSON.stringify(saved));
+      const saved = await page.evaluate(async () => { saveProgress(); return (await Store.flush()) && !S.saveFailed; });
+      check("the storage agrees to save it (saveProgress() leaves no S.saveFailed)", saved);
       const t = await timeSave(page);
-      check("…and agrees to every save while one is timed", t.ok);
+      check("…and to every save while one is timed", t.ok);
       await settleSync(page);
 
       // the cloud's copy
@@ -544,25 +558,13 @@ async function runSession(page, start, maxSteps = 200) {
       const inCloud = shardDocs.reduce((n, [k]) => n + Object.keys(cloud.docs.get(k).items).length, 0);
       const cloudMissing = extraIds.filter(id => !(cloud.docs.get("progress2/" + shardOf(id)) || { items: {} }).items[id]);
       check(`all ${total} records reach the cloud, the made-up ones in the shards their ids hash to`, inCloud === total && !cloudMissing.length, `${inCloud} in the cloud; missing ${cloudMissing.slice(0, 5).join(", ")}`);
-      check(`every cloud document stays under 200 KB (largest ${sizes[0][0]}, ${kb(sizes[0][1])}; the limit is 256 KB)`, sizes[0][1] < 200 * KB);
+      check(`every cloud document stays under ${CLOUD_LINE / KB} KB (largest ${sizes[0][0]}, ${kb(sizes[0][1])}; the limit is 256 KB)`, sizes[0][1] < CLOUD_LINE);
 
-      // every key together, and the room left: worked out from the limit, and measured in this browser by finding the
-      // longest text one more key could take (then removing it)
-      const ls = await page.evaluate(() => {
-        const keys = {};
-        for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); keys[k] = k.length + localStorage.getItem(k).length; }
-        const K = "itapp.room-probe";
-        let lo = 0, hi = 6e6;
-        while (lo < hi) { const m = Math.ceil((lo + hi) / 2); try { localStorage.setItem(K, "x".repeat(m)); lo = m; } catch (e) { hi = m - 1; } finally { localStorage.removeItem(K); } }
-        return { keys, room: lo + K.length };
-      });
-      const all = Object.values(ls.keys).reduce((a, b) => a + b, 0), rest = all - ls.keys[LS_PROGRESS];
-      const spare = BROWSER_LIMIT - all;
-      console.log(`         ${total} records (${worst.records} items and ${extraIds.length} made up), ${caps}: browser copy ${mb(lsSize)}; the other ${Object.keys(ls.keys).length - 1} keys ${kb(rest)}; all ${Object.keys(ls.keys).length} keys together ${mb(all)} (${all.toLocaleString("en-GB")} characters)`);
-      console.log(`         left of the browser's 5 MiB (${BROWSER_LIMIT.toLocaleString("en-GB")} characters): ${mb(spare)}; measured in this browser: ${mb(ls.room)} (${ls.room.toLocaleString("en-GB")} characters)`);
-      console.log(`         largest cloud document ${sizes[0][0]} ${kb(sizes[0][1])}; one saveProgress() takes ${saveTime(t)} with the CPU slowed ${CPU_SLOWDOWN}×`);
-      check(`with every key full, at least ${SPARE_MIN / MB} MB of the browser's 5 MiB is still free (${mb(Math.min(spare, ls.room))})`, Math.min(spare, ls.room) >= SPARE_MIN);
-      check("no key is left over from measuring", await page.evaluate(() => localStorage.getItem("itapp.room-probe") === null));
+      // the saved copy
+      const use = await page.evaluate(() => Store.usage()), rows = await storedRows(page);
+      const partRows = Object.keys(rows).filter(k => k.startsWith(LS_PROGRESS + "/")), biggest = Math.max(...partRows.map(k => rows[k].length));
+      console.log(`         ${total} records (${worst.records} items and ${extraIds.length} made up), ${caps}: the saved copy is ${mb(use.saved)} in ${Object.keys(rows).length} rows (the largest ${kb(biggest)}); as one text in localStorage it would be ${mb(asText)}, ${asText > LOCAL_LIMIT ? "more than" : "of"} the ${(LOCAL_LIMIT / MB).toFixed(0)} MB it holds`);
+      console.log(`         largest cloud document ${sizes[0][0]} ${kb(sizes[0][1])}; saving one answer takes ${saveTime(t)}, with the CPU slowed ${CPU_SLOWDOWN}×`);
 
       // after a reload: the same progress, and the other keys as they were
       const before = await stored(page);
@@ -576,7 +578,7 @@ async function runSession(page, start, maxSteps = 200) {
       const changedKeys = [];
       for (const [k, v] of Object.entries(otherKeys)) if (!same(await stored(page, k), v)) changedKeys.push(k);
       check("…and the other keys are just as they were", !changedKeys.length, changedKeys.join(", "));
-      check("…and the browser still agrees to save", await page.evaluate(() => { saveProgress(); return !S.saveFailed; }));
+      check("…and the storage still agrees to save", await page.evaluate(async () => { saveProgress(); return (await Store.flush()) && !S.saveFailed; }));
       check("no script errors", !page.__errors, page.__errors);
       await context.close();
     }
@@ -761,15 +763,15 @@ async function runSession(page, start, maxSteps = 200) {
       const merged = await page.evaluate(([f]) => mergeProgress(progress, { v: 2, items: {}, days: {}, flags: { "rep-flag": Object.assign({}, f, { updatedAt: f.updatedAt - 1, reportedAt: undefined }) } }).flags["rep-flag"], [reported]);
       check("merging an older copy of a flag, without reportedAt (as an older version wrote it), keeps the reported one", same(merged, reported), JSON.stringify(merged));
       // the problems the app noticed: kept on the device in itapp.errors.v1, apart from progress
-      const textBefore = await page.evaluate(k => localStorage.getItem(k), LS_PROGRESS);
+      const textBefore = await progressRows(page);
       w = await since(() => page.evaluate(() => { for (let n = 0; n < 25; n++) setTimeout(() => { throw new Error("progress test error " + n); }); Promise.reject(new Error("progress test rejection")); }));
       const errs = await stored(page, "itapp.errors.v1");
       check("errors are kept in itapp.errors.v1, the last 20", Array.isArray(errs) && errs.length === 20 && errs.every(e => typeof e.m === "string" && e.t > 0), JSON.stringify(errs).slice(0, 200));
-      check("…leaving the browser copy of progress exactly as it was", (await page.evaluate(k => localStorage.getItem(k), LS_PROGRESS)) === textBefore);
+      check("…leaving the browser copy of progress exactly as it was", (await progressRows(page)) === textBefore);
       check(`…writing nothing to the cloud (${w.join(", ") || "nothing"})`, !w.length);
       check("…and appearing neither in progress nor in a backup", await page.evaluate(() => !/progress test (error|rejection)/.test(JSON.stringify(progress) + backupText()) && !("errors" in progress)));
       await page.evaluate(() => { S.screen = "data"; render(); action("clearErrors"); });
-      check("clearing them removes only itapp.errors.v1", (await stored(page, "itapp.errors.v1")) === null && (await page.evaluate(k => localStorage.getItem(k), LS_PROGRESS)) === textBefore);
+      check("clearing them removes only itapp.errors.v1", (await stored(page, "itapp.errors.v1")) === null && (await progressRows(page)) === textBefore);
       await context.close();
     }
   } catch (e) {
