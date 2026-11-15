@@ -46,6 +46,14 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/test-reports.js
 
+      - name: Rules test (tools/test-rules.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node tools/test-rules.js
+
+      - name: Course sweep (tools/test-course.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node tools/test-course.js
+
       # The storage test updates from, and goes back to, the version before the move to IndexedDB: its index.html comes
       # from the tag v9.25, which a shallow checkout doesn't have (without it that section is skipped with a note).
       - name: Storage test (tools/test-storage.js)
