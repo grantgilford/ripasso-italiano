@@ -35,6 +35,10 @@
       of those writes, and the pushProgress after it; and another device's newer copy merged in, as
       adoptRemote and as a whole snapshot, with Today redrawn. (The snapshots go through
       onProgressSnapshot from 9.4; on 9.3 and before, through the same steps as their handler.)
+    - from 9.26, the storage (IndexedDB behind Store): after a reload, when the saved data is in memory (the
+      database opened and every row read); saving one answer, a record changed as an answer changes it:
+      saveProgress() itself and until the storage has it; and every part of progress compared with what is
+      stored, as when the app is put away.
 
   Each figure is the median of 7 runs (3 for the reload and the idle work), in milliseconds. The app's random
   choices (which items a session takes, which exercise each becomes) come from a fixed seed while
@@ -96,11 +100,11 @@ const BUDGETS = {
   // the sync figures, set at 9.4 (dirty tracking and the record-by-record merge) in the same way; the push after an echo
   // takes well under a millisecond, so its budget leaves room for the timer's own granularity
   "pushProgress (fake db)": 94,
-  "adoptRemote (fake db)": 166,
+  "adoptRemote (fake db)": 107, // 9.26: was 166 (see below)
   "pushProgress after an answer": 23,
   "Snapshot: the echo of own writes": 43,
   "pushProgress after the echo": 3,
-  "Snapshot: another device's changes": 160,
+  "Snapshot: another device's changes": 108, // 9.26: was 160 (see below)
   // 9.7: meaning choices no longer list the whole course for every choice, so "buildSession unit" and "buildSession hard"
   // took about 60% and 50% of 9.6's time on the same computer; their budgets were lowered in the same proportion. The first
   // lookup of a flashcard's sentence indexes the grammar units' sentences while the answer panel is drawn, so it is held to
@@ -118,6 +122,16 @@ const BUDGETS = {
   "Draw its answer panel: Verb in a sentence": 18,
   "Draw a session: Which tense fits?": 10,
   "Draw its answer panel: Which tense fits?": 15,
+  // 9.26: saved data moved to IndexedDB behind Store. Saving progress now writes only the parts that changed, so a merge
+  // from the cloud, which ends by saving, takes about 60% of 9.25's time on the same computer: the budgets of "adoptRemote"
+  // and "Snapshot: another device's changes" were lowered to the slowest of four runs plus 25%. New figures, set the same
+  // way: when the saved data is in memory after a reload (the database opened and every row read, while the browser is
+  // still reading the app's own script); saving one answer (saveProgress() itself, which holds up the screen, and until the
+  // storage has it); and every part of progress compared with what is stored, as when the app is put away
+  "Saved data in memory": 530,
+  "Save an answer": 18,
+  "Save an answer: in the storage": 21,
+  "Put away: everything compared": 63,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work, and no

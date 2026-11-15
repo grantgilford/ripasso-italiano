@@ -120,6 +120,8 @@ const flushed = (page) => page.evaluate(() => Store.flush());
 const NO_IDB = `Object.defineProperty(window, "indexedDB", { get() { return undefined; }, configurable: true });`;
 // IndexedDB that answers every open with an error.
 const IDB_ERRORS = `IDBFactory.prototype.open = function () { const r = {}; setTimeout(() => r.onerror && r.onerror(new Event("error")), 0); return r; };`;
+// IndexedDB that answers the first open with an error, and works after that.
+const IDB_ERRORS_ONCE = `(() => { const open = IDBFactory.prototype.open; let n = 0; IDBFactory.prototype.open = function (...a) { if (n++) return open.apply(this, a); const r = {}; setTimeout(() => r.onerror && r.onerror(new Event("error")), 0); return r; }; })();`;
 // IndexedDB that never answers an open.
 const IDB_SILENT = `IDBFactory.prototype.open = function () { return {}; };`;
 // A transaction held open and never finished, as if the app were closed in the middle of it: its commit does nothing and
@@ -602,6 +604,27 @@ const SPY = `(() => { const P = Storage.prototype, log = window.__ls = { get: []
       const t3 = await b.evaluate(async (id) => { applyResult(id, true, "recall"); await Store.flush(); await new Promise(r => setTimeout(r, 300)); await Store.flush(); return progress.items[pid(id)].lastSeen; }, ids[42]);
       const s = await stored(b);
       check("…and even with no word from the other window, a save first merges what it saved", (s.items[ids[41]] || {}).lastSeen === t2 && (s.items[ids[42]] || {}).lastSeen === t3 && (s.items[ids[40]] || {}).lastSeen === t);
+      await context.close();
+    }
+
+    {
+      // a window saving the older way (IndexedDB didn't open for it) while another makes the move
+      const context = await newContext();
+      await seedLocal(context, deviceTexts(someProgress(300)));
+      const a = await openPage(context, "index.html", { init: IDB_ERRORS_ONCE });
+      check("(one window couldn't open IndexedDB and is saving the older way)", (await status(a)).backend === "local" && /^n-store: Saving the older way/.test(await noticeText(a)));
+      const t1 = await answer(a, ids[400]); // saved in localStorage, the live copy
+      const b = await openPage(context, "index.html"); // IndexedDB works here: the move is made
+      check("(another window opens, and makes the move with what the first has saved so far)", (await status(b)).backend === "idb" && (await status(b)).moved.records === 301);
+      const frozen = oldKeys(await localTexts(b));
+      const t2 = await answer(a, ids[401]);
+      await a.waitForFunction(() => Store.status().backend === "idb" && Store.status().writes > 0, null, { timeout: 10000 }).catch(() => { });
+      await flushed(a); await pause(300); await flushed(a); await flushed(b);
+      const s = await stored(a);
+      check("the first window's next answer is saved in IndexedDB, not in the old storage: it has moved over", (await status(a)).backend === "idb" && (s.items[ids[401]] || {}).lastSeen === t2 && (s.items[ids[400]] || {}).lastSeen === t1 && Object.keys(s.items).length === 302, JSON.stringify(await status(a)));
+      check("…the old copy is as the move left it", oldKeys(await localTexts(a)) === frozen);
+      check("…its notice about saving the older way is gone, and both windows hold the same progress", !/^n-store/.test(await noticeText(a)) && (await records(a)) === 302 && await b.waitForFunction(() => Object.keys(progress.items).length === 302, null, { timeout: 10000 }).then(() => true, () => false), await noticeText(a));
+      check("no script errors in either window", !a.errors.length && !b.errors.length, a.errors.concat(b.errors).join("\n"));
       await context.close();
     }
 

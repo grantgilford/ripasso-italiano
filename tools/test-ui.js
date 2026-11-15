@@ -97,6 +97,15 @@
        unhandled rejection kept in itapp.errors.v1 with their message, place,
        screen, version and time, the last 20, a repeated one counted, kept out
        of progress and backups, and harmless when damaged or refused.
+   13. storage (from 9.26), in light and dark at 390 and 360 px and at 120%
+       text: Your data's Storage card, after Sync (which storage is in use, how
+       much is saved and the room left, when the data was moved, and Merge in
+       the copy from before the move while that copy is on the device), and
+       Today's notices about where progress is kept, each as the only notice
+       and within the layout rules: Saving the older way (no IndexedDB), Saved
+       progress couldn't be opened (IndexedDB unavailable after the move) and
+       Progress saved by an older version (the old copy changed since the
+       move). What the storage itself does is tools/test-storage.js's.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -175,6 +184,63 @@ async function layout(page, label, { zoomOnly } = {}) {
   if (zoomOnly) return;
   check(`${label}: nothing is hidden behind the tab bar`, !r.hidden, r.hidden);
   check(`${label}: every control is at least 44 × 44 px`, !r.small.length, r.small.slice(0, 8).join("\n"));
+}
+
+/* Storage (from 9.26): Your data's Storage card and Today's notices about where progress is kept, in each layout.
+   What the storage does is tools/test-storage.js's; this is how it is shown. Each case is set up by a script run before
+   the page's own: a device that had progress before 9.26 (so the first opening moves it), one with no IndexedDB, and
+   one whose IndexedDB can't be opened once the move has been made. */
+async function storage(browser, origin) {
+  const BEFORE = `if (!localStorage.getItem("ripasso.boot.v1") && !localStorage.getItem("itapp.progress.v1")) localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items: {}, days: {}, flags: {}, settings: {}, updatedAt: 1 }));`;
+  const NO_IDB = `Object.defineProperty(window, "indexedDB", { get() { return undefined; }, configurable: true });`;
+  const LOST_AFTER = BEFORE + `if (/"idb":[0-9]/.test(localStorage.getItem("ripasso.boot.v1") || "")) { ${NO_IDB} }`;
+  const notice = (page) => page.evaluate(() => { const all = [...document.querySelectorAll("#app .notice")]; return all.length === 1 ? all[0].id + ": " + all[0].textContent : all.length + " notices"; });
+  const card = async (page) => { await page.evaluate(() => { S.screen = "data"; S.report = null; render(); }); await page.waitForFunction(() => { const e = document.getElementById("store-use"); return e && e.textContent; }, null, { timeout: 5000 }).catch(() => { }); return (await page.textContent("#sec-storage")).replace(/\s+/g, " ").trim(); };
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Storage, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    { // the usual case, on a device that had progress before 9.26
+      const { page, context } = await openApp(browser, origin, { width, height, scheme, init: BEFORE });
+      check(L("with the data in IndexedDB, Today has no notice about storage"), !/n-store/.test(await notice(page)), await notice(page));
+      const text = await card(page);
+      check(L("Your data has the Storage card straight after Sync"), await page.evaluate(() => { const s = [...document.querySelectorAll("#app .dsec")].map(e => e.id); return s[0] === "sec-sync" && s[1] === "sec-storage"; }));
+      check(L("it names the storage, what is saved and the room left, and when the data was moved"), /^Storage Saved in this device's database \(IndexedDB\)\. \d+(\.\d)? (KB|MB) saved, with room for about \d+(\.\d)? (MB|GB) more\. Moved here from the browser's older storage on /.test(text), text);
+      check(L("it offers Merge in the copy from before the move, as a secondary button"), await page.evaluate(() => { const b = document.querySelector('#sec-storage [data-act="mergeOld"]'); return !!b && !b.classList.contains("primary") && /Merge in the copy from before the move/.test(b.textContent); }));
+      await layout(page, L("Your data"), opts);
+      // an older version saves to the old copy: Today's notice, with its two buttons
+      await page.evaluate(() => localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items: { "zz-older": { box: 1, due: 1, lapses: 0, lastSeen: Date.now(), lastWrong: 0, seenCount: 1, lastRight: 1 } }, days: {}, flags: {}, settings: {}, updatedAt: Date.now() })));
+      await page.reload(); await page.waitForFunction(ready);
+      await page.waitForFunction(() => Store.status().oldChanged, null, { timeout: 15000 }).catch(() => { });
+      const n = await notice(page);
+      check(L("when an older version has saved to the old copy, Today's one notice says so, with Merge it in and Later"), /^n-store: Progress saved by an older version/.test(n) && await page.evaluate(() => { const b = [...document.querySelectorAll("#n-store button")]; return b.length === 2 && b[0].classList.contains("primary") && b[0].dataset.act === "mergeOld" && b[1].dataset.act === "oldLater"; }), n);
+      await layout(page, L("Today with that notice"), opts);
+      await tap(page, '#n-store [data-act="mergeOld"]');
+      check(L("Merge it in opens Your data, which says it is merged in"), (await screen(page)) === "data" && /merged in/.test(await page.textContent("#sec-sync")) && await page.evaluate(() => !!progress.items["zz-older"]));
+      await layout(page, L("Your data after merging"), opts);
+      check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+      await context.close();
+    }
+    { // no IndexedDB: saving the older way
+      const { page, context } = await openApp(browser, origin, { width, height, scheme, init: NO_IDB });
+      const n = await notice(page);
+      check(L("without IndexedDB, Today's one notice says Saving the older way, with Got it"), /^n-store: Saving the older way/.test(n) && await page.evaluate(() => { const b = [...document.querySelectorAll("#n-store button")]; return b.length === 1 && b[0].classList.contains("primary") && b[0].dataset.act === "storeSeen"; }), n);
+      await layout(page, L("Today, saving the older way"), opts);
+      check(L("…and the Storage card says so, with no move or old copy to speak of"), /^Storage Saved in the browser's older storage, as before version 9\.26\. .* Ripasso will try again each time it opens\. \d+(\.\d)? (KB|MB) saved, with room for about \d+(\.\d)? MB more\.$/.test(await card(page)), await card(page));
+      await layout(page, L("Your data, saving the older way"), opts);
+      check(L("no script errors, saving the older way"), !page.errors.length, page.errors.join("\n"));
+      await context.close();
+    }
+    { // the move made, and IndexedDB can't be opened: not saving
+      const { page, context } = await openApp(browser, origin, { width, height, scheme, init: LOST_AFTER });
+      const n = await notice(page);
+      check(L("when the saved progress can't be opened, Today's one notice says so, with Try again"), /^n-store: Saved progress couldn't be opened/.test(n) && await page.evaluate(() => { const b = [...document.querySelectorAll("#n-store button")]; return b.length === 1 && b[0].dataset.act === "reloadApp"; }), n);
+      await layout(page, L("Today, not saving"), opts);
+      check(L("…and the Storage card says it isn't saving"), /^Storage Not saving: this device's database \(IndexedDB\), where your progress is kept, couldn't be opened\./.test(await card(page)), await card(page));
+      await layout(page, L("Your data, not saving"), opts);
+      check(L("no script errors, not saving"), !page.errors.length, page.errors.join("\n"));
+      await context.close();
+    }
+    console.log(`  Storage checked, ${label}`);
+  }
 }
 
 async function tour(page, label, opts = {}) {
@@ -1276,6 +1342,9 @@ async function readAloud(browser, origin) {
 
     /* Reports (from 9.19) */
     await reports(browser, origin);
+
+    /* Storage (from 9.26) */
+    await storage(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

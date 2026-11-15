@@ -71,7 +71,8 @@
    "store.rev" and first checks the token is the one this window last saw. If another window has saved since, the save
    is dropped, the storage is read again, the app merges the other window's progress with its own (Store.onChange: the
    newest record of each item wins, as in the cloud sync) and saves the result. A window also looks when it comes
-   back to the screen and when another window says it has saved (BroadcastChannel "ripasso-store").
+   back to the screen and when another window says it has saved (BroadcastChannel "ripasso-store"). A window saving in
+   localStorage looks at the note before each save, and moves over to IndexedDB once another window has made the move.
 
    A NATIVE DATABASE would replace open(), readAll(), write() and usage() below (and drop the move); the parts of
    progress could become rows of a table. Nothing outside this script would change. */
@@ -79,13 +80,13 @@ const Store = (() => {
   "use strict";
   const PROGRESS = "itapp.progress.v1", THEME = "itapp.theme.v1", OLD_PREFIX = "itapp.", HINT = "ripasso.boot.v1";
   const DB_NAME = "ripasso", TABLE = "data", MARK = "store.migration", REV = "store.rev", PART = PROGRESS + "/", HEAD = PART + "head", BUCKETS = 256;
-  const FOREIGN = new Error("another window saved first");
+  const FOREIGN = new Error("another window saved first"), UNSEEN = "?"; // UNSEEN: a token no save carries, so the next save reads the storage first
   const api = { onChange: null, onError: null, onNotice: null };
   let mode = "opening", reason = "", detail = "";
   let db = null, texts = new Map(), rev, marker = null; // texts: every key's text as the storage holds it, or will once the writes waiting have landed
   let shadow = null, members = null, lastProgress;      // the records as stored (a copy of each), the ids in each bucket, and the progress last saved
   let pending = new Map(), writing = null, failed = false, writes = 0;
-  let persisted = null, oldCopy = false, oldChanged = false, chan = null;
+  let persisted = null, oldCopy = false, oldChanged = false, chan = null, listening = false, wantLook = false;
   const alias = new Map(); // key → a text that says the same as the stored one with its keys in another order
 
   /* ----- small helpers ----- */
@@ -333,6 +334,8 @@ const Store = (() => {
     return api;
   }
   function listen() { // other windows: told when this one saves, and looked at when they say they have, or this one comes back to the screen
+    if (listening) return;
+    listening = true;
     try { chan = new BroadcastChannel("ripasso-store"); chan.onmessage = (e) => { if (e.data && e.data.rev !== rev) refresh(); }; } catch (e) { chan = null; }
     document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
     window.addEventListener("pageshow", (e) => { if (e.persisted) refresh(); });
@@ -371,7 +374,7 @@ const Store = (() => {
         try { await write(batch); setFailed(false); }
         catch (x) { if (x === FOREIGN) { try { await reload(batch); } catch (y) { again(); setFailed(true); } } else { again(); detail = String((x && x.message) || x || ""); setFailed(true); } }
       }
-    })().then(() => { writing = null; if (!failed) pump(); });
+    })().then(() => { writing = null; if (!failed) pump(); if (wantLook) refresh(); });
   }
   async function reload(mine) { // another window has saved: the storage is read again, its progress merged with this window's by the app, and this window's small values set again
     if (!db) db = await openDB();
@@ -388,10 +391,24 @@ const Store = (() => {
     call(api.onNotice);
   }
   function refresh() { // looks whether another window has saved since this one last looked
-    if (mode !== "idb" || writing) return; // a save under way finds out for itself
+    if (mode !== "idb") return;
+    if (writing) { wantLook = true; return; } // once the save under way is done
+    wantLook = false;
     writing = (async () => {
       try { if (!db) db = await openDB(); const now = await req(db.transaction(TABLE, "readonly").objectStore(TABLE).get(REV)); if (now !== rev) await reload(null); } catch (e) { }
-    })().then(() => { writing = null; if (!failed) pump(); });
+    })().then(() => { writing = null; if (!failed) pump(); if (wantLook) refresh(); });
+  }
+  /* A window saving in localStorage (IndexedDB didn't open for it, or its own move didn't check out) must not go on doing
+     so once another window has moved the data: before each save it looks at the note, and if the move has been made it
+     saves in IndexedDB from then on. Its first save there reads the storage (its token is one no save carries), the app
+     merges what this window holds with it, and the result is saved; nothing more is written to localStorage. */
+  function movedElsewhere() {
+    const h = parse(ls.get(HINT));
+    if (!(plain(h) && h.idb)) return false;
+    mode = "idb"; reason = ""; detail = ""; texts = new Map(); rev = UNSEEN; marker = null; shadow = null; members = null; pending = new Map(); alias.clear();
+    oldCopy = ls.keys().includes(PROGRESS);
+    listen();
+    return true;
   }
 
   /* ----- what the app calls ----- */
@@ -404,7 +421,7 @@ const Store = (() => {
   };
   api.set = (key, value, full) => {
     if (value === undefined) return api.remove(key);
-    if (mode === "local") return ls.set(key, JSON.stringify(value));
+    if (mode === "local" && !movedElsewhere()) return ls.set(key, JSON.stringify(value));
     if (mode !== "idb") return false;
     if (key === PROGRESS && plain(value)) { lastProgress = value; queue(progressChanges(value, full)); } // never made into one text: only its changed parts
     else {
@@ -417,10 +434,10 @@ const Store = (() => {
     return !failed;
   };
   api.remove = (key) => {
-    if (mode === "local") { ls.remove(key); return true; }
+    if (mode === "local" && !movedElsewhere()) { ls.remove(key); return true; }
     if (mode !== "idb") return false;
     const changes = new Map();
-    if (texts.has(key)) changes.set(key, null);
+    if (texts.has(key) || rev === UNSEEN) changes.set(key, null);
     if (key === PROGRESS) { lastProgress = undefined; shadow = null; members = null; for (const k of texts.keys()) if (isPart(k)) changes.set(k, null); }
     queue(changes);
     if (key === THEME) hint({ theme: "auto" });
@@ -22722,8 +22739,8 @@ Store.onError = (ok) => setSaveFailed(!ok);
 Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "data")) render(); };
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.25";
-const CHANGES = "The Verbs section grows from 437 to 500 verbs: 63 new everyday ones such as ripassare, indossare and scommettere, each with its full table and an example sentence for every tense."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.26";
+const CHANGES = "Your progress is now kept in the phone's larger storage, so the course has room to keep growing. It was moved and checked as this version first opened, your old copy is left untouched, and Your data has a new Storage card showing where things are kept."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());
