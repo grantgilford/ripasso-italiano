@@ -22,7 +22,7 @@ jobs:
     # Pinned: in November 2026 ubuntu-latest moved to Ubuntu 26.04, where the pinned Playwright (1.56.1) cannot install
     # Chromium. Move this on when package.json moves to a Playwright that supports the newer image.
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40 # a run takes about 23 minutes (the Verbs test over half of it)
     steps:
       - uses: actions/checkout@v5
 
@@ -45,6 +45,14 @@ jobs:
       - name: Reports test (tools/test-reports.js)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: node tools/test-reports.js
+
+      # The storage test updates from, and goes back to, the version before the move to IndexedDB: its index.html comes
+      # from the tag v9.25, which a shallow checkout doesn't have (without it that section is skipped with a note).
+      - name: Storage test (tools/test-storage.js)
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          git fetch --depth 1 origin tag v9.25 || echo "could not fetch the tag v9.25"
+          node tools/test-storage.js
 
       - name: Progress safety test (tools/test-progress.js)
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}

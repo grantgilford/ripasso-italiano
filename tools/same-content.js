@@ -96,6 +96,7 @@ function compare(a, b, at, diff, seen = new Map()) {
   const ka = kind(a), kb = kind(b);
   if (ka !== kb) return diff(at, `${ka} ${show(a)} → ${kb} ${show(b)}`);
   if (ka === "function") return; // code, not content
+  if (ka === "WeakMap" || ka === "WeakSet") return; // a cache keyed by objects (WORD_KEY, UNIT_WORDS), empty until the app runs: not content, and nothing in it can be listed
   if (!["Array", "Object", "RegExp", "Set", "Map"].includes(ka)) return diff(at, `${show(a)} → ${show(b)}`);
   if (seen.get(a) === b) return; // already being compared (shared or circular references)
   seen.set(a, b);

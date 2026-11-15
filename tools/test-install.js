@@ -36,7 +36,7 @@
 "use strict";
 const fs = require("fs");
 const path = require("path");
-const { loadPlaywright, serve: listen, checks } = require("./lib/browser");
+const { loadPlaywright, serve: listen, checks, stored, save } = require("./lib/browser");
 
 const HEADED = process.argv.includes("--headed");
 const ROOT = path.join(__dirname, "..");
@@ -69,12 +69,12 @@ const pause = (ms) => new Promise(r => setTimeout(r, ms));
 async function waitFor(page, fn, arg, timeout = 8000) { try { await page.waitForFunction(fn, arg, { timeout }); return true; } catch (e) { return false; } }
 async function tap(page, sel) { await page.click(sel); await page.waitForTimeout(80); }
 const screen = (page) => page.evaluate("S.screen");
-const stored = (page, key) => page.evaluate(k => JSON.parse(localStorage.getItem(k) || "null"), key);
 
 function seed(T) { // some practice, saved on this device
   const items = {};
   content.byUnit.u01.slice(0, 30).forEach((i, k) => { items[i.id] = { box: 1 + (k % 6), due: T + 864e5, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 3, lastRight: T - 864e5 }; });
-  localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items, days: {}, flags: {}, currentUnit: "u01", settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T }));
+  Store.set("itapp.progress.v1", { v: 2, items, days: {}, flags: {}, currentUnit: "u01", settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T });
+  return Store.flush(); // stored before the page is loaded again
 }
 
 function pngSize(file) { const b = fs.readFileSync(file); return b.toString("ascii", 1, 4) === "PNG" ? [b.readUInt32BE(16), b.readUInt32BE(20)] : null; }
@@ -150,9 +150,17 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
     const version = await page.evaluate("APP_VERSION"); // the running version, whatever its number
     check("Your data has an App section with the version", (await page.textContent("#sec-app")).includes("Version " + version) && !!(await page.$('#sec-app [data-act="applyUpdate"]')));
     const progBefore = await stored(page, "itapp.progress.v1");
+    const other = await ctx.newPage(); // a second window of the app, as a browser tab beside the installed app, still on the version before
+    await other.goto(appUrl); await other.waitForFunction(ready);
+    const otherBefore = await other.evaluate("APP_VERSION");
+    await page.bringToFront();
     await Promise.all([page.waitForNavigation({ timeout: 10000 }), page.click('#sec-app [data-act="applyUpdate"]')]);
     await page.waitForFunction(ready);
     check("Update now switches to the new version", /^9\.9-test-/.test(await page.evaluate("APP_VERSION")));
+    const otherMoved = await waitFor(other, () => typeof APP_VERSION !== "undefined" && /^9\.9-test-/.test(APP_VERSION) && typeof content !== "undefined" && !!content);
+    check("…in every open window: a second one, on the version before, reloads into the new version too", otherBefore === version && otherMoved, `${otherBefore} → ${await other.evaluate("typeof APP_VERSION === 'undefined' ? '?' : APP_VERSION").catch(() => "?")}`);
+    check("…with the same progress", otherMoved && (await other.evaluate("Object.keys(progress.items).length")) === 30);
+    await other.close();
     const progAfter = await stored(page, "itapp.progress.v1");
     check("…and keeps all the progress", JSON.stringify(progAfter.items) === JSON.stringify(progBefore.items));
     check("…and no update is offered any more", !(await page.$("#n-update")) && !(await page.evaluate("S.update")));
@@ -205,13 +213,13 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
 
     /* 5b. Backups */
     section("5. Backups on this device");
-    await page.evaluate(() => { localStorage.removeItem("itapp.backup.v1"); render(); });
+    await page.evaluate(() => { Store.remove("itapp.backup.v1"); render(); });
     check("with practice and no backup, Today reminds you to back up", !!(await page.$("#n-backup")));
     await tap(page, '#n-backup [data-act="backupLater"]');
     check("Later hides the reminder for three days", !(await page.$("#n-backup")) && (await stored(page, "itapp.backup.v1")).snooze > Date.now() + 2.9 * 864e5);
-    await page.evaluate(() => { localStorage.setItem("itapp.backup.v1", JSON.stringify({ at: Date.now() - 2 * 864e5 })); render(); });
+    await page.evaluate(() => { Store.set("itapp.backup.v1", { at: Date.now() - 2 * 864e5 }); render(); });
     check("no reminder when the last backup is recent", !(await page.$("#n-backup")));
-    await page.evaluate(() => { localStorage.setItem("itapp.backup.v1", JSON.stringify({ at: Date.now() - 10 * 864e5 })); render(); });
+    await page.evaluate(() => { Store.set("itapp.backup.v1", { at: Date.now() - 10 * 864e5 }); render(); });
     check("a reminder when it is over a week old, saying when", !!(await page.$("#n-backup")) && /10 days ago/.test(await page.textContent("#n-backup")));
     const [dl] = await Promise.all([page.waitForEvent("download", { timeout: 5000 }).catch(() => null), page.click('#n-backup [data-act="backupNow"]')]);
     check("Back up now saves a backup file where sharing isn't available", !!dl && /^ripasso-backup-\d{4}-\d\d-\d\d\.json$/.test(dl.suggestedFilename()), dl && dl.suggestedFilename());
@@ -225,7 +233,7 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
       window.__shared = null;
       navigator.canShare = (d) => !!(d && d.files && d.files.every(f => f.type === "text/plain"));
       navigator.share = async (d) => { window.__shared = { name: d.files[0].name, type: d.files[0].type, text: await d.files[0].text() }; };
-      localStorage.setItem("itapp.backup.v1", JSON.stringify({ at: 1 })); S.screen = "data"; render();
+      Store.set("itapp.backup.v1", { at: 1 }); S.screen = "data"; render();
     });
     check("Your data shows Share backup… where sharing is available", !!(await page.$('[data-act="shareProgress"]')));
     check("…and when the last backup was made", /Last backup from this device/.test(await page.textContent("#sec-backup")));
@@ -243,10 +251,11 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
     fs.unlinkSync(bfile);
 
     // A device that refuses to save
-    await page.evaluate(() => { const set = Storage.prototype.setItem; window.__set = set; Storage.prototype.setItem = function (k, v) { if (k === "itapp.progress.v1") throw new Error("QuotaExceededError"); return set.call(this, k, v); }; S.screen = "home"; saveProgress(); render(); });
+    await page.evaluate(async () => { const put = IDBObjectStore.prototype.put; window.__put = put; IDBObjectStore.prototype.put = function () { throw new DOMException("no room", "QuotaExceededError"); }; S.screen = "home"; saveProgress(); render(); await Store.flush(); });
     check("if the device refuses to save, Today says so and offers a backup", !!(await page.$("#n-save")) && !!(await page.$('#n-save [data-act="backupNow"]')));
-    await page.evaluate(() => { Storage.prototype.setItem = window.__set; saveProgress(); });
+    await page.evaluate(async () => { IDBObjectStore.prototype.put = window.__put; saveProgress(); await Store.flush(); });
     check("…and the warning goes once saving works again", !(await page.$("#n-save")));
+    check("…with what was refused stored after all", (await stored(page, "itapp.progress.v1")).updatedAt === (await page.evaluate("progress.updatedAt")));
     check("the app asked the phone to protect its storage", typeof (await page.evaluate("S.persisted")) === "boolean");
     check("no script errors", !errors.length, errors.slice(0, 3).join("\n"));
     await ctx.close();
@@ -265,7 +274,7 @@ function pngSize(file) { const b = fs.readFileSync(file); return b.toString("asc
       const len = await p2.evaluate("history.length");
       await tap(p2, '.tab[data-go="units"]'); await tap(p2, '.tab[data-go="you"]');
       check("no history entries are added", (await p2.evaluate("history.length")) === len);
-      await p2.evaluate(() => { localStorage.removeItem("itapp.backup.v1"); render(); });
+      await p2.evaluate(() => { Store.remove("itapp.backup.v1"); render(); });
       await tap(p2, '.tab[data-go="home"]');
       check("no welcome or backup cards on Today", !(await p2.$(".notice")));
       await c2.close();

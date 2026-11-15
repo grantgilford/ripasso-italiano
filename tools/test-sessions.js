@@ -155,19 +155,19 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       section("2. Rotation: another kind of exercise for an item, per device");
       const rot = await page.evaluate(() => {
         const out = {};
-        localStorage.removeItem("itapp.lasttype.v1"); LAST_TYPES = null;
+        Store.remove("itapp.lasttype.v1"); LAST_TYPES = null;
         startSession("review");
         const answered = [];
         for (let n = 0; S.screen === "session" && n < 60; n++) { const q = current(); if (!S.feedback) { answered.push([pid(q.ex.item.id), q.ex.typeKey]); finishAnswer(true, "", ""); } continueSession(); }
-        const saved = JSON.parse(localStorage.getItem("itapp.lasttype.v1") || "null");
+        const saved = Store.get("itapp.lasttype.v1");
         const last = new Map(); answered.forEach(([id, k]) => { last.delete(id); last.set(id, k); });
         out.saved = Array.isArray(saved) && saved.length === last.size && saved.every(([id, k]) => last.get(id) === k) && saved.map(p => p[0]).join() === [...last.keys()].join();
-        out.notInProgress = !JSON.stringify(progress).includes("lasttype") && !localStorage.getItem("itapp.progress.v1").includes("lasttype");
+        out.notInProgress = !JSON.stringify(progress).includes("lasttype") && !JSON.stringify(Store.get("itapp.progress.v1")).includes("lasttype");
         S.screen = "home"; session = null;
         // a vocab pack's cards are not remembered
-        const before = localStorage.getItem("itapp.lasttype.v1");
+        const before = JSON.stringify(Store.get("itapp.lasttype.v1"));
         startSession("flashcards"); for (let n = 0; S.screen === "session" && n < 8; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); }
-        out.cardsLeftOut = localStorage.getItem("itapp.lasttype.v1") === before;
+        out.cardsLeftOut = JSON.stringify(Store.get("itapp.lasttype.v1")) === before;
         session = null; S.screen = "home";
         // the next sessions: where an item's exercise has another of the same kind (typed or not), it is another kind.
         // Review 40 times brings back the same most-overdue items each time, so (from 9.13) every grammar unit's session
@@ -192,15 +192,15 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         Object.assign(out, { could, same, plainSame });
         // capped at 2,000, newest last
         const many = Array.from({ length: 2100 }, (_, k) => ["old-" + k, "recall"]);
-        localStorage.setItem("itapp.lasttype.v1", JSON.stringify(many)); LAST_TYPES = null;
+        Store.set("itapp.lasttype.v1", many); LAST_TYPES = null;
         const g = Object.values(content.items).find(i => i.unit === "u02" && i.type === "grammar_mc");
         noteType({ item: g, typeKey: "grammar" });
-        const capped = JSON.parse(localStorage.getItem("itapp.lasttype.v1"));
+        const capped = Store.get("itapp.lasttype.v1");
         out.capped = capped.length === 2000 && capped[capped.length - 1][0] === pid(g.id) && capped[0][0] === "old-101";
-        // damaged values are ignored
+        // damaged values are ignored (a row whose text can't be read at all is the storage test's: it reads as nothing saved)
         out.damaged = [];
-        for (const v of ["not json", "{\"a\":1}", "[1,2,[3]]", "null", "[[\"x\"]]"]) {
-          localStorage.setItem("itapp.lasttype.v1", v); LAST_TYPES = null;
+        for (const v of ["\"not a list\"", "{\"a\":1}", "[1,2,[3]]", "null", "[[\"x\"]]"]) {
+          Store.set("itapp.lasttype.v1", JSON.parse(v)); LAST_TYPES = null;
           try { const s = buildSession("review"); if (!s.queue.length) out.damaged.push(v + ": an empty session"); noteType(s.queue[0].ex); } catch (e) { out.damaged.push(v + ": " + e.message); }
         }
         return out;
@@ -215,9 +215,9 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       await context.close();
 
       // a device that refuses to store anything new: sessions still run, nothing is remembered, nothing breaks
-      const { page: p2, context: c2 } = await open(browser, origin, { seed: false, init: `Storage.prototype.setItem = function () { throw new Error("quota"); };` });
+      const { page: p2, context: c2 } = await open(browser, origin, { seed: false, init: `Storage.prototype.setItem = function () { throw new Error("quota"); }; IDBObjectStore.prototype.put = function () { throw new Error("quota"); };` });
       await p2.evaluate(() => startSession("wild"));
-      const refused = { scr: await p2.evaluate(FINISH), saved: await p2.evaluate(() => localStorage.getItem("itapp.lasttype.v1")) };
+      const refused = { scr: await p2.evaluate(FINISH), saved: await p2.evaluate(() => Store.get("itapp.lasttype.v1")), saving: await p2.evaluate(() => Store.status().backend + ":" + S.saveFailed) };
       check("a device that refuses to save still runs a whole session, remembering nothing", refused.scr === "summary" && refused.saved === null && !p2.errors.length, JSON.stringify(refused) + p2.errors.join("\n"));
       await c2.close();
     }

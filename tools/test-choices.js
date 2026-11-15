@@ -58,7 +58,7 @@
 const fs = require("fs");
 const path = require("path");
 const { loadApp } = require("./lib/load-app");
-const { loadPlaywright, serveApp, checks } = require("./lib/browser");
+const { loadPlaywright, serveApp, checks, save, saveText } = require("./lib/browser");
 
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
@@ -355,7 +355,7 @@ async function browserChecks(browser, origin) {
   const errors = []; page.on("pageerror", e => errors.push(String(e)));
   page.on("dialog", d => d.accept());
   await page.goto(origin + "/index.html"); await page.waitForFunction(ready);
-  const store = () => page.evaluate(() => JSON.parse(localStorage.getItem("itapp.confusions.v1") || "null"));
+  const store = () => page.evaluate(() => Store.read("itapp.confusions.v1")); // what the storage holds, once every save has landed
   const panel = () => page.evaluate(() => { const f = document.querySelector(".fb"); return f ? f.innerText : ""; });
 
   section("Indexes built in idle time");
@@ -399,7 +399,7 @@ async function browserChecks(browser, origin) {
   check("the next meaning choice for the word offers the word it was mixed up with", second && second.src === first.src);
   check(`the second time the panel says “You've mixed up ${pair.it} and ${first.srcIt} 2 times”`, has(st, pair.pid, first.src, 2) && p2.includes(`You've mixed up ${pair.it} and ${first.srcIt} 2 times.`), p2);
   const outOfProgress = await page.evaluate(() => {
-    const docs = JSON.stringify(progressToDocs(progress)), all = [localStorage.getItem("itapp.progress.v1"), docs, backupText()].join("\n");
+    const docs = JSON.stringify(progressToDocs(progress)), all = [JSON.stringify(Store.get("itapp.progress.v1")), docs, backupText()].join("\n");
     return !/confusion/i.test(all) && !("confusions" in progress);
   });
   check("the store is kept out of progress, the backup file and the cloud's documents", outOfProgress);
@@ -444,12 +444,12 @@ async function browserChecks(browser, origin) {
   check("…and Accept my answer takes it back", !st.some(e => e[0] + "|" + e[1] === k(card.a, card.b)) && (await page.evaluate(() => S.feedback && S.feedback.ok)), JSON.stringify(st));
 
   // the cap, damaged entries, a damaged value and a device that refuses to store it
-  await page.evaluate(() => {
+  {
     const list = [];
     for (let i = 0; i < 700; i++) list.push(["zz-old-" + String(i).padStart(4, "0"), "zz-old-x" + i, 1 + (i % 3)]);
     list.splice(10, 0, "oops", [1, 2, 3], ["a", "a", 1], ["a", "b", -1], ["a", "b", 1.5], null, ["c"], { a: 1 });
-    localStorage.setItem("itapp.confusions.v1", JSON.stringify(list));
-  });
+    await save(page, "itapp.confusions.v1", list);
+  }
   await page.reload(); await page.waitForFunction(ready);
   const loaded = await page.evaluate(() => confusions().size);
   await chooseWrong(null);
@@ -458,13 +458,13 @@ async function browserChecks(browser, origin) {
   check(`at most 500 pairs are kept, the oldest going first, and damaged entries are dropped (${loaded} loaded from 700 and 8 damaged; ${st && st.length} after one more)`, loaded === 500 && st.length === 500 && valid && st[st.length - 1].includes(pair.pid) && st.some(e => e[0] === "zz-old-0699") && !st.some(e => e[0] === "zz-old-0200"), JSON.stringify(st && st.slice(-2)));
   const before = errors.length;
   for (const raw of ["{not json", "\"oops\"", "42", "{\"a\":1}"]) {
-    await page.evaluate((v) => localStorage.setItem("itapp.confusions.v1", v), raw);
+    await saveText(page, "itapp.confusions.v1", raw);
     await page.reload(); await page.waitForFunction(ready);
     await chooseWrong(null);
   }
   st = await store();
   check("a damaged value costs nothing: the app opens, the answer counts and the pair is stored afresh", errors.length === before && Array.isArray(st) && st.length === 1 && (await page.evaluate(() => S.feedback && S.feedback.ok === false)), JSON.stringify({ st, errors: errors.slice(before) }));
-  await page.evaluate(() => { const set = Storage.prototype.setItem; Storage.prototype.setItem = function (k, v) { if (k === "itapp.confusions.v1") throw new Error("QuotaExceededError"); return set.call(this, k, v); }; });
+  await page.evaluate(() => { const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (v, k) { if (k === "itapp.confusions.v1") throw new DOMException("no room", "QuotaExceededError"); return put.call(this, v, k); }; });
   const seen = () => page.evaluate((id) => (progress.items[pid(id)] || {}).seenCount || 0, pair.id);
   const answered = await seen();
   await chooseWrong(null);

@@ -7,8 +7,9 @@
     const { seedProgress } = require("./lib/seed");
     const records = await page.evaluate(seedProgress);   // in a page with the app loaded; then reload it
 
-  seedProgress runs inside the page (it uses the app's content, dayKey, defaultProgress and APP_VERSION): it writes
-  the progress to localStorage, marks What's new as read, and returns the number of records.
+  seedProgress runs inside the page (it uses the app's content, dayKey, defaultProgress and APP_VERSION): it saves
+  the progress as the app saves it (through Store from 9.26, waiting until it is stored; in localStorage in a version
+  before), marks What's new as read, and returns a promise of the number of records.
 */
 "use strict";
 
@@ -33,9 +34,16 @@ function seedProgress() {
   }
   const flagged = ids.slice(0, 6);
   const flags = Object.fromEntries(flagged.map(id => [id, { id, unit: content.items[id].unit, exercise: "Grammar", prompt: "a question", given: "", expected: "x", note: "", createdAt: T - D, updatedAt: T - D }]));
-  localStorage.setItem("itapp.progress.v1", JSON.stringify({ v: 2, items, days, flags, synonyms: { [ids[10]]: ["my own answer"] }, currentUnit: content.units.find(u => /^Verb tenses/.test(u.title)).id, settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T - D }));
-  localStorage.setItem("itapp.seen.v1", JSON.stringify(APP_VERSION)); // an ordinary day: What's new already read
-  return Object.keys(items).length;
+  const seeded = { v: 2, items, days, flags, synonyms: { [ids[10]]: ["my own answer"] }, currentUnit: content.units.find(u => /^Verb tenses/.test(u.title)).id, settings: defaultProgress().settings, updatedAt: T, settingsUpdatedAt: T - D };
+  const n = Object.keys(items).length;
+  if (typeof Store === "undefined") { // a version before 9.26
+    localStorage.setItem("itapp.progress.v1", JSON.stringify(seeded));
+    localStorage.setItem("itapp.seen.v1", JSON.stringify(APP_VERSION)); // an ordinary day: What's new already read
+    return n;
+  }
+  Store.set("itapp.progress.v1", seeded);
+  Store.set("itapp.seen.v1", APP_VERSION);
+  return Store.flush().then(() => n);
 }
 
 module.exports = { seedProgress };

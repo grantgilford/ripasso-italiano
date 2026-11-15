@@ -35,6 +35,10 @@
       of those writes, and the pushProgress after it; and another device's newer copy merged in, as
       adoptRemote and as a whole snapshot, with Today redrawn. (The snapshots go through
       onProgressSnapshot from 9.4; on 9.3 and before, through the same steps as their handler.)
+    - from 9.26, the storage (IndexedDB behind Store): after a reload, when the saved data is in memory (the
+      database opened and every row read); saving one answer, a record changed as an answer changes it:
+      saveProgress() itself and until the storage has it; and every part of progress compared with what is
+      stored, as when the app is put away.
 
   Each figure is the median of 7 runs (3 for the reload and the idle work), in milliseconds. The app's random
   choices (which items a session takes, which exercise each becomes) come from a fixed seed while
@@ -96,7 +100,7 @@ const BUDGETS = {
   // the sync figures, set at 9.4 (dirty tracking and the record-by-record merge) in the same way; the push after an echo
   // takes well under a millisecond, so its budget leaves room for the timer's own granularity
   "pushProgress (fake db)": 94,
-  "adoptRemote (fake db)": 166,
+  "adoptRemote (fake db)": 140, // 9.26: was 166 (see below)
   "pushProgress after an answer": 23,
   "Snapshot: the echo of own writes": 43,
   "pushProgress after the echo": 3,
@@ -118,6 +122,17 @@ const BUDGETS = {
   "Draw its answer panel: Verb in a sentence": 18,
   "Draw a session: Which tense fits?": 10,
   "Draw its answer panel: Which tense fits?": 15,
+  // 9.26: saved data moved to IndexedDB behind Store. Saving progress now writes only the parts that changed, so a merge
+  // from the cloud, which ends by saving, is quicker: "adoptRemote" took 75–112 ms over six runs where 9.25 took 139 on
+  // the same computer, and its budget was lowered to the slowest of them plus 25% ("Snapshot: another device's changes"
+  // varied too much between runs, 77–129 ms, to lower). New figures, set the same way from six runs, two of them on a
+  // slower afternoon: when the saved data is in memory after a reload (the database opened and every row read, while the
+  // browser is still reading the app's own script); saving one answer (saveProgress() itself, which holds up the screen,
+  // and until the storage has it); and every part of progress compared with what is stored, as when the app is put away
+  "Saved data in memory": 820,
+  "Save an answer": 21,
+  "Save an answer: in the storage": 24,
+  "Put away: everything compared": 76,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work, and no
@@ -236,7 +251,7 @@ async function measure(runs) {
     progress = JSON.parse(mine); buildContent(); draw({ screen: "home" }); // and again, for the next round
   }
   clearTimeout(syncTimer); db = null; dbState = "off";
-  lsSet(LS_PROGRESS, progress);
+  if (typeof Store !== "undefined") Store.set(LS_PROGRESS, progress); else lsSet(LS_PROGRESS, progress);
   Math.random = random;
   return T;
 }
@@ -277,6 +292,8 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
       const t = await page.evaluate("window.__todayAt");
       if (!r) continue;
       (times["Reload to Today"] = times["Reload to Today"] || []).push(t);
+      const storeAt = await page.evaluate(() => (performance.getEntriesByName("ripasso-store-ready")[0] || {}).startTime);
+      if (storeAt) (times["Saved data in memory"] = times["Saved data in memory"] || []).push(storeAt); // 9.26 on
       if (await page.evaluate("typeof warmKnownWords === 'function'")) { // 9.3 on: the word lists are built in idle time
         await page.waitForFunction(() => window.__wordsAt, null, { timeout: 60000, polling: 250 });
         const idle = await page.evaluate(() => ({ ready: window.__wordsAt - window.__todayAt, longest: Math.max(...window.__idle) }));
@@ -287,6 +304,22 @@ const fmt = (ms) => ms >= 100 ? String(Math.round(ms)) : ms.toFixed(1);
     const loaded = await page.evaluate("Object.keys(progress.items).length");
     if (loaded !== records) throw new Error(`the app loaded ${loaded} of the ${records} saved records`);
     Object.assign(times, await page.evaluate(measure, RUNS));
+    if (await page.evaluate("typeof Store !== 'undefined'")) Object.assign(times, await page.evaluate(async (runs) => { // 9.26 on: saving one answer, a record changed as an answer changes it
+      const save = [], landed = [], away = [];
+      const ids = Object.keys(progress.items);
+      for (let i = 0; i < runs + 2; i++) {
+        await new Promise(r => setTimeout(r, 300)); // answers come seconds apart
+        const id = ids[(i * 131) % ids.length], r = progress.items[id];
+        progress.items[id] = Object.assign({}, r, { lastSeen: (r.lastSeen || 0) + 1 }); markItem(id);
+        const t0 = performance.now(); saveProgress(); const t1 = performance.now();
+        await Store.flush();
+        if (i >= 2) { save.push(t1 - t0); landed.push(performance.now() - t0); }
+        const t2 = performance.now(); putAway(); if (i >= 2) away.push(performance.now() - t2); // every part compared, as when the app is put away
+        await Store.flush();
+      }
+      clearTimeout(syncTimer);
+      return { "Save an answer": save, "Save an answer: in the storage": landed, "Put away: everything compared": away };
+    }, RUNS));
 
     console.log(`Speed test for ${path.relative(process.cwd(), file) || file} (version ${version}): CPU slowed ${CPU_SLOWDOWN}×, 390 × 844, ${records.toLocaleString("en-GB")} progress records and 45 days of log`);
     console.log(`Each figure is the median of ${RUNS} runs (${RELOADS} for the reload and the idle work), in milliseconds.\n`);

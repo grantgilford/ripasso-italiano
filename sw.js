@@ -13,7 +13,14 @@
   installed app offers it the next time it opens.
 
   None of this touches saved progress: that lives in the app's own storage
-  (localStorage), which the worker never reads or clears.
+  (IndexedDB from 9.26, localStorage before), which the worker never reads or
+  clears.
+
+  When an update is applied, every open window of the app is told, not only
+  the one that asked, and each reloads (from 9.26). The installed app and a
+  browser tab share one storage, so they must not carry on in different
+  versions: 9.26 moved saved progress to a new place, and a window left
+  running the version before would have gone on saving to the old one.
 
   Not used inside claude.ai: the app only registers this worker when it is
   served from its own website.
@@ -80,7 +87,7 @@ self.addEventListener("message", (e) => {
   const type = e.data && e.data.type, client = e.source;
   const reply = (msg) => { try { client && client.postMessage(msg); } catch (err) { } };
   if (type === "check") e.waitUntil(check(reply));
-  else if (type === "apply") e.waitUntil(apply(reply));
+  else if (type === "apply") e.waitUntil(apply(reply, client));
 });
 
 async function check(reply) {
@@ -103,7 +110,7 @@ async function check(reply) {
   reply({ type: "update", version: versionOf(fresh.text) });
 }
 
-async function apply(reply) {
+async function apply(reply, asker) {
   const c = await caches.open(CACHE);
   const waiting = await c.match(PENDING);
   if (waiting) {
@@ -112,4 +119,8 @@ async function apply(reply) {
     await keepFiles(c, true); // the icons and manifest may have changed too
   }
   reply({ type: "applied" });
+  try { // the other windows too: each reloads into the new version (the app has always reloaded on "applied")
+    const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of all) if (!asker || c.id !== asker.id) c.postMessage({ type: "applied" });
+  } catch (err) { }
 }

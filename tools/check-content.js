@@ -17,7 +17,7 @@
 const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
-const { BOOT_MARK, inlineScripts, loadApp } = require("./lib/load-app");
+const { BOOT_MARK, STORE_MARK, inlineScripts, loadApp } = require("./lib/load-app");
 
 const args = process.argv.slice(2);
 const VERBOSE = args.includes("--verbose");
@@ -32,16 +32,27 @@ const stats = {};
 const count = (k, n = 1) => (stats[k] = (stats[k] || 0) + n);
 
 /* ---------- 1. the script parses ---------- */
-// One inline script is the app (it holds the boot section). Any other inline script must be a
-// small start-up snippet, such as the one in <head> that applies the Appearance setting before
-// the first paint; it must parse too.
+// One inline script is the app (it holds the boot section), and one is the storage script (from 9.26: it
+// defines Store, the only way saved data is read or written). Any other inline script must be a small
+// start-up snippet, such as the one in <head> that applies the Appearance setting before the first paint;
+// each must parse too.
 const scripts = inlineScripts(html);
 const appScripts = scripts.filter(s => s.includes(BOOT_MARK));
 if (appScripts.length !== 1) problem("Structure", `expected one inline app <script> (the one with the boot section), found ${appScripts.length}`);
+const storeScripts = scripts.filter(s => s.includes(STORE_MARK));
+if (storeScripts.length !== 1) problem("Structure", `expected one storage <script> (the one that defines Store), found ${storeScripts.length}`);
+if (storeScripts.length === 1 && scripts.indexOf(storeScripts[0]) > scripts.indexOf(appScripts[0])) problem("Structure", "the storage <script> must come before the app's, which starts once Store.ready is kept");
 for (const s of scripts.filter(s => !s.includes(BOOT_MARK))) {
-  if (s.length > 2000) problem("Structure", `an extra inline <script> of ${s.length} characters; only small start-up snippets may sit beside the app script`);
+  if (s.length > 2000 && !s.includes(STORE_MARK)) problem("Structure", `an extra inline <script> of ${s.length} characters; only small start-up snippets and the storage script may sit beside the app script`);
   try { new vm.Script(s, { filename: "index.html start-up <script>" }); }
   catch (e) { console.error("A start-up script does not parse:\n" + e.stack); process.exit(1); }
+}
+// Saved data goes through Store alone: outside the storage script nothing names the browser's storage, but for the
+// snippet that reads (never writes) the theme before the first paint.
+for (const s of scripts.filter(s => !s.includes(STORE_MARK))) {
+  const isApp = s.includes(BOOT_MARK), names = [...new Set(s.match(/\b(?:localStorage|sessionStorage|indexedDB)\b/g) || [])];
+  const readsTheme = !isApp && /ripasso\.boot\.v1/.test(s) && !/setItem|removeItem|\.clear\(|indexedDB|sessionStorage/.test(s);
+  if (names.length && !readsTheme) problem("Structure", `${isApp ? "the app's script" : "a start-up snippet"} uses ${names.join(" and ")} directly; saved data is read and written only through Store (the storage script)`);
 }
 const code = appScripts[0] || "";
 try { new vm.Script(code, { filename: "index.html <script>" }); }
