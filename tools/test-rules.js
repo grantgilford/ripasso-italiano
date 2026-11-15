@@ -219,7 +219,7 @@ function calendarChecks() {
     check("new items: still none a millisecond before midnight", app.newLeftToday() === 0);
     app.clock.t = utc(2026, 11, 10, 23, 0);
     check("new items: all 10 again at midnight", app.newLeftToday() === 10 && app.dayKey(app.clock.t) === "2026-11-11", `${app.newLeftToday()} left on ${app.dayKey(app.clock.t)}`);
-    check("new items: yesterday's count is kept as it was", p.days["2026-11-10"].new === 12 && (p.days["2026-11-11"].new || 0) === 0, show(p.days));
+    check("new items: yesterday's count is kept as it was", p.days["2026-11-10"].new === 12 && ((p.days["2026-11-11"] || {}).new || 0) === 0, show(p.days));
     p.settings.newPerDay = 3; app.applyResult(word(12).id, true, "recognition", false, "meaning");
     check("new items: a limit of 3 with one started leaves 2", app.newLeftToday() === 2, String(app.newLeftToday())); }
 

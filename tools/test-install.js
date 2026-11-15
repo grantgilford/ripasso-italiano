@@ -47,7 +47,9 @@ const { chromium } = loadPlaywright();
 const results = checks(), { check, section } = results;
 
 /* ---------- a stand-in for GitHub Pages: the repository under /ripasso-italiano/, which can be taken down or given a new index.html ---------- */
-const site = { down: false, html: fs.readFileSync(path.join(ROOT, "index.html"), "utf8"), hits: [] };
+// The page is the repository's index.html, or the copy named on the command line (the files beside it always come from the repository).
+const FILE = process.argv.slice(2).find(a => a.endsWith(".html")) || path.join(ROOT, "index.html");
+const site = { down: false, html: fs.readFileSync(FILE, "utf8"), hits: [] };
 const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript", ".webmanifest": "application/manifest+json", ".png": "image/png", ".json": "application/json" };
 function serve() {
   return listen((req, res) => {
@@ -68,7 +70,7 @@ const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefi
 const pause = (ms) => new Promise(r => setTimeout(r, ms));
 async function waitFor(page, fn, arg, timeout = 8000) { try { await page.waitForFunction(fn, arg, { timeout }); return true; } catch (e) { return false; } }
 async function tap(page, sel) { await page.click(sel); await page.waitForTimeout(80); }
-const screen = (page) => page.evaluate("S.screen");
+const screen = (page) => page.evaluate("typeof S === 'undefined' ? '(the app was left)' : S.screen").catch(() => "(the app was left)"); // back with no history entry leaves the app
 
 function seed(T) { // some practice, saved on this device
   const items = {};

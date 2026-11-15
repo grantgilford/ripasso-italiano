@@ -65,8 +65,8 @@ function checks({ onlyFailures = false } = {}) {
   };
   T.section = (title) => console.log("\n" + title);
   T.stopped = (e) => { T.failures++; console.log("\n  FAIL the test itself stopped: " + (e && e.stack || e)); };
-  T.summary = ({ ofTotal = false } = {}) => {
-    console.log(T.failures ? `\n${T.failures}${ofTotal ? " of " + T.total : ""} check(s) failed.` : `\nAll ${T.total} checks passed.`);
+  T.summary = () => { // the runner (tools/run-tests.js) reads the number of checks from this line, passed or failed
+    console.log(T.failures ? `\n${T.failures} of ${T.total} check(s) failed.` : `\nAll ${T.total} checks passed.`);
     process.exit(T.failures ? 1 : 0);
   };
   return T;
