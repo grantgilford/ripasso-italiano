@@ -1,0 +1,77 @@
+# The slow checks on the tests themselves, once a week (and by hand: Actions › Weekly › Run workflow), not on every
+# pull request:
+#   - Test the tests (tools/test-the-tests.js): each of some forty small faults is put into a copy of index.html and
+#     the suite that should notice is run on it; a fault that survives means a suite has gone soft.
+#   - Five times in a row (tools/run-tests.js --times 5): every suite five times, to find a check that passes on some
+#     runs and fails on others.
+# They also run on a pull request that changes them, so a change to either is tried before it is merged.
+name: Weekly
+
+on:
+  schedule:
+    - cron: "17 3 * * 1" # Mondays, 03:17 UTC
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - tools/test-the-tests.js
+      - .github/workflows/weekly.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: weekly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-the-tests:
+    name: Test the tests (would the suites notice a fault?)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Playwright with Chromium
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+      # --no-speed: the speed test's budgets are for a computer of known speed, which GitHub's are not
+      - name: Test the tests (tools/test-the-tests.js)
+        run: node tools/test-the-tests.js --no-speed --jobs 2 --keep --out test-output
+      - name: Keep the broken copies' output
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-test-the-tests
+          path: |
+            test-output/**/output.txt
+          retention-days: 14
+
+  five-times:
+    name: Every suite five times in a row
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Playwright with Chromium, Firefox and WebKit
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium firefox webkit
+      - name: Fetch the tag v9.25
+        run: git fetch --depth 1 origin tag v9.25
+      - name: Every suite, five times (tools/run-tests.js --times 5)
+        run: node tools/run-tests.js --times 5 --no-speed
+      - name: Keep the suites' output
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-five-times
+          path: test-output/
+          retention-days: 14

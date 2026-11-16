@@ -141,6 +141,7 @@ Keeping the old token names where they still fit saves churn; new tokens are mar
 | `--accent-fg` | `#FFFFFF` | `#0E1512` | Text on `--accent` |
 | `--hero` *new* | `#0F6B4B` | `#127A55` | Continue card and primary buttons (white text on both) |
 | `--hero-btn-fg` *new* | `#0F6B4B` | `#0E5A40` | Text on the white "Continue" pill inside the hero card |
+| `--hero-chip` *9.27* | `rgba(255, 255, 255, .16)` | `rgba(255, 255, 255, .08)` | The unit chip on the hero card: fainter in dark, where the hero is lighter, so its white 13 px text keeps 4.5:1 |
 | `--nav-bg` *new* | `#FFFFFF` | `#131C18` | Tab bar (top border `--line` in light, `#24302B` in dark) |
 | `--bad` | `#C62B36` | `#F0616B` | Red accent: streak flame, Mistakes icon, wrong-answer border, wrong button |
 | `--bad-fg` *new* | `#FFFFFF` | `#1F0B0D` | Text on a `--bad` button |

@@ -5,12 +5,16 @@
   "license": "UNLICENSED",
   "scripts": {
     "check": "node tools/check-content.js",
-    "test": "node tools/check-content.js && node tools/test-reports.js && node tools/test-storage.js && node tools/test-progress.js && node tools/test-ui.js && node tools/test-install.js && node tools/test-speedups.js && node tools/test-sessions.js && node tools/test-choices.js && node tools/test-verbs.js && node tools/test-perf.js",
+    "test": "node tools/run-tests.js",
+    "test:quick": "node tools/run-tests.js --no-browser",
     "test:items": "node tools/test-items.js",
     "test:storage": "node tools/test-storage.js",
-    "test:verbs": "node tools/test-verbs.js"
+    "test:verbs": "node tools/test-verbs.js",
+    "test:rules": "node tools/test-rules.js",
+    "test:course": "node tools/test-course.js",
+    "test:the-tests": "node tools/test-the-tests.js"
   },
   "devDependencies": {
-    "playwright": "1.56.1"
+    "playwright": "1.63.0"
   }
 }

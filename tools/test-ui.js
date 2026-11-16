@@ -158,7 +158,12 @@ async function openApp(browser, origin, { width, height, scheme, init, touch, pe
 }
 const screen = page => page.evaluate("S.screen");
 const listedUnits = page => page.$$eval(".ulist > *", es => es.map(e => e.dataset.upick || e.querySelector("[data-unit]")?.dataset.unit)); // the units on Units, in order
-async function tap(page, selector) { await page.click(selector); await page.waitForTimeout(60); }
+/* Waiting (from 9.27): never for a length of time, always for the thing waited for. settle: the screen has been drawn
+   again (two frames) and nothing on it is still moving (the answer panel sliding up, a sheet opening) and, after an answer, the panel's Continue can be tapped. until: a
+   condition asked again and again until it holds (false if it never does, so the check that follows fails and says why). */
+const settle = (page) => page.evaluate(() => new Promise(done => { const still = () => document.getAnimations().every(a => a.playState !== "running") && (typeof S === "undefined" || !S.feedback || Date.now() - (S.answeredAt || 0) > 350); /* …and Continue is live: the app ignores it for a moment after an answer, against a double tap */ let n = 0; const look = () => { if (++n >= 2 && (still() || n > 240)) done(); else requestAnimationFrame(look); }; requestAnimationFrame(look); }));
+async function until(fn, ms = 5000) { const end = Date.now() + ms; for (;;) { if (await fn()) return true; if (Date.now() > end) return false; await new Promise(r => setTimeout(r, 20)); } }
+async function tap(page, selector) { await page.click(selector); await settle(page); }
 
 // Layout rules that hold on every screen with a tab bar.
 async function layout(page, label, { zoomOnly } = {}) {
@@ -177,10 +182,43 @@ async function layout(page, label, { zoomOnly } = {}) {
       const rc = el.getBoundingClientRect();
       if (rc.height < 43.5 || rc.width < 43.5) out.small.push(`${el.tagName.toLowerCase()} “${(el.textContent || el.getAttribute("aria-label") || el.id).trim().slice(0, 24)}” ${Math.round(rc.width)}×${Math.round(rc.height)}`);
     }
+    /* Contrast (from 9.27): every piece of text against what is behind it, from the computed colours. Body text needs
+       4.5:1; large text (24 px, or 18.66 px bold) 3:1, as WCAG has it. Colours with some transparency are laid over what
+       is beneath; text on a picture or a gradient, and controls that are switched off, are left out. */
+    const rgba = (c) => { const m = String(c).match(/rgba?\(([^)]+)\)/); if (!m) return null; const p = m[1].split(/[,/ ]+/).filter(Boolean).map(Number); return [p[0], p[1], p[2], p.length > 3 ? p[3] : 1]; };
+    const over = (top, under) => { const a = top[3]; return [0, 1, 2].map(i => top[i] * a + under[i] * (1 - a)).concat(1); };
+    const lum = (c) => { const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(c[0]) + 0.7152 * f(c[1]) + 0.0722 * f(c[2]); };
+    const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    const behind = (el) => { // the colour behind an element: its own and its ancestors' backgrounds, laid over each other; null on a picture
+      const layers = [];
+      for (let e = el; e; e = e.parentElement) { const cs = getComputedStyle(e); if (cs.backgroundImage !== "none") return null; const c = rgba(cs.backgroundColor); if (c && c[3] > 0) { layers.push(c); if (c[3] === 1) break; } }
+      let base = [255, 255, 255, 1];
+      for (const c of layers.reverse()) base = over(c, base);
+      return base;
+    };
+    out.faint = []; out.texts = 0;
+    const seen = new Set();
+    const tw = document.createTreeWalker(app, NodeFilter.SHOW_TEXT);
+    while (tw.nextNode()) {
+      const el = tw.currentNode.parentElement;
+      if (!tw.currentNode.nodeValue.trim() || !el || seen.has(el)) continue;
+      seen.add(el);
+      if (!el.getClientRects().length || el.closest("[disabled], [aria-hidden=true], .vh, script, style")) continue;
+      const cs = getComputedStyle(el);
+      if (cs.visibility !== "visible" || Number(cs.opacity) === 0) continue;
+      let fg = rgba(cs.color); const bg = behind(el);
+      if (!fg || !bg) continue;
+      let op = 1; for (let e = el; e && e !== document.body; e = e.parentElement) op *= Number(getComputedStyle(e).opacity);
+      fg = over([fg[0], fg[1], fg[2], fg[3] * op], bg);
+      const px = parseFloat(cs.fontSize), large = px >= 24 || (px >= 18.66 && Number(cs.fontWeight) >= 700), need = large ? 3 : 4.5, r = ratio(fg, bg);
+      out.texts++;
+      if (r < need - 0.005) out.faint.push(`“${tw.currentNode.nodeValue.trim().slice(0, 28)}” (${el.tagName.toLowerCase()}${el.className && typeof el.className === "string" ? "." + el.className.trim().split(/\s+/).join(".") : ""}, ${Math.round(px)} px): ${r.toFixed(2)}:1, needs ${need}:1 — ${cs.color} on rgb(${bg.slice(0, 3).map(Math.round).join(", ")})`);
+    }
     window.scrollTo(0, 0);
     return out;
   });
   check(`${label}: nothing scrolls sideways`, !r.sideways);
+  check(`${label}: text stands out from what is behind it (4.5:1; large text 3:1)`, r.texts > 0 && !r.faint.length, [...new Set(r.faint)].slice(0, 10).join("\n") + (r.faint.length > 10 ? `\n… and more (${r.faint.length} in all)` : ""));
   if (zoomOnly) return;
   check(`${label}: nothing is hidden behind the tab bar`, !r.hidden, r.hidden);
   check(`${label}: every control is at least 44 × 44 px`, !r.small.length, r.small.slice(0, 8).join("\n"));
@@ -264,7 +302,7 @@ async function tour(page, label, opts = {}) {
   check(L("Read lesson opens the unit's lesson, with Units still the current tab"), (await screen(page)) === "reference" && await page.$(".lesson") && await page.$('.tab[data-go="units"][aria-current="page"]'));
   const chips = await page.$$(".chips .chip"), secs = await page.$$(".lsec");
   check(L("there is one section chip per lesson section"), chips.length && chips.length === secs.length, `${chips.length} chips, ${secs.length} sections`);
-  await tap(page, '.chips .chip[data-lsec="3"]'); await page.waitForTimeout(250);
+  await tap(page, '.chips .chip[data-lsec="3"]'); await settle(page);
   check(L("a section chip jumps to its section and is marked as the one in view"), await page.$('.chips .chip[data-lsec="3"][aria-current="true"]') && await page.evaluate(() => { const t = document.getElementById("lsec-3").getBoundingClientRect().top; return t > 0 && t < 260; }));
   await layout(page, L("Lesson"), opts);
   await tap(page, '[data-reftab="glossary"]');
@@ -318,7 +356,7 @@ async function tour(page, label, opts = {}) {
     else if (mode === "vintro") { await tap(page, '[data-act="introDone"]'); continue; }
     else if (mode === "flip") { await tap(page, '[data-act="reveal"]'); await tap(page, '[data-act="missed"]'); }
     else await page.evaluate(() => finishAnswer(false, "", ""));
-    await page.waitForTimeout(450);
+    await settle(page);
     const p = await page.evaluate(() => { const fb = document.querySelector(".fb"), c = document.querySelector('.fb [data-act="continue"]'); if (!fb || !c) return null; const r = c.getBoundingClientRect(); return { title: fb.querySelector(".fb-title").textContent, onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 0.5, icon: !!fb.querySelector(".fb-icon svg") }; });
     check(L(`after Check (${mode}) the answer panel shows its heading and icon, with Continue on screen`), p && /^(Not quite|Correct|Marked as missed)$/.test(p.title) && p.icon && p.onScreen, JSON.stringify(p));
     await tap(page, '[data-act="continue"]');
@@ -363,7 +401,7 @@ async function readTheRule(browser, origin) {
       session = { kind: "unit", unitId: "u05", queue: [mk(content.items[id]), mk(other)], pos: 0, done: 0, total: 2, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
       S.screen = "session"; S.feedback = null; S.rule = null; S.leaveAsk = false; S.retry = null; resetExState(); render(); window.scrollTo(0, 0);
     }, id);
-    const answer = async (ok) => { await page.evaluate((ok) => finishAnswer(ok, "", ok ? "" : "zzz"), ok); await page.waitForTimeout(450); };
+    const answer = async (ok) => { await page.evaluate((ok) => finishAnswer(ok, "", ok ? "" : "zzz"), ok); await settle(page); };
     const ruleText = () => page.evaluate(() => { const b = document.querySelector('.fb [data-act="rule"]'); return b ? b.textContent.replace(/\u2011/g, "-").trim() : null; }); // a word ending's hyphen is drawn unbreakable
     const expect = (id) => page.evaluate((id) => { const at = itemSection(id), L = lessonOf(content.unitById[at.unit]); return `Read the rule: ${at.index + 1} · ${plainText(L.sections[at.index].h)}`; }, id);
     const snap = () => page.evaluate(() => JSON.stringify({ pos: session.pos, done: session.done, answered: session.answered, correct: session.correct, xp: session.xp, queue: session.queue.map(q => q.ex.item.id + ":" + q.ex.typeKey + ":" + !!q.repeat), fb: [S.feedback.ok, S.feedback.given, S.feedback.intro], screen: S.screen, saved: localStorage.getItem("itapp.progress.v1") }));
@@ -410,21 +448,21 @@ async function readTheRule(browser, origin) {
     check(L("the focus moves into the sheet, and the session behind is out of reach"), k && k.focus && k.behind);
     const scroll = await page.evaluate(() => { const b = document.querySelector(".rs-body"), y = window.scrollY; b.scrollTop = 300; return { scrolls: b.scrollHeight > b.clientHeight && b.scrollTop > 0, page: window.scrollY === y }; });
     check(L("a long section scrolls inside the sheet, not the page behind"), scroll.scrolls && scroll.page, JSON.stringify(scroll));
-    await page.keyboard.press("Enter"); await page.waitForTimeout(60);
+    await page.keyboard.press("Enter"); await settle(page);
     check(L("Enter in the sheet doesn't move the session on"), !!(await sheet()) && (await page.evaluate("session.pos")) === 0);
     await tap(page, '[data-act="ruleClose"]');
     check(L("Close closes it, leaving the session, its answer and saved progress as they were"), !(await sheet()) && (await snap()) === before && !(await page.evaluate("S.rule")));
     check(L("…with the focus back on Read the rule, and the session reachable again"), await page.evaluate(() => document.activeElement && document.activeElement.dataset.act === "rule" && ![...app.children].some(c => c.inert)));
     await tap(page, '.fb [data-act="rule"]');
-    await page.mouse.click(4, 4); await page.waitForTimeout(60);
+    await page.mouse.click(4, 4); await settle(page);
     check(L("a tap beside the sheet closes it"), !(await sheet()) && (await snap()) === before);
     await tap(page, '.fb [data-act="rule"]');
-    await page.keyboard.press("Escape"); await page.waitForTimeout(60);
+    await page.keyboard.press("Escape"); await settle(page);
     check(L("Escape closes it"), !(await sheet()) && (await snap()) === before);
     await tap(page, '.fb [data-act="rule"]');
-    await page.goBack(); await page.waitForTimeout(150);
+    await page.goBack(); await settle(page);
     check(L("the back button closes it, staying in the session"), !(await sheet()) && (await screen(page)) === "session" && (await snap()) === before && !(await page.evaluate("S.leaveAsk")));
-    await page.goBack(); await page.waitForTimeout(150);
+    await page.goBack(); await settle(page);
     check(L("…and back again still asks before leaving the session"), (await page.evaluate("S.leaveAsk")) && !!(await page.$("#sheetBg")));
     await tap(page, '[data-act="stay"]');
     await tap(page, '[data-act="continue"]');
@@ -445,7 +483,7 @@ async function readTheRule(browser, origin) {
     } else check(L("an item whose section links to other lessons exists, to try links in the sheet"), false);
     await page.evaluate(() => { window.__said.length = 0; });
     const spk = await page.$(".rs-body [data-say]");
-    if (spk) { await spk.scrollIntoViewIfNeeded(); await spk.click(); await page.waitForTimeout(60); }
+    if (spk) { await spk.scrollIntoViewIfNeeded(); await spk.click(); await settle(page); }
     const heard = await said(page), wantSay = spk ? await spk.evaluate(b => b.dataset.say) : null;
     check(L("a speaker in the sheet reads its Italian with the Italian voice"), !!spk && heard.length >= 1 && heard[0].text === wantSay && heard[0].lang === "it-IT", JSON.stringify(heard));
     await tap(page, '[data-act="ruleClose"]');
@@ -498,7 +536,7 @@ async function newTypes(browser, origin) {
       S.screen = "session"; S.feedback = null; S.retry = null; resetExState(); render(); window.scrollTo(0, 0);
       return { mode: ex.mode, at: ex.at, fix: ex.fix, accepted: ex.accepted, order: ex.order, n: item.pairs ? item.pairs.length : 0, rows: item.rows ? item.rows.map(r => item.groups.indexOf(r.group)) : [] };
     }, [id, box, how]);
-    const panel = async () => { await page.waitForTimeout(450); return page.evaluate(() => { const fb = document.querySelector(".fb"), c = document.querySelector('.fb [data-act="continue"]'); if (!fb || !c) return null; const r = c.getBoundingClientRect(); return { title: fb.querySelector(".fb-title").textContent, onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 0.5, text: fb.textContent.replace(/\s+/g, " ") }; }); };
+    const panel = async () => { await settle(page); return page.evaluate(() => { const fb = document.querySelector(".fb"), c = document.querySelector('.fb [data-act="continue"]'); if (!fb || !c) return null; const r = c.getBoundingClientRect(); return { title: fb.querySelector(".fb-title").textContent, onScreen: r.top >= 0 && r.bottom <= window.innerHeight + 0.5, text: fb.textContent.replace(/\s+/g, " ") }; }); };
     const ok = (p, title) => !!p && p.title === title && p.onScreen;
 
     // Spot the mistake: a correct word tapped, then the wrong word tapped and typed right, and No mistake
@@ -570,7 +608,7 @@ async function newTypes(browser, origin) {
     ex = await one("s-u01-01", 3, "listen");
     await layout(page, L("Listen and type"));
     await page.evaluate(() => { window.__said.length = 0; });
-    await tap(page, ".listen .say"); await page.waitForTimeout(100); await tap(page, ".listen .slowbtn"); await page.waitForTimeout(400); // a new utterance starts 80 ms after the one it stops
+    await tap(page, ".listen .say"); await until(() => page.evaluate(() => window.__said.length >= 1)); await tap(page, ".listen .slowbtn"); await until(() => page.evaluate(() => window.__said.length >= 2 && window.__said[window.__said.length - 1].rate === 0.65)); // a new utterance starts 80 ms after the one it stops
     const heard = await page.evaluate(() => window.__said.slice());
     check(L("Listen and type: Play reads the sentence, Slow reads it slowly"), heard.length >= 2 && heard[0].text === "Sono stanco." && heard[heard.length - 1].rate === 0.65 && heard[0].rate !== 0.65, JSON.stringify(heard));
     const before = await page.evaluate(() => JSON.stringify(progress.items[pid("s-u01-01")] || null));
@@ -670,7 +708,7 @@ async function reports(browser, origin) {
         small: [...k.querySelectorAll("button, summary, textarea")].filter(b => b.offsetParent !== null).map(b => [b.textContent.trim().slice(0, 20), b.getBoundingClientRect()]).filter(([, c]) => c.width < 43.5 || c.height < 43.5).map(([t, c]) => `${t} ${Math.round(c.width)}×${Math.round(c.height)}`) };
     });
     const sheetOk = (k) => k && k.inside && k.focus && k.behind && !k.sideways && !k.small.length;
-    const toData = async (sec) => { await page.evaluate((sec) => { S.screen = "data"; S.scrollTo = sec; render(); }, sec); await page.waitForTimeout(60); };
+    const toData = async (sec) => { await page.evaluate((sec) => { S.screen = "data"; S.scrollTo = sec; render(); }, sec); await settle(page); };
     const safe = (text) => Object.keys(fieldsOf(text)).every(k => REPORT_KEYS.includes(k)) && !/"box"|lapses|settings|currentUnit|synonyms/.test(text);
 
     // 1. A content problem from the answer panel: Flag this item, then Report it
@@ -680,7 +718,7 @@ async function reports(browser, origin) {
       session = { kind: "unit", unitId: it.unit, queue: [{ ex: makeExercise(it, rec(id)), repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
       S.screen = "session"; S.feedback = null; S.rule = null; S.leaveAsk = false; S.retry = null; resetExState(); render(); finishAnswer(false, "", "zzz");
     }, itemId);
-    await page.waitForTimeout(450);
+    await settle(page);
     await tap(page, '[data-act="flagOpen"]');
     await page.fill("#flagNote", "The answer looks wrong to me");
     await tap(page, '[data-act="flagSave"]');
@@ -716,7 +754,7 @@ async function reports(browser, origin) {
       S.screen = "session"; S.feedback = null; S.retry = null; resetExState(); render();
       return { id: it.id, it: [].concat(it.it).join(" / "), en: [].concat(it.en).join(" · "), type: ex.type };
     });
-    await page.fill("#answer", "a learner's own answer"); await tap(page, '[data-act="check"]'); await page.waitForTimeout(450);
+    await page.fill("#answer", "a learner's own answer"); await tap(page, '[data-act="check"]'); await settle(page);
     await tap(page, '[data-act="accept"]');
     check(L("after Accept my answer, the panel offers Suggest it for everyone, at least 44 px"), await page.evaluate(() => { const b = document.querySelector('.fb [data-act="suggest"]'); if (!b) return false; const r = b.getBoundingClientRect(); return r.width >= 43.5 && r.height >= 43.5; }));
     await tap(page, '.fb [data-act="suggest"]');
@@ -725,7 +763,7 @@ async function reports(browser, origin) {
     await tap(page, '[data-act="rpGithub"]');
     urls = await opened(); u = linkOf(urls[urls.length - 1]); f = fieldsOf(u.report || "");
     check(L("…its link opens missing-answer.yml with the card, its answers and what was typed"), u.template === "missing-answer.yml" && u.title.startsWith(`fc01 · ${card.id} · missing answer: `) && f.kind === "missing answer" && f.item === card.id && f.shown === card.it && f.expected === card.en && f.given === "a learner's own answer" && f.exercise === card.type && safe(u.report) && u.length <= 6000, JSON.stringify(f));
-    await page.keyboard.press("Escape"); await page.waitForTimeout(60);
+    await page.keyboard.press("Escape"); await settle(page);
     check(L("Escape closes the sheet"), !(await sheet()));
     await page.evaluate(() => { session = null; S.feedback = null; S.screen = "home"; render(); });
 
@@ -766,10 +804,10 @@ async function reports(browser, origin) {
     // closing it: a tap beside it, and the back button
     await tap(page, '[data-act="rpClose"]');
     await tap(page, '[data-reportflag="f1"]');
-    await page.mouse.click(4, 4); await page.waitForTimeout(60);
+    await page.mouse.click(4, 4); await settle(page);
     check(L("a tap beside the sheet closes it, and the focus goes back to Report"), !(await sheet()) && await page.evaluate(() => document.activeElement && document.activeElement.dataset.reportflag === "f1"));
     await tap(page, '[data-reportflag="f1"]');
-    await page.goBack(); await page.waitForTimeout(150);
+    await page.goBack(); await settle(page);
     check(L("the back button closes the sheet and stays on Your data"), !(await sheet()) && (await screen(page)) === "data");
     // copying refused, and a view that can't open links
     await tap(page, '[data-reportflag="f1"]');
@@ -868,20 +906,21 @@ async function reports(browser, origin) {
     const { page, context } = await openApp(browser, origin, { width: 390, height: 844, scheme: "light" });
     const kept = () => stored(page, "itapp.errors.v1");
     const progressBefore = await savedProgress(page);
+    const keeps = (n, last) => until(async () => { const e = await kept(); return !!e && e.length === n && (!last || last.test(e[e.length - 1].m) ); });
     await page.evaluate(() => { setTimeout(() => { throw new TypeError("a test error"); }); });
-    await page.waitForTimeout(100);
+    await keeps(1);
     let e = await kept(), V = await page.evaluate("APP_VERSION");
     check("Errors: a thrown error is kept, with its message, place, screen, version and time", e && e.length === 1 && /a test error/.test(e[0].m) && typeof e[0].at === "string" && e[0].screen === "home" && e[0].v === V && Math.abs(e[0].t - Date.now()) < 60000, JSON.stringify(e));
     await page.evaluate(() => { Promise.reject(new Error("a test rejection")); });
-    await page.waitForTimeout(100);
+    await keeps(2);
     e = await kept();
     check("Errors: an unhandled rejection is kept too", e.length === 2 && /Error: a test rejection/.test(e[1].m), JSON.stringify(e[1]));
     await page.evaluate(() => { for (let n = 0; n < 25; n++) setTimeout(() => { throw new Error("test error " + n); }); });
-    await page.waitForTimeout(300);
+    await keeps(20, /test error 24/);
     e = await kept();
     check("Errors: the list is capped at the last 20", e.length === 20 && /test error 24/.test(e[19].m) && /test error 5/.test(e[0].m), JSON.stringify(e.map(x => x.m)).slice(0, 300));
     await page.evaluate(() => { const f = () => { throw new Error("the same error"); }; for (let n = 0; n < 3; n++) setTimeout(f); });
-    await page.waitForTimeout(150);
+    await until(async () => { const e = await kept(); return /the same error/.test(e[19].m) && e[19].n === 3; });
     e = await kept();
     check("Errors: the same error again and again is kept once, with how many times", /the same error/.test(e[19].m) && e[19].n === 3 && !/the same error/.test(e[18].m), JSON.stringify(e.slice(-2)));
     check("Errors: saved progress is untouched, and they are not part of progress (so never synced) or a backup", (await savedProgress(page)) === progressBefore && await page.evaluate(() => !/test error|errors\.v1/.test(JSON.stringify(progress)) && !/test error/.test(backupText())));
@@ -889,12 +928,12 @@ async function reports(browser, origin) {
     await page.reload(); await page.waitForFunction(ready);
     await page.evaluate(() => { S.screen = "data"; render(); });
     check("Errors: a damaged list counts as none, and Your data still draws", /Problems the app noticed \(0\)/.test(await page.textContent("#sec-problems")));
-    await page.evaluate(() => { setTimeout(() => { throw new Error("after the damage"); }); }); await page.waitForTimeout(100);
+    await page.evaluate(() => { setTimeout(() => { throw new Error("after the damage"); }); }); await keeps(1);
     e = await kept();
     check("Errors: …and keeping one starts a new list", e && e.length === 1 && /after the damage/.test(e[0].m));
     const n = page.errors.length;
     await page.evaluate(() => { IDBObjectStore.prototype.put = function () { throw new DOMException("no room", "QuotaExceededError"); }; setTimeout(() => { throw new Error("storage refused"); }); });
-    await page.waitForTimeout(100);
+    await until(async () => page.errors.length >= n + 1); await settle(page);
     check("Errors: a device that refuses to store them simply forgets, with no further error", page.errors.length === n + 1 && (await kept()).length === 1);
     await context.close();
     console.log("  Problems the app noticed checked");
@@ -944,18 +983,18 @@ async function readAloud(browser, origin) {
   let s1 = await said(page);
   check("Read aloud: a lesson example is read in Italian, with the Italian voice, at Normal speed", first.join() === lex[0].it && s1.length === 1 && s1[0].text === lex[0].it && s1[0].lang === "it-IT" && s1[0].voice === "Italiano (test)" && s1[0].rate === 0.9, JSON.stringify(s1) + " / " + lex[0].it);
   check("Read aloud: the speaker that is playing shows it", await page.$(".lex .lit [data-say].on"));
-  await page.waitForTimeout(400);
+  await until(() => page.evaluate(() => !document.querySelector(".lex .lit [data-say].on")));
   check("Read aloud: …and goes back to the speaker when it ends", !(await page.$(".lex .lit [data-say].on")));
   const lines = await page.$eval(".dlg", d => [...d.querySelectorAll(".lit [data-say]")].flatMap(b => speakable(b.dataset.say)));
   await page.locator(".dlg-all").first().scrollIntoViewIfNeeded();
   await clearSaid(page); await page.tap(".dlg-all");
   check("Read aloud: Listen to the dialogue reads it line by line and offers Stop", (await page.$(".dlg-all.on")) && (await page.$eval(".dlg-all.on .lbl-stop", e => e.offsetParent !== null)));
-  await page.waitForTimeout(700);
+  await until(async () => (await said(page)).length >= 2); // two lines read, the rest still to come
   const cancels = await page.evaluate(() => speechSynthesis.cancels);
   await page.tap(".dlg-all");
   s1 = await said(page);
   check("Read aloud: the lines come in order, and a second tap stops them", s1.length >= 2 && s1.length < lines.length && s1.every((x, i) => x.text === lines[i]) && (await page.evaluate(() => speechSynthesis.cancels)) > cancels && !(await page.$(".dlg-all.on")) && !(await page.evaluate(() => speechSynthesis.speaking)), JSON.stringify(s1.map(x => x.text)) + "\n" + JSON.stringify(lines));
-  await page.tap(".dlg-all"); await page.waitForTimeout(100);
+  await page.tap(".dlg-all"); await until(() => page.evaluate(() => speechSynthesis.speaking || !!sayNow));
   await page.evaluate(() => { S.refTab = "glossary"; render(); });
   check("Read aloud: switching to another screen stops the reading", !(await page.evaluate(() => speechSynthesis.speaking || !!sayNow)));
 
@@ -966,11 +1005,11 @@ async function readAloud(browser, origin) {
   await page.evaluate(() => { S.refUnit = "u03"; render(); });
   await clearSaid(page); await page.evaluate(() => document.querySelector(".conj > .say").click());
   const table = (await said(page)).map(x => x.text);
-  await page.waitForTimeout(2000);
+  await until(async () => (await said(page)).length >= 6 && !(await page.evaluate(() => speechSynthesis.speaking)), 15000); // the whole table read
   const all = (await said(page)).map(x => x.text);
   check("Read aloud: a verb table is read one person at a time (io …, tu …)", table.length === 1 && /^io \S/.test(table[0]) && all.length === 6 && /^tu \S/.test(all[1]), all.join(" | "));
   await page.evaluate(() => { S.refUnit = "vb"; render(); [...document.querySelectorAll("details.vref")].slice(0, 12).forEach(d => { d.open = true; }); }); // a verb's tables are drawn when its row opens
-  await page.waitForTimeout(100);
+  await settle(page);
   const cmd = await page.evaluate(() => { const d = document.createElement("div"); d.innerHTML = vgTableHtml(vgItem("andare", "imperativo"), "imperativo"); const b = d.querySelector(".conj > .say"); return b && speakable(conjRead(b)).join(" | "); });
   check("Read aloud: in the Verbs section, commands are read bare (va', vada, andiamo…, no “tu va'”)", cmd === "va' | vada | andiamo | andate | vadano", cmd);
   const subj = await page.evaluate(() => { const b = [...document.querySelectorAll(".conj > .say")].find(x => /^che io /.test(conjRead(x))); return b && conjRead(b); });
@@ -987,7 +1026,7 @@ async function readAloud(browser, origin) {
   check("Read aloud: tapping it reads the word and leaves the answer field focused, with what was typed", (await said(page)).map(x => x.text).join() === ex.it && (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "answer" && (await page.inputValue("#answer")) === "abc");
   await page.click(".prompt-card [data-say]");
   check("Read aloud: …with a mouse too", (await page.evaluate(() => document.activeElement && document.activeElement.id)) === "answer");
-  await page.click('[data-act="check"]'); await page.waitForTimeout(400);
+  await page.click('[data-act="check"]'); await settle(page);
   const fbSay = await speakerText(".fb-head [data-say]").catch(() => null);
   check("Read aloud: the answer panel has a speaker for the Italian", fbSay === ex.it, fbSay);
   await clearSaid(page); await page.tap(".fb-head [data-say]");
@@ -1078,7 +1117,7 @@ async function readAloud(browser, origin) {
     await page.evaluate(() => { S.refUnit = "u01"; S.refTab = "lesson"; S.screen = "reference"; render(); });
     const lessonSpeakers = (await page.$$(".say, [data-say]")).length;
     await page.evaluate(() => { S.refUnit = "vb"; S.screen = "reference"; render(); [...document.querySelectorAll("details.vref")].slice(0, 12).forEach(d => { d.open = true; }); });
-    await page.waitForTimeout(100);
+    await settle(page);
     const verbSpeakers = (await page.$$(".say, [data-say]")).length, verbTables = (await page.$$("details.vref .conjtable")).length;
     await page.evaluate(() => startSession("unit", "fc01"));
     check("No speech: no speakers are drawn, in a lesson, the verb tables or a session", lessonSpeakers === 0 && verbTables > 0 && verbSpeakers === 0 && (await page.$$(".say, [data-say]")).length === 0);
@@ -1219,10 +1258,10 @@ async function readAloud(browser, origin) {
       const seen = new Set([first && first.text]);
       for (let n = 0; n < 4; n++) { await page.reload(); await page.waitForFunction(ready); const t = await tip(); if (t) seen.add(t.text); }
       check("Lo sapevi?: a new load picks a new tidbit", seen.size > 1, [...seen].join(" | "));
-      await page.setViewportSize({ width: 360, height: 560 }); await page.waitForTimeout(150);
+      await page.setViewportSize({ width: 360, height: 560 }); await settle(page);
       const small = await page.evaluate(() => { const c = document.getElementById("tipcard"), bar = document.querySelector(".tabbar"); return { hidden: !c || c.hidden, fits: !c || c.hidden || c.getBoundingClientRect().bottom <= window.innerHeight - bar.offsetHeight }; });
       check("Lo sapevi?: on a short screen the card steps aside", small.hidden, JSON.stringify(small));
-      await page.setViewportSize({ width: 390, height: 1000 }); await page.waitForTimeout(150);
+      await page.setViewportSize({ width: 390, height: 1000 }); await settle(page);
       check("Lo sapevi?: it comes back when there is room again", !(await tip()).hidden);
       check("Lo sapevi?: no script errors", !page.errors.length, page.errors.join("\n"));
       await context.close();
