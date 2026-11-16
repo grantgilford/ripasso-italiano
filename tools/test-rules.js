@@ -30,6 +30,10 @@
        closest answer. And, through answerTyped itself, for every kind of typed exercise: a one-letter
        slip is forgiven in the kinds that forgive (flashcards, typed recall, translate, reply, listen)
        and never in the others (conjugation, fill in the blank, the Verbs section's forms…).
+    3c. What the conjugation drill says after an answer in a compound tense (verbWhy, from 9.28): for
+       the trapassato prossimo, the futuro anteriore and the condizionale passato, with avere, with
+       essere and for a reflexive verb, the tense named, the auxiliary's tense and verb, whether the
+       participle is regular and whether it agrees, and what the tense is for.
 
   Then, unless --no-browser, in the real app (Playwright and Chromium, the clock fixed, the device in
   Europe/Tirane): Today and Stats show the streak with the goal met exactly, the new day arrives at
@@ -53,7 +57,7 @@ const tally = (from) => console.log(`  ${T.total - from} checks`);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const show = (x) => JSON.stringify(x);
 
-const app = openApp({ file });
+const app = openApp({ file, names: "verbWhy: typeof verbWhy === 'undefined' ? null : verbWhy" });
 const content = app.content();
 console.log(`Rules test for ${path.basename(file)} (version ${app.version})`);
 
@@ -557,6 +561,43 @@ function checkerChecks() {
   tally(from2);
 }
 
+/* ------------------------------------------------------------------ 3c. the conjugation drill's explanation of a compound tense */
+// Written out by hand: the tables as the compound tenses unit holds them, and the words the explanation must have.
+function compoundChecks() {
+  section("3c. The conjugation drill's explanation of a compound tense (verbWhy)");
+  const from = T.total;
+  if (!app.verbWhy) { check("the app has verbWhy", false); return; }
+  const A = {
+    trapassato_prossimo: { a: ["avevo", "avevi", "aveva", "avevamo", "avevate", "avevano"], e: ["ero", "eri", "era", "eravamo", "eravate", "erano"] },
+    futuro_anteriore: { a: ["avrò", "avrai", "avrà", "avremo", "avrete", "avranno"], e: ["sarò", "sarai", "sarà", "saremo", "sarete", "saranno"] },
+    condizionale_passato: { a: ["avrei", "avresti", "avrebbe", "avremmo", "avreste", "avrebbero"], e: ["sarei", "saresti", "sarebbe", "saremmo", "sareste", "sarebbero"] },
+    passato_prossimo: { a: ["ho", "hai", "ha", "abbiamo", "avete", "hanno"], e: ["sono", "sei", "è", "siamo", "siete", "sono"] },
+  };
+  const PRON = ["mi", "ti", "si", "ci", "vi", "si"];
+  const table = (tense, aux, pp, refl) => A[tense][aux].map((a, p) => (refl ? PRON[p] + " " : "") + a + " " + (aux === "a" ? pp : pp.slice(0, -1) + (p < 3 ? "o/a" : "i/e")));
+  const USE = { trapassato_prossimo: "had already happened before another past moment", futuro_anteriore: "a guess about the past", condizionale_passato: "what would have happened" };
+  const CASES = [ // [infinitive, group, participle, auxiliary, tense, person, what the explanation must say]
+    ["andare", "irregular", "andato", "e", "condizionale_passato", 0, ["Condizionale passato = conditional of essere (sarei, io)", "Regular participle: andare → andato", "the participle agrees with the subject"]],
+    ["fare", "irregular", "fatto", "a", "condizionale_passato", 2, ["Condizionale passato = conditional of avere (avrebbe, lui/lei)", "fare has an irregular participle: fatto", "the participle does not change"]],
+    ["arrivare", "-are", "arrivato", "e", "futuro_anteriore", 3, ["Futuro anteriore = future of essere (saremo, noi)", "Regular participle: arrivare → arrivato", "the participle agrees with the subject"]],
+    ["finire", "-ire (-isc-)", "finito", "a", "futuro_anteriore", 0, ["Futuro anteriore = future of avere (avrò, io)", "Regular participle: finire → finito", "the participle does not change"]],
+    ["vedere", "-ere", "visto", "a", "trapassato_prossimo", 5, ["Trapassato prossimo = imperfetto of avere (avevano, loro)", "vedere has an irregular participle: visto", "the participle does not change"]],
+    ["uscire", "irregular", "uscito", "e", "trapassato_prossimo", 4, ["Trapassato prossimo = imperfetto of essere (eravate, voi)", "the participle agrees with the subject"]],
+    ["alzarsi", "reflexive", "alzato", "e", "condizionale_passato", 0, ["alzarsi is reflexive", "the pronoun mi (matching io)", "reflexive verbs always take essere", "Condizionale passato = conditional of essere (sarei, io)", "Regular participle: alzare → alzato"]],
+    ["divertirsi", "reflexive", "divertito", "e", "futuro_anteriore", 1, ["divertirsi is reflexive", "the pronoun ti (matching tu)", "Futuro anteriore = future of essere (sarai, tu)"]],
+    ["accorgersi", "reflexive", "accorto", "e", "trapassato_prossimo", 3, ["accorgersi is reflexive", "the pronoun ci (matching noi)", "Trapassato prossimo = imperfetto of essere (eravamo, noi)", "accorgere has an irregular participle: accorto"]],
+    ["parlare", "-are", "parlato", "a", "passato_prossimo", 0, ["Passato prossimo = present of avere (ho, io)", "Regular participle: parlare → parlato"]],
+  ];
+  for (const [it, group, pp, aux, tense, p, must] of CASES) {
+    const item = { it, group, forms: { [tense]: table(tense, aux, pp, /si$/.test(it)) } };
+    const said = String(app.verbWhy(item, tense, p)), want = must.concat(USE[tense] || []);
+    const lacks = want.filter(w => !said.includes(w)), extra = Object.entries(USE).filter(([t, w]) => t !== tense && said.includes(w)).map(([, w]) => w);
+    check(`${tense.replace(/_/g, " ")} of ${it}, ${["io", "tu", "lui/lei", "noi", "voi", "loro"][p]} (${item.forms[tense][p]}): the auxiliary, the participle and what the tense is for`, !lacks.length && !extra.length,
+      (lacks.length ? "lacks: " + lacks.join(" | ") : "") + (extra.length ? " has another tense's use: " + extra.join(" | ") : "") + "\n    it says: " + said);
+  }
+  tally(from);
+}
+
 /* ------------------------------------------------------------------ 4. in the real app */
 async function browserChecks() {
   section("4. In the real app: the streak, midnight and a change of time zone (Chromium, the clock fixed)");
@@ -625,6 +666,7 @@ async function browserChecks() {
   schedulingChecks();
   calendarChecks();
   checkerChecks();
+  compoundChecks();
   if (BROWSER) await browserChecks(); else console.log("\n(--no-browser: the checks in the real app were left out)");
   T.summary();
 })().catch(e => { T.stopped(e); T.summary(); });

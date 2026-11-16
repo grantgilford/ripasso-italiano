@@ -260,7 +260,7 @@ const FC_POS = new Set(["nm", "nf", "v", "adj", "adv", "pron", "prep", "conj", "
 }
 
 /* ---------- 6. unit notes and the review-unit tags ---------- */
-const REVIEW_TAGS = ["Essere & basics", "Nouns & articles", "Present tense", "Irregular verbs", "Verb tenses", "Adjectives", "Possessives", "Numbers", "Adverbs", "Questions", "Prepositions", "Conjunctions", "Subjunctive", "Object pronouns", "Formal & informal", "Time", "Longer sentences"];
+const REVIEW_TAGS = ["Essere & basics", "Nouns & articles", "Present tense", "Irregular verbs", "Verb tenses", "Adjectives", "Possessives", "Numbers", "Adverbs", "Questions", "Prepositions", "Conjunctions", "Subjunctive", "Compound tenses", "Object pronouns", "Formal & informal", "Time", "Longer sentences"];
 for (const u of Object.values(units)) {
   if (u.mode) continue;
   const n = arr(u.notes).length;
@@ -380,8 +380,14 @@ const P6 = ["io", "tu", "lui/lei", "noi", "voi", "loro"];
 const vg = {}; for (const v of VERB_GYM) vg[v.it] = v;
 const vgForms = (v, tense) => v.f[VG_TENSES.indexOf(tense)];
 const AUX_PP = { a: ["ho", "hai", "ha", "abbiamo", "avete", "hanno"], e: ["sono", "sei", "è", "siamo", "siete", "sono"] };
-// The auxiliary of each compound tense: the passato prossimo takes the present, the trapassato prossimo the imperfetto.
-const AUX_OF = { passato_prossimo: AUX_PP, trapassato_prossimo: { a: ["avevo", "avevi", "aveva", "avevamo", "avevate", "avevano"], e: ["ero", "eri", "era", "eravamo", "eravate", "erano"] } };
+// The auxiliary of each compound tense: the passato prossimo takes the present, the trapassato prossimo the imperfetto,
+// the futuro anteriore the futuro and the condizionale passato the condizionale (the compound tenses unit, from 9.28).
+const AUX_OF = {
+  passato_prossimo: AUX_PP,
+  trapassato_prossimo: { a: ["avevo", "avevi", "aveva", "avevamo", "avevate", "avevano"], e: ["ero", "eri", "era", "eravamo", "eravate", "erano"] },
+  futuro_anteriore: { a: ["avrò", "avrai", "avrà", "avremo", "avrete", "avranno"], e: ["sarò", "sarai", "sarà", "saremo", "sarete", "saranno"] },
+  condizionale_passato: { a: ["avrei", "avresti", "avrebbe", "avremmo", "avreste", "avrebbero"], e: ["sarei", "saresti", "sarebbe", "saremmo", "sareste", "sarebbero"] },
+};
 
 // Pronominal verbs (alzarsi, metterci, andarsene, farcela) put pronouns in front of each form;
 // strip them to check the verb itself: "mi alzo" → "alzo", "se n'è andato" → "è andato".
