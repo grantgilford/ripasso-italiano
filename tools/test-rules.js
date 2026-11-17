@@ -34,6 +34,8 @@
        the trapassato prossimo, the futuro anteriore and the condizionale passato, with avere, with
        essere and for a reflexive verb, the tense named, the auxiliary's tense and verb, whether the
        participle is regular and whether it agrees, and what the tense is for.
+    3d. The agreement drill (agreementDrill, from 9.29): the adjective form and the gender the answer panel names, for
+       a noun whose plural changes gender (il paio → le paia, l'uovo → le uova) and for ordinary ones.
 
   Then, unless --no-browser, in the real app (Playwright and Chromium, the clock fixed, the device in
   Europe/Tirane): Today and Stats show the streak with the goal met exactly, the new day arrives at
@@ -57,7 +59,7 @@ const tally = (from) => console.log(`  ${T.total - from} checks`);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const show = (x) => JSON.stringify(x);
 
-const app = openApp({ file, names: "verbWhy: typeof verbWhy === 'undefined' ? null : verbWhy" });
+const app = openApp({ file, names: "verbWhy: typeof verbWhy === 'undefined' ? null : verbWhy, agreementDrill, explainFor" });
 const content = app.content();
 console.log(`Rules test for ${path.basename(file)} (version ${app.version})`);
 
@@ -598,6 +600,38 @@ function compoundChecks() {
   tally(from);
 }
 
+/* ------------------------------------------------------------------ 3d. the agreement drill's noun, singular and plural */
+// Written out by hand: a noun, its number, and the adjective form and gender the drill must give. A few nouns change gender
+// in the plural (il paio → le paia, l'uovo → le uova), so the plural's gender comes from its article (from 9.29).
+function agreementChecks() {
+  section("3d. The agreement drill's noun, singular and plural (agreementDrill)");
+  const from = T.total, c = app.content(), keep = c.byUnit.zz;
+  const adj = { id: "zz-diverso", unit: "zz", type: "vocab", it: "diverso", en: ["different"], pos: "adjective", forms: ["diverso", "diversa", "diversi", "diverse"] };
+  const N = {
+    paio: { it: "paio", en: ["pair"], pos: "noun", gender: "m", art: "il", indef: "un", plural: "paia", artPl: "le" },
+    uovo: { it: "uovo", en: ["egg"], pos: "noun", gender: "m", art: "l'", indef: "un", plural: "uova", artPl: "le" },
+    libro: { it: "libro", en: ["book"], pos: "noun", gender: "m", art: "il", indef: "un", plural: "libri", artPl: "i" },
+    casa: { it: "casa", en: ["house"], pos: "noun", gender: "f", art: "la", indef: "una", plural: "case", artPl: "le" },
+  };
+  const CASES = [ // [noun, plural?, the phrase, the form, the gender the explanation must name]
+    ["paio", true, "le paia", "diverse", "feminine plural"], ["paio", false, "il paio", "diverso", "masculine singular"],
+    ["uovo", true, "le uova", "diverse", "feminine plural"], ["uovo", false, "l'uovo", "diverso", "masculine singular"],
+    ["libro", true, "i libri", "diversi", "masculine plural"], ["casa", true, "le case", "diverse", "feminine plural"],
+  ];
+  try {
+    for (const [n, pl, phrase, form, g] of CASES) {
+      const noun = Object.assign({ id: "zz-" + n, unit: "zz", type: "vocab" }, N[n]);
+      c.byUnit.zz = [noun, noun, noun, noun];
+      app.setRandom(() => (pl ? 0.1 : 0.9));
+      const ex = app.agreementDrill({ item: adj, note: "" }, adj);
+      const why = ex ? app.explainFor(ex, { ok: false, given: "" }).why.join(" ") : "";
+      check(`agreement: ${phrase} + diverso → ${form}, explained as ${g}`, !!ex && same(ex.accepted, [form]) && ex.answerInContext === phrase + " " + form && why.includes(g + " form: " + form),
+        ex ? `gave ${show(ex.accepted)} in “${ex.answerInContext}”; says: ${why}` : "no exercise");
+    }
+  } finally { if (keep) c.byUnit.zz = keep; else delete c.byUnit.zz; app.setRandom(seeded(1)); }
+  tally(from);
+}
+
 /* ------------------------------------------------------------------ 4. in the real app */
 async function browserChecks() {
   section("4. In the real app: the streak, midnight and a change of time zone (Chromium, the clock fixed)");
@@ -667,6 +701,7 @@ async function browserChecks() {
   calendarChecks();
   checkerChecks();
   compoundChecks();
+  agreementChecks();
   if (BROWSER) await browserChecks(); else console.log("\n(--no-browser: the checks in the real app were left out)");
   T.summary();
 })().catch(e => { T.stopped(e); T.summary(); });
