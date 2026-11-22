@@ -142,6 +142,9 @@ const FAULTS = [
   { id: "meaning-offers-same-word", what: "a meaning choice may offer a word with the same Italian as a wrong option",
     find: `if (!v || ownIt.has(word(i)) || words.has(pid(i.id))) continue;`, put: `if (!v || words.has(pid(i.id))) continue;`,
     suite: "test-choices.js", expect: "no wrong option is right" },
+  { id: "mixups-not-first", what: "a meaning choice no longer offers the words the learner has mixed up with it first (9.30)",
+    find: `const score = (i) => (mixed.has(pid(i.id)) ? 4 : 0) + (kin(i) ? 2 : 0)`, put: `const score = (i) => (kin(i) ? 2 : 0)`,
+    suite: "test-choices.js", expect: "remembered mix-ups are offered first" },
   // ---- the installed copy (test-install.js)
   { id: "back-button-unhandled", what: "the Android back button is no longer handled away from Today",
     find: `const want = S.screen !== "home";`, put: `const want = false;`,

@@ -177,6 +177,7 @@ function nodeChecks() {
         }
         if (withConf) { // remembered mix-ups that are valid options are offered first: as many of the three wrong options as there are of them
           const me = app.pid(item.id), mates = new Set(), texts = new Set(); // mixed-up record ids with a valid option, and the option texts they give
+          let seenOptions = 0; // how many different options those give
           for (const [x, y] of conf.values()) {
             const other = x === me ? y : y === me ? x : null;
             if (!other) continue;
@@ -184,12 +185,17 @@ function nodeChecks() {
               const v = arr(toEn ? o.en : o.it)[0];
               return v && key(arr(o.it)[0]) !== key(arr(item.it)[0]) && !(toEn ? enForms(String(v)).some(f => ownEn.has(f)) : arr(o.en).some(e => enForms(String(e)).some(f => ownEn.has(f))));
             });
-            if (ok) { mates.add(other); texts.add(toEn ? enForms(String(arr(ok.en)[0]))[0] : key(arr(ok.it)[0])); }
+            if (!ok) continue;
+            mates.add(other);
+            // two mix-ups whose English shares a form (goodbye, goodbye (very formal)) would read as the same option, and the
+            // app offers only one of them, so they count once
+            const forms = toEn ? enForms(String(arr(ok.en)[0])) : [key(arr(ok.it)[0])];
+            if (!forms.some(f => texts.has(f))) { forms.forEach(f => texts.add(f)); seenOptions++; }
           }
           if (mates.size) {
             partners++;
             const got = new Set(wrong.map(o => ex.optionSources[o] && app.pid(ex.optionSources[o].id)).filter(id => mates.has(id))).size;
-            if (got < Math.min(3, texts.size)) partnerMissed.push(`${where}: ${got} of the wrong options are remembered mix-ups, of ${texts.size} possible (${opts.join(" | ")})`);
+            if (got < Math.min(3, seenOptions)) partnerMissed.push(`${where}: ${got} of the wrong options are remembered mix-ups, of ${seenOptions} possible (${opts.join(" | ")})`);
           }
         }
       }

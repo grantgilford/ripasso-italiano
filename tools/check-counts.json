@@ -2,7 +2,7 @@
   "test-browsers.js": 20,
   "test-browsers.js --require": 40,
   "test-choices.js": 48,
-  "test-course.js": 183,
+  "test-course.js": 195,
   "test-install.js": 68,
   "test-items.js --sample": 7,
   "test-perf.js": 46,
