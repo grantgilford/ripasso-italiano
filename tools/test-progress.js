@@ -517,6 +517,7 @@ async function runSession(page, start, maxSteps = 200) {
       const longest = (mode, n) => [...new Set(info.items.filter(i => i[2] === mode).map(i => canonicalOf(i[0])))].sort((a, b) => b.length - a.length || a.localeCompare(b)).slice(0, n);
       const typeKeys = ["conjugation", "preparticle", "translate", "transform", "cloze", "recall", "spot", "reply"];
       const words = longest("flashcards", 1000);
+      const longestVerbs = [...new Set(info.items.filter(i => i[2] === "verbs").map(i => i[0].replace(/^vg-|-(presente|passato_prossimo|imperfetto|futuro|condizionale|imperativo|congiuntivo_presente|congiuntivo_imperfetto)$/g, "")))].sort((a, b) => b.length - a.length).slice(0, 250);
       const errMsg = "TypeError: Cannot read properties of undefined (reading 'length') ".repeat(5).slice(0, 300);
       const errAt = "at buildSession (index.html:18512:31) ".repeat(4).slice(0, 120);
       const otherKeys = {
@@ -529,8 +530,10 @@ async function runSession(page, start, maxSteps = 200) {
         "itapp.lasttype.v1": longest("grammar", 2000).map((id, k) => [id, typeKeys[k % typeKeys.length]]).concat(longest("verbs", 2000).map((id, k) => [id, ["vtenseid", "vmeaning", "vswitch", "vperson"][k % 4]])),
         "itapp.confusions.v1": Array.from({ length: Math.floor(words.length / 2) }, (_, k) => [words[2 * k], words[2 * k + 1]].sort().concat(9999)),
         "itapp.errors.v1": Array.from({ length: 20 }, (_, k) => ({ m: errMsg, at: errAt, screen: "session", v: info.version, t: T - (20 - k) * 3600e3, n: 999 })),
+        // from 9.31, the Verbs section's weak spots: 1,500 cells under the longest verbs
+        "itapp.vgmiss.v1": Array.from({ length: 1500 }, (_, k) => [longestVerbs[k % longestVerbs.length], k % 8, k % 6, 99, T - k * 60e3]),
       };
-      const caps = `${otherKeys["itapp.lasttype.v1"].length} last kinds, ${otherKeys["itapp.confusions.v1"].length} mix-ups, ${otherKeys["itapp.errors.v1"].length} problems`;
+      const caps = `${otherKeys["itapp.lasttype.v1"].length} last kinds, ${otherKeys["itapp.confusions.v1"].length} mix-ups, ${otherKeys["itapp.errors.v1"].length} problems, ${otherKeys["itapp.vgmiss.v1"].length} verb weak spots`;
       // Section 8's worst case, plus worst-case records under made-up ids (standing in for items not written yet), as many
       // as take the largest cloud document from its size in section 8 to about CLOUD_TARGET.
       const extraIds = Array.from({ length: Math.floor(worst.records * (CLOUD_TARGET / worst.largest - 1)) }, (_, k) => "zz-future-" + String(k).padStart(5, "0"));

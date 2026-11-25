@@ -113,7 +113,10 @@
        Practise this verb in an opened row, each within the layout rules; a
        chip starts a session of that tense, the back button then asks before
        leaving, and the summary names the focus; the back arrow returns to
-       Units.
+       Units. Stats' Verbs: weak spots card (You › Stats), empty with its
+       button disabled and saying why, then with misses saved: the bars by
+       person and by tense, each with its label and number, the cells missed
+       most, and Practise my weak spots, which starts that session.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -258,6 +261,20 @@ async function verbsScreens(browser, origin) {
     await page.evaluate(() => { S.screen = "reference"; S.refUnit = "vb"; render(); });
     await tap(page, '.hdr .back[data-go="units"]');
     check(L("the back arrow returns to Units"), (await screen(page)) === "units");
+    // Stats: Verbs: weak spots, empty and then with misses
+    await page.evaluate(() => { Store.remove("itapp.vgmiss.v1"); VG_MISS = null; });
+    await tap(page, '.tab[data-go="you"]'); await tap(page, '.statcard[data-go="stats"]');
+    check(L("Stats has Verbs: weak spots, saying none yet, with Practise my weak spots disabled and saying why"), await page.evaluate(() => { const c = document.querySelector(".weak"), b = document.querySelector('[data-start="vweak"]'); return !!c && /None yet/.test(c.textContent) && !!b && b.disabled && !!document.getElementById(b.getAttribute("aria-describedby")); }));
+    await page.evaluate(() => { const t = Date.now(); Store.set("itapp.vgmiss.v1", [["andare", 3, 4, 4, t], ["andare", 3, 1, 2, t], ["fare", 0, 0, 3, t], ["venire", 4, 5, 2, t], ["essere", 6, 2, 1, t], ["dire", 1, 3, 2, t], ["potere", 3, 0, 1, t], ["bere", 2, 4, 1, t], ["sapere", 0, 5, 2, t]]); VG_MISS = null; render(); });
+    await settle(page);
+    const wk = await page.evaluate(() => { const c = document.querySelector(".weak"), rows = [...c.querySelectorAll(".wkrow")]; return { rows: rows.length, labelled: rows.every(r => r.querySelector(".wk-l").textContent.trim() && /^\d+$/.test(r.querySelector(".wk-n").textContent)), top: c.querySelectorAll(".wk-top li").length, first: (c.querySelector(".wk-top li") || {}).textContent }; });
+    check(L("…and with misses: a bar for each person and each tense, each with its label and number, and the 8 cells missed most, most first"), wk.rows === 14 && wk.labelled && wk.top === 8 && /^voi · andare · futuro: andrete, missed 4 times$/.test(wk.first), JSON.stringify(wk));
+    await layout(page, L("Stats with Verbs: weak spots"), opts);
+    await tap(page, '[data-start="vweak"]');
+    check(L("Practise my weak spots starts that session"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vweak" && session.queue.every(q => vgWeakIds().includes(q.ex.item.id))));
+    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } render(); }); await settle(page);
+    check(L("…and its summary names it"), /^Focus: your weak spots$/.test(await page.textContent(".sumfocus")));
+    await tap(page, '.sumbtns [data-go="home"]');
     check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
     await context.close();
     console.log(`  Verbs screens checked, ${label}`);

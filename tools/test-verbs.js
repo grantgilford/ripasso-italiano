@@ -21,6 +21,18 @@
   screen (a wrong option tapped, nonsense typed, a table filled with nonsense): it must be marked wrong,
   the panel must say "Not quite", show the right answer and explain it.
 
+  Weak spots (from 9.31), in a fresh page, through the screen: a wrong cell of a Verb table, Don't know on
+  a table and a wrong answer to each drill on one form (Verb form, Pick the form, From English, Change the
+  tense, Verb in a sentence, Which tense fits?) are each noted in itapp.vgmiss.v1 as [verb, tense,
+  person, times, last time]; a later right answer takes one off, and at nought the cell goes, but not a
+  right answer in a repeat; the list survives a reload, holds at most 1,500 cells (the oldest going
+  first; its size at the cap is printed), drops damaged entries, and a damaged value or a device that
+  refuses to store it costs nothing; it never reaches progress, the cloud's documents or a backup;
+  Stats' "Verbs: weak spots" card shows exactly the stored misses by person, by tense and the 8 cells
+  missed most; Practise my weak spots takes the verb tenses with misses, most first, its tables asking
+  only the persons missed and its drills on one form those persons; and elsewhere a drill on one form
+  asks for a person missed in that tense about half the time.
+
   How much:
     (default)      every verb-tense (3,954 at 9.27), each kind it can give answered once: about four
                    minutes. Until 9.27 each kind was answered once at every box (158,397 exercises,
@@ -34,7 +46,7 @@
 */
 "use strict";
 const path = require("path");
-const { loadPlaywright, serveApp, checks } = require("./lib/browser");
+const { loadPlaywright, serveApp, checks, save, saveText } = require("./lib/browser");
 
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : null; };
@@ -160,6 +172,8 @@ const SEEDER = (seed) => { let s = seed; Math.random = () => { s = (s + 0x6D2B79
     bad.push(...r.bad); answered += r.answered; withSentence += r.withSentence;
     badWrong.push(...r.badWrong); wrongDone += r.wrong.length; for (const kt of r.wrong) wrongKinds[kt] = true;
   }
+  // Weak spots (from 9.31), in a fresh page: the drills above have missed cells on purpose
+  const weak = await weakSpots(browser, `http://127.0.0.1:${server.address().port}/index.html`);
   await browser.close(); server.close();
 
   const byKind = {};
@@ -174,5 +188,145 @@ const SEEDER = (seed) => { let s = seed; Math.random = () => { s = (s + 0x6D2B79
   const want = new Set(plan.items.map(([id]) => id.replace(/^vg-.*?-(presente|passato_prossimo|imperfetto|futuro|condizionale|imperativo|congiuntivo_presente|congiuntivo_imperfetto)$/, "$1")));
   T.check(`every tense of the verbs chosen is drilled (${drilled.size} of ${want.size})`, [...want].every(t => drilled.has(t)), "not drilled: " + [...want].filter(t => !drilled.has(t)).join(", "));
   T.check("no script errors", !errors.length, errors.slice(0, 5).join("\n"));
+  for (const [name, ok, detail] of weak) T.check(name, ok, detail);
   T.summary();
 })().catch(e => { T.stopped(e); T.summary(); });
+
+/* Weak spots (from 9.31): itapp.vgmiss.v1 through the screen, Stats and Practise my weak spots. Returns [check name, ok, detail]. */
+async function weakSpots(browser, url) {
+  const out = [], check = (name, ok, detail) => out.push([name, !!ok, detail || ""]);
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.addInitScript(SEEDER, SEED + 1);
+  await context.addInitScript(() => { // a session of one exercise on the screen, answered right or wrong by tapping and typing (kept across reloads)
+    window.__show = (ex, repeat) => { session = { kind: "verbs", unitId: "vb", queue: [{ ex, repeat: !!repeat }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false }; S.screen = "session"; S.feedback = null; S.revealed = false; S.picked = null; S.bankPicked = []; S.retry = null; resetExState(); render(); };
+    window.__answer = (ex, wrongCells) => { // wrongCells: for a table, the persons to get wrong; otherwise true for a wrong answer
+      const $ = (q) => document.querySelector(q);
+      if (ex.mode === "table") { for (const p of ex.cells) document.getElementById("vt" + p).value = wrongCells.includes(p) ? "zzqx" : [].concat(ex.accepted[p])[0]; $('[data-act="checkTable"]').click(); }
+      else if (ex.mode === "options") { const b = [...document.querySelectorAll("[data-opt]")].find(b => wrongCells ? b.dataset.opt !== ex.correct : b.dataset.opt === ex.correct); b.click(); }
+      else { $("#answer").value = wrongCells ? "zzqx" : [].concat(ex.accepted)[0]; $('[data-act="check"]').click(); }
+      return S.feedback && S.feedback.ok;
+    };
+    window.__ex = (verb, tense, key, box) => { const item = vgItem(verb, tense); for (let n = 0; n < 400; n++) { const ex = makeExercise(item, Object.assign({}, rec(item.id), { box }), key === "vtable" ? "production" : undefined, { prefer: [key], anyKind: true }); if (ex.typeKey === key) return ex; } return null; };
+  });
+  const page = await context.newPage();
+  const errors = []; page.on("pageerror", e => errors.push(String(e))); page.on("dialog", d => d.accept());
+  const ready = () => page.waitForFunction(() => typeof S !== "undefined" && S.screen === "home" && content && content.byUnit && content.byUnit.vb);
+  await page.goto(url); await ready();
+  const KEY = "itapp.vgmiss.v1";
+  const stored = () => page.evaluate((k) => Store.read(k), KEY); // what the storage holds, once every save has landed
+  // In the page: a few verbs started, and a fresh memory
+  await page.evaluate(() => {
+    for (const v of ["andare", "parlare", "fare", "venire", "essere"]) for (const t of VG_TENSES) { const i = vgItem(v, t); if (i) progress.items[pid(i.id)] = { box: 3, due: Date.now() + 864e5, lapses: 0, lastSeen: Date.now() - 864e5, lastWrong: 0, seenCount: 3, lastRight: Date.now() }; }
+    saveProgress();
+    Store.remove("itapp.vgmiss.v1"); VG_MISS = null;
+  });
+  const cell = (list, verb, tense, p) => (list || []).find(e => e[0] === verb && e[1] === tense && e[2] === p);
+  // a table with one cell wrong, then Don't know on another table
+  const t1 = await page.evaluate(() => { const ex = __ex("andare", "futuro", "vtable", 3); __show(ex); return __answer(ex, [1, 4]); });
+  let st = await stored();
+  check("a Verb table with two cells wrong notes those two cells, once each, as [verb, tense, person, times, last time]", t1 === false && st && st.length === 2 && cell(st, "andare", 3, 1) && cell(st, "andare", 3, 1)[3] === 1 && cell(st, "andare", 3, 4) && cell(st, "andare", 3, 4)[4] > 0, JSON.stringify(st));
+  await page.evaluate(() => { const ex = __ex("parlare", "presente", "vtable", 3); __show(ex); document.querySelector('[data-act="giveupTable"]').click(); });
+  st = await stored();
+  check("Don't know on a table notes every cell it asked", [0, 1, 2, 3, 4, 5].every(p => cell(st, "parlare", 0, p)), JSON.stringify(st));
+  // each drill on one form, answered wrong
+  const drills = await page.evaluate(() => {
+    const res = [];
+    for (const [key, verb, tense, box] of [["vspot", "venire", "presente", 2], ["vpick", "venire", "imperfetto", 1], ["vmeaning", "venire", "futuro", 2], ["vswitch", "venire", "condizionale", 2], ["vctx", "fare", "presente", 2], ["vfit", "fare", "imperfetto", 4]]) {
+      const ex = __ex(verb, tense, key, box);
+      if (!ex) { res.push([key, "not built"]); continue; }
+      const t = VG_TENSES.indexOf(tense), before = (vgMisses().get(vgMissKey(verb, t, ex.person)) || [0, 0, 0, 0])[3];
+      __show(ex); const ok = __answer(ex, true);
+      const after = (vgMisses().get(vgMissKey(verb, t, ex.person)) || [0, 0, 0, 0])[3];
+      res.push([key, ok === false && after === before + 1 ? "" : `marked ${ok}, count ${before} → ${after}`]);
+    }
+    return res;
+  });
+  check("a wrong answer to each drill on one form (Verb form, Pick the form, From English, Change the tense, Verb in a sentence, Which tense fits?) notes its cell", drills.length === 6 && drills.every(d => !d[1]), JSON.stringify(drills));
+  // healing: andare futuro tu (1), missed once: missed again, then right twice; a right answer in a repeat heals nothing
+  const heal = await page.evaluate(() => {
+    const n = () => (vgMisses().get(vgMissKey("andare", 3, 1)) || [0, 0, 0, 0])[3], steps = [n()];
+    let ex = __ex("andare", "futuro", "vtable", 3); __show(ex); __answer(ex, [1]); steps.push(n());
+    ex = __ex("andare", "futuro", "vtable", 3); __show(ex, true); __answer(ex, []); steps.push(n()); // a repeat, right
+    ex = __ex("andare", "futuro", "vtable", 3); __show(ex); __answer(ex, []); steps.push(n());
+    ex = __ex("andare", "futuro", "vspot", 3); for (let k = 0; k < 50 && ex.person !== 1; k++) ex = __ex("andare", "futuro", "vspot", 3);
+    __show(ex); __answer(ex, false); steps.push(n());
+    return steps;
+  });
+  st = await stored();
+  check(`a later right answer takes one off, and at nought the cell goes; a right answer in a repeat doesn't (andare · futuro · tu: ${heal.join(" → ")})`, heal.join() === "1,2,2,1,0" && !cell(st, "andare", 3, 1), JSON.stringify(st));
+  // out of progress, the cloud and backups; and a reload
+  const kept = await page.evaluate(() => { const all = [JSON.stringify(progress), JSON.stringify(Store.get("itapp.progress.v1")), JSON.stringify(progressToDocs(progress)), backupText()].join("\n"); return !/vgmiss/.test(all) && !/\["andare",3,4,/.test(all) && !/\["parlare",0,/.test(all); });
+  check("the list is kept out of progress, the cloud's documents and the backup file", kept);
+  const before = JSON.stringify(st);
+  await page.reload(); await ready();
+  check("it survives a reload", JSON.stringify(await page.evaluate(() => [...vgMisses().values()])) === before && JSON.stringify(await stored()) === before);
+  // Stats shows exactly what is stored
+  const stats = await page.evaluate(() => {
+    S.screen = "stats"; render();
+    const card = document.querySelector(".weak"), bars = [...card.querySelectorAll(".wkbars")].map(b => [...b.querySelectorAll(".wkrow")].map(r => [r.querySelector(".wk-l").textContent, Number(r.querySelector(".wk-n").textContent.replace(/\D/g, ""))]));
+    const list = [...vgMisses().values()], byP = [0, 0, 0, 0, 0, 0], byT = VG_TENSES.map(() => 0);
+    list.forEach(e => { byP[e[2]] += e[3]; byT[e[1]] += e[3]; });
+    const top = list.slice().sort((a, b) => b[3] - a[3] || b[4] - a[4]).slice(0, 8).map(e => `${vgPerson(VG_TENSES[e[1]], e[2])} · ${e[0]} · ${TENSE_LABEL[VG_TENSES[e[1]]]}: ${vgItem(e[0], VG_TENSES[e[1]]).forms[e[2]]}, missed ${e[3]} time${e[3] === 1 ? "" : "s"}`);
+    const drawn = [...card.querySelectorAll(".wk-top li")].map(li => li.textContent);
+    return { persons: JSON.stringify(bars[0]) === JSON.stringify(PERSONS.map((l, i) => [l, byP[i]])), tenses: JSON.stringify(bars[1]) === JSON.stringify(VG_TENSES.map((t, i) => [TENSE_LABEL[t], byT[i]])), top: JSON.stringify(drawn) === JSON.stringify(top), drawn, btn: !!document.querySelector('[data-start="vweak"]:not([disabled])'), n: list.length };
+  });
+  check(`Stats' Verbs: weak spots shows the stored misses by person and by tense, each bar with its label and number, and the cells missed most (${stats.n} cells)`, stats.persons && stats.tenses && stats.top, JSON.stringify(stats.drawn));
+  // Practise my weak spots
+  await page.click('[data-start="vweak"]');
+  const ws = await page.evaluate(() => {
+    const res = { kind: session && session.kind, bad: [], tables: 0, one: 0, ids: vgWeakIds() };
+    const check = (q) => {
+      const it = q.ex.item, miss = vgMissedPersons(it), P = vgPersons(it), can = miss.filter(p => P.includes(p));
+      if (!res.ids.includes(it.id) && it.type === "vtense") res.bad.push(it.id + ": not a weak spot");
+      if (q.ex.typeKey === "vtable") { res.tables++; if (can.length && q.ex.cells.some(p => !can.includes(p))) res.bad.push(`${it.id}: a table asks ${q.ex.cells}, the persons missed are ${can}`); }
+      if (VG_ONE_FORM.has(q.ex.typeKey)) { res.one++; const sents = verbSentences(it).filter(s => can.includes(s.p)); if (can.length && !can.includes(q.ex.person) && !(["vctx", "vfit"].includes(q.ex.typeKey) && !sents.length)) res.bad.push(`${it.id} ${q.ex.typeKey}: person ${q.ex.person}, missed ${can}`); }
+    };
+    session.queue.forEach(check);
+    const ids = session.queue.map(q => q.ex.item.id);
+    res.order = JSON.stringify(uniqueByPid(sessionIds("vweak")).slice().sort()) === JSON.stringify([...new Set(ids)].filter(id => res.ids.includes(id)).sort());
+    for (let k = 0; k < 30; k++) buildSession("vweak").queue.forEach(check);
+    return res;
+  });
+  check(`Practise my weak spots runs a session of the verb tenses with misses, its tables asking only the persons missed and its drills on one form those persons (${ws.tables} tables, ${ws.one} drills on one form)`, ws.kind === "vweak" && ws.order && !ws.bad.length && ws.tables > 0 && ws.one > 0, ws.bad.slice(0, 5).join("\n"));
+  // elsewhere, a drill on one form asks for a missed person about half the time
+  const half = await page.evaluate(() => {
+    session = null; S.screen = "home";
+    const item = vgItem("essere", "presente"), t = 0, r = Object.assign({}, rec(item.id), { box: 2 });
+    const share = (n) => { let hit = 0, all = 0; for (let k = 0; k < n; k++) { const ex = makeExercise(item, r, undefined, { prefer: ["vspot"], anyKind: true }); if (ex.typeKey !== "vspot") continue; all++; if (ex.person === 4) hit++; } return hit / all; };
+    for (const k of [...vgMisses().keys()]) if (k.startsWith("essere\n")) vgMisses().delete(k);
+    const plain = share(600);
+    vgMisses().set(vgMissKey("essere", t, 4), ["essere", t, 4, 2, Date.now()]);
+    const missed = share(600);
+    vgMisses().delete(vgMissKey("essere", t, 4));
+    return { plain, missed };
+  });
+  check(`elsewhere a drill on one form asks for a person missed in that tense about half the time (voi: ${Math.round(100 * half.plain)}% with no misses, ${Math.round(100 * half.missed)}% once voi is missed; a half plus a sixth would be 58%)`, half.plain < 0.25 && half.missed > 0.48 && half.missed < 0.7, JSON.stringify(half));
+  // the cap, damaged entries, its size at the cap
+  {
+    const list = [];
+    for (let i = 0; i < 1600; i++) list.push(["zzverb" + String(i).padStart(4, "0"), i % 8, i % 6, 1 + (i % 4), 1700000000000 + i]);
+    list.splice(5, 0, "oops", ["a", 9, 0, 1, 1], ["a", 0, 6, 1, 1], ["a", 0, 0, 0, 1], ["a", 0, 0, 1.5, 1], ["", 0, 0, 1, 1], null, { a: 1 }, ["a", 0, 0, 1]);
+    await save(page, KEY, list);
+  }
+  await page.reload(); await ready();
+  const capped = await page.evaluate(() => { const n = vgMisses().size; const ex = __ex("venire", "presente", "vspot", 2); __show(ex); __answer(ex, true); return { n, last: [...vgMisses().values()].pop() }; });
+  st = await stored();
+  check(`at most 1,500 cells are kept, the oldest going first, and damaged entries are dropped (${capped.n} loaded from 1,600 and 9 damaged; ${st && st.length} after one more)`, capped.n === 1500 && st.length === 1500 && st[0][0] === "zzverb0101" && st[st.length - 1][0] === "venire" && st.every(e => e.length === 5 && typeof e[0] === "string" && e[0]), JSON.stringify(st && st.slice(0, 1)));
+  const size = await page.evaluate(() => { const longest = VERB_GYM.map(v => v.it).sort((a, b) => b.length - a.length)[0]; return JSON.stringify(Array.from({ length: VGMISS_CAP }, (_, k) => [longest, 7, 5, 99, Date.now() + k])).length; });
+  console.log(`  itapp.vgmiss.v1 at its cap of 1,500 cells, with the longest verb: ${(size / 1024).toFixed(0)} KB`);
+  check(`at the cap, with the longest verb, the list takes ${(size / 1024).toFixed(0)} KB: under 100 KB`, size < 100 * 1024);
+  const before2 = errors.length;
+  for (const raw of ["{not json", "\"oops\"", "42", "{\"a\":1}"]) {
+    await saveText(page, KEY, raw);
+    await page.reload(); await ready();
+    await page.evaluate(() => { const ex = __ex("venire", "presente", "vspot", 2); __show(ex); __answer(ex, true); });
+  }
+  st = await stored();
+  check("a damaged value costs nothing: the app opens, the answer counts and the cell is stored afresh", errors.length === before2 && Array.isArray(st) && st.length === 1 && st[0][0] === "venire", JSON.stringify({ st, errors: errors.slice(before2) }));
+  await page.evaluate(() => { const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (v, k) { if (k === "itapp.vgmiss.v1") throw new DOMException("no room", "QuotaExceededError"); return put.call(this, v, k); }; });
+  const refused = await page.evaluate(() => { const item = vgItem("venire", "presente"), was = (progress.items[pid(item.id)] || {}).seenCount || 0; const ex = __ex("venire", "presente", "vspot", 2); __show(ex); const ok = __answer(ex, true); return { ok, counted: progress.items[pid(item.id)].seenCount === was + 1 }; });
+  check("a device that refuses to store it: no script error, and the answer still counts", errors.length === before2 && refused.ok === false && refused.counted, JSON.stringify({ refused, errors: errors.slice(before2) }));
+  check("weak spots: no script errors", !errors.length, errors.slice(0, 5).join("\n"));
+  await context.close();
+  return out;
+}

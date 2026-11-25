@@ -779,6 +779,16 @@ th { color: var(--muted); font-size: 13px; font-weight: 600; vertical-align: bot
 .tchip { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 8px 14px; border-radius: 14px; background: var(--card); color: var(--fg); text-align: left; }
 .tchip-t { font-size: 15px; font-weight: 600; line-height: 1.25; }
 .tchip-n { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.weak { display: flex; flex-direction: column; gap: 6px; } /* Verbs: weak spots on Stats (from 9.31) */
+.weak p { margin: 0; }
+.wk-h { margin: 8px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.weak > .wk-h:first-child { margin-top: 0; }
+.wkbars { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 6px 10px; }
+.wkrow { display: contents; }
+.wk-l { font-size: 14px; }
+.wk-n { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.wk-top { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.45; }
+.wk-top li + li { margin-top: 4px; }
 details > summary { cursor: pointer; }
 /* ---------- practice session ---------- */
 .sbar { display: flex; align-items: center; gap: 12px; }
@@ -21139,14 +21149,18 @@ function verbGymExercise(ex, item, r, force, opt) {
   }
   const persons = force && force.persons, plan = vgDrillPlan(item), P = plan.P, pl = (p) => vgPerson(item.tense, p);
   const said = (p) => item.tense === "imperativo" ? item.forms[p] : pl(p) + " " + item.forms[p]; // the answer read aloud: commands bare, other forms with their person
-  const choose = (list) => pick(list);
+  // a drill on one form asks for a person missed in this tense (itapp.vgmiss.v1) about half the time, and in Practise my weak
+  // spots (opt.persons) always, where it can; a table there asks only those persons (from 9.31)
+  const weak = opt && opt.persons && opt.persons.filter(p => P.includes(p)), missed = weak && weak.length ? weak : vgMissedPersons(item);
+  const choose = (list) => { const w = list.filter(p => missed.includes(p)); return w.length && (weak && weak.length || Math.random() < 0.5) ? pick(w) : pick(list); };
+  const chooseS = (list) => { const w = list.filter(x => missed.includes(x.p)); return w.length && (weak && weak.length || Math.random() < 0.5) ? pick(w) : pick(list); }; // a sentence, by its person
   const table = (cells, label) => {
     Object.assign(ex, { type: label || "Verb table", typeKey: "vtable", kind: "production", mode: "table", cells: cells && cells.length ? cells.slice() : P.slice(), say: item.it,
       promptHtml: head + `<div class="hint sans">${esc(arr(item.en)[0])}</div>`,
       accepted: item.forms.map((f, p) => vgAcc(item, p)), shownAnswer: item.forms.join(", "), answerInContext: item.it + ", " + tl + ": " + item.forms.join(", ") });
     return ex;
   };
-  if (persons || force === "production") return table(persons, persons && "Verb table · the forms you missed");
+  if (persons || force === "production") return table(persons || (weak && weak.length ? weak : null), persons ? "Verb table · the forms you missed" : weak && weak.length ? "Verb table · your weak spots" : null);
   const started = VG_TENSES.filter(t => t === item.tense || rec(vgId(item.it, t)).box >= 1);
   const sents = verbSentences(item), R = "recognition", W = "production";
   const T = {}, make = {}; // the drills this item can be given now: typeKey → [chance, kind], and how each is built
@@ -21171,9 +21185,10 @@ function verbGymExercise(ex, item, r, force, opt) {
     promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
     accepted: vgAcc(item, p), shownAnswer: pl(p) + " " + item.forms[p] }); };
   if (box <= 1) {
-    const ctx = sents.length ? vgTry(ex, (t) => vgCtxExercise(t, item, pick(sents), box)) : null;
+    const ctx = sents.length ? vgTry(ex, (t) => vgCtxExercise(t, item, chooseS(sents), box)) : null;
     offer("vctx", 0.15, R, !!ctx, () => Object.assign(ex, ctx));
-    add("vtable", ctx ? 0.43 : 0.58, W, () => table()); // Verb in a sentence takes its share from the table's
+    const wt = () => weak && weak.length ? table(weak, "Verb table · your weak spots") : table();
+    add("vtable", ctx ? 0.43 : 0.58, W, wt); // Verb in a sentence takes its share from the table's
     const pp = choose(P), po = vgPickOptions(item, pp);
     offer("vpick", 0.16, R, po.opts.length >= 2, () => pickEx(pp, po));
     offer("vtenseid", 0.08, R, started.length >= 2 && plan.tenseid.length > 0, tenseidEx);
@@ -21181,11 +21196,12 @@ function verbGymExercise(ex, item, r, force, opt) {
     add("vspot", 0.12 + spare, W, spotEx);
   } else {
     const clued = sents.filter(x => x.clue);
-    const fit = box >= 3 && clued.length && item.tense !== "imperativo" ? vgTry(ex, (t) => vgFitExercise(t, item, pick(clued), box)) : null;
+    const fit = box >= 3 && clued.length && item.tense !== "imperativo" ? vgTry(ex, (t) => vgFitExercise(t, item, chooseS(clued), box)) : null;
     const ctxW = sents.length ? 0.12 : 0, fitW = fit ? 0.12 : 0, m = 1 - ctxW - fitW; // the others in proportion
-    if (ctxW) add("vctx", ctxW, W, () => vgCtxExercise(ex, item, pick(sents), box));
+    if (ctxW) add("vctx", ctxW, W, () => vgCtxExercise(ex, item, chooseS(sents), box));
     if (fit) add("vfit", fitW, fit.kind === "recognition" ? R : W, () => Object.assign(ex, fit));
-    add("vtable", 0.30 * m, W, () => table());
+    const wt = () => weak && weak.length ? table(weak, "Verb table · your weak spots") : table();
+    add("vtable", 0.30 * m, W, wt);
     add("vmeaning", 0.12 * m, W, () => { const p = choose(P), mm = vgMeaningAnswers(item, p);
       Object.assign(ex, { type: "From English", typeKey: "vmeaning", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, others: mm.others, sayAnswer: said(p),
         promptHtml: `<span class="en">${esc(arr(item.en)[0])}</span> <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">type the Italian verb form</div>`,
@@ -21440,6 +21456,8 @@ function sessionIds(kind, unitId) { // the items a session of this kind takes (b
     const fresh = verbNewIds().slice(0, Math.min(nNew, per));
     ids = dueIds("vb").slice(0, Math.max(0, per - fresh.length)).concat(fresh);
     if (ids.length < per) ids = ids.concat(shuffle((content.byUnit.vb || []).map(i => i.id).filter(id => !ids.includes(id) && rec(id).box >= 1)).slice(0, per - ids.length));
+  } else if (kind === "vweak") { // Practise my weak spots (from 9.31, on Stats)
+    ids = vgWeakIds();
   } else if (VG_FOCUS[kind]) { // Practise this verb, a tense or a family (from 9.31)
     ids = vgFocusIds(kind, unitId);
   } else if (kind === "section") { // Practise this section (from 9.6): its items due, then new (as many as today allows), then the rest, least known first
@@ -21469,9 +21487,18 @@ function lessonOrder(unitId, ids) {
   for (const id of ids) { const at = itemSection(id), k = at && at.unit === unitId ? at.index : Infinity; if (by.has(k)) by.get(k).push(id); else by.set(k, [id]); }
   return [...by.keys()].sort((a, b) => a - b).flatMap(k => shuffle(by.get(k)));
 }
-const BALANCED = new Set(["continue", "unit", "section", "review", "wild", "hard", "mistakes", "verbs", "vverb", "vtense", "vfam"]); // grammar and (from 9.31) Verbs sessions, focus sessions included: planSession chooses their exercises
+const BALANCED = new Set(["continue", "unit", "section", "review", "wild", "hard", "mistakes", "verbs", "vverb", "vtense", "vfam", "vweak"]); // grammar and (from 9.31) Verbs sessions, focus sessions included: planSession chooses their exercises
+// What every exercise of a session asks of makeExercise besides the plan's hint (from 9.31): in Practise my weak spots, a verb
+// tense's persons missed (a table asks only those; a drill on one form picks one of them). Set by buildSession for the
+// session being built, and by the running session's kind for its follow-ups and repeats, so follow-ups and repeats keep to them too.
+let BUILDING = null; // the kind of session being built, while buildSession runs
+const sessionHint = (item) => (BUILDING !== null ? BUILDING : session && session.kind) === "vweak" && item.type === "vtense" ? { persons: vgMissedPersons(item) } : undefined;
 function buildSession(kind, unitId) {
   const ids = shuffle(uniqueByPid(sessionIds(kind, unitId)));
+  BUILDING = kind;
+  try { return buildQueue(kind, unitId, ids); } finally { BUILDING = null; }
+}
+function buildQueue(kind, unitId, ids) {
   const queue = BALANCED.has(kind) && !(kind === "unit" && isSideUnit(unitId)) ? planSession(ids)
     : ids.map(id => ({ ex: makeExercise(content.items[id], rec(id)), repeat: false })).filter(q => q.ex); // a vocab pack, as before
   return { kind, unitId: kind === "continue" ? progress.currentUnit : unitId, queue, pos: 0, done: 0, total: queue.length, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
@@ -21501,7 +21528,7 @@ function planSession(ids) {
     }
     if (!q) {
       const n = out.length, run = n >= 2 && key(out[n - 1]) === key(out[n - 2]) ? key(out[n - 1]) : null;
-      const ex = makeExercise(item, r, undefined, isBalancedUnit(item.unit) ? { avoid: [last.get(pid(id)), run].filter(Boolean), prefer: unused() } : undefined);
+      const ex = makeExercise(item, r, undefined, isBalancedUnit(item.unit) ? Object.assign({ avoid: [last.get(pid(id)), run].filter(Boolean), prefer: unused() }, sessionHint(item)) : undefined);
       if (ex) q = { ex, repeat: false };
     }
     if (q) { out.push(q); count(key(q), 1); }
@@ -21510,7 +21537,7 @@ function planSession(ids) {
   for (const q of out.slice().sort((a, b) => used.get(key(b)) - used.get(key(a)))) {
     if (kinds() >= want) break;
     if (q.reintro || !isBalancedUnit(q.ex.item.unit) || used.get(key(q)) < 2) continue; // a kind used once would only be swapped for another
-    const ex = makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: unused(), avoid: [key(q)], anyKind: true });
+    const ex = makeExercise(q.ex.item, rec(q.ex.item.id), undefined, Object.assign({ prefer: unused(), avoid: [key(q)], anyKind: true }, sessionHint(q.ex.item)));
     if (ex && !used.get(ex.typeKey)) { count(key(q), -1); q.ex = ex; count(key(q), 1); }
   }
   return noTriples(out, key);
@@ -21560,6 +21587,61 @@ function noteType(ex) { // an answered exercise on a grammar item or a verb tens
     while (m.size > LAST_CAP) m.delete(m.keys().next().value);
     Store.set(LS_LASTTYPE, [...m]);
   } catch (e) { }
+}
+/* Weak spots in the Verbs section (from 9.31). Every verb form missed on this device is remembered: itapp.vgmiss.v1, a list
+   of [verb, tense (its place in VG_TENSES), person (0–5, as in the tables), times, last time missed], the cell missed last at
+   the end, at most VGMISS_CAP of them (about 65 KB at the cap, measured by tools/test-verbs.js), the oldest going first. A
+   cell is missed by a wrong cell of a Verb table (Don't know misses every cell asked) and by a wrong answer to a drill on one
+   form: Verb form, Pick the form, From English, Change the tense, Verb in a sentence and Which tense fits?. A later right
+   answer on the cell, outside a repeat (which comes moments after the answer was shown), takes one off its count, and at
+   nought it goes: weak spots heal. Stats shows them (Verbs: weak spots), Practise my weak spots drills them, and elsewhere a
+   drill on one form asks for a person missed in that tense about half the time. Kept out of progress, like
+   itapp.confusions.v1, so it never syncs and is never in a backup; read once; every read and write is guarded, and a device
+   that refuses to store it simply forgets. */
+const LS_VGMISS = "itapp.vgmiss.v1", VGMISS_CAP = 1500;
+const VG_ONE_FORM = new Set(["vspot", "vpick", "vmeaning", "vswitch", "vctx", "vfit"]); // the drills on one form whose miss is noted
+let VG_MISS = null;
+const vgMissKey = (verb, t, p) => verb + "\n" + t + "\n" + p;
+function vgMisses() { // key → [verb, tense, person, times, last], oldest first
+  if (VG_MISS) return VG_MISS;
+  VG_MISS = new Map();
+  try {
+    const v = Store.get(LS_VGMISS);
+    if (Array.isArray(v)) for (const e of v) if (Array.isArray(e) && e.length === 5 && typeof e[0] === "string" && e[0] && Number.isInteger(e[1]) && e[1] >= 0 && e[1] < VG_TENSES.length
+      && Number.isInteger(e[2]) && e[2] >= 0 && e[2] <= 5 && Number.isInteger(e[3]) && e[3] > 0 && Number.isFinite(e[4]) && e[4] >= 0) {
+      const k = vgMissKey(e[0], e[1], e[2]); VG_MISS.delete(k); VG_MISS.set(k, e.slice());
+    }
+    while (VG_MISS.size > VGMISS_CAP) VG_MISS.delete(VG_MISS.keys().next().value);
+  } catch (e) { VG_MISS = new Map(); }
+  return VG_MISS;
+}
+function noteVgMisses(item, wrong, right) { // persons missed (each counted once more) and persons answered right (each healed by one)
+  try {
+    const m = vgMisses(), t = VG_TENSES.indexOf(item.tense);
+    if (t < 0) return;
+    let changed = false;
+    for (const p of right) { const k = vgMissKey(item.it, t, p), e = m.get(k); if (!e) continue; changed = true; if (--e[3] <= 0) m.delete(k); }
+    for (const p of wrong) { const k = vgMissKey(item.it, t, p), e = m.get(k) || [item.it, t, p, 0, 0]; m.delete(k); e[3]++; e[4] = now(); m.set(k, e); changed = true; }
+    while (m.size > VGMISS_CAP) m.delete(m.keys().next().value);
+    if (changed) Store.set(LS_VGMISS, [...m.values()]);
+  } catch (e) { }
+}
+function noteVerbAnswer(ex, ok, repeat) { // after a Verbs exercise on forms: which cells it missed, and which it got right
+  if (!ex || ex.item.type !== "vtense") return;
+  if (ex.typeKey === "vtable") {
+    const cells = ex.lastCells || {}, wrong = ok ? [] : ex.cells.filter(p => !(cells[p] && cells[p].ok)), right = ex.cells.filter(p => !wrong.includes(p));
+    noteVgMisses(ex.item, wrong, repeat ? [] : right);
+  } else if (VG_ONE_FORM.has(ex.typeKey) && ex.person != null) noteVgMisses(ex.item, ok ? [] : [ex.person], ok && !repeat ? [ex.person] : []);
+}
+const vgMissedPersons = (item) => { // the persons missed in this verb tense, most missed first
+  const t = VG_TENSES.indexOf(item.tense), out = [];
+  for (const e of vgMisses().values()) if (e[0] === item.it && e[1] === t) out.push(e);
+  return out.sort((a, b) => b[3] - a[3] || b[4] - a[4]).map(e => e[2]);
+};
+function vgWeakIds() { // Practise my weak spots: the verb tenses with forms missed, most misses first, up to a Verbs session's length
+  const per = progress.settings.verbsPerSession || 12, by = new Map();
+  for (const e of vgMisses().values()) { const id = vgId(e[0], VG_TENSES[e[1]]); if (!content.items[id]) continue; const b = by.get(id) || { n: 0, last: 0 }; b.n += e[3]; b.last = Math.max(b.last, e[4]); by.set(id, b); }
+  return [...by.entries()].sort((a, b) => b[1].n - a[1].n || b[1].last - a[1].last).slice(0, per).map(([id]) => id);
 }
 /* Confusion memory (from 9.7). When a wrong answer is another item's right answer (cosa typed for "house", or the meaning of
    cosa chosen for casa), the pair is remembered on this device: itapp.confusions.v1, a list of [record id, record id, times]
@@ -21719,17 +21801,18 @@ function finishAnswer(ok, note, given, closest) {
   const teach = !!q.reintro && ex.kind === "recognition" && itemHasProduction(ex.item); // a tricky item's introduction: its follow-up is the answer that counts
   const out = applyResult(ex.item.id, ok, ex.kind, q.repeat || teach, ex.typeKey);
   noteType(ex);
+  noteVerbAnswer(ex, ok, q.repeat); // the Verbs section's weak spots (from 9.31)
   const other = ok ? null : confusedWith(ex, given), mixed = other ? { other, n: noteConfusion(ex.item.id, other.id) } : null;
   session.answered++;
   if (ok) session.correct++;
   if (!q.repeat) { session.xp += out.xp; if (out.promoted) session.promoted++; }
   if (!ok) {
-    session.queue.push({ ex: makeExercise(ex.item, rec(ex.item.id), ex.repeatForce), repeat: true, of: ex.item.id });
+    session.queue.push({ ex: makeExercise(ex.item, rec(ex.item.id), ex.repeatForce, sessionHint(ex.item)), repeat: true, of: ex.item.id });
     if (!session.missedIds.has(ex.item.id)) { session.missedIds.add(ex.item.id); session.missed.push({ item: ex.item, answer: ex.shownAnswer || ex.correct || "", it: missedItalian(ex), context: ex.answerInContext, why: explainFor(ex, { ok: false, given }).why }); }
   } else if ((wasNew || q.reintro) && !q.repeat && !q.followup && ex.kind === "recognition" && itemHasProduction(ex.item) && session.kind !== "flashcards") {
     // second pass in the same session: a production exercise for the item just introduced (or introduced again, if tricky)
     const at = Math.min(session.queue.length, session.pos + 3 + Math.floor(Math.random() * 4));
-    session.queue.splice(at, 0, { ex: makeExercise(ex.item, rec(ex.item.id), "production"), repeat: false, followup: true });
+    session.queue.splice(at, 0, { ex: makeExercise(ex.item, rec(ex.item.id), "production", sessionHint(ex.item)), repeat: false, followup: true });
   }
   S.feedback = { ok, note, given, closest, ex, res: out, intro: wasNew || !!q.reintro, mixed }; S.answeredAt = Date.now(); S.retry = null; S.flagOpen = false;
   render();
@@ -22314,7 +22397,7 @@ function renderSummary() {
   const s = session;
   const acc = s.answered ? Math.round(100 * s.correct / s.answered) : 0;
   const goal = progress.settings.goal || 30, xp = today().xp || 0;
-  const focus = VG_FOCUS[s.kind] ? `<p class="eyebrow sumfocus">Focus: ${esc(vgFocusName(s.kind, s.unitId))}</p>` : ""; // a focus session names its verb, tense or family
+  const focus = VG_FOCUS[s.kind] || s.kind === "vweak" ? `<p class="eyebrow sumfocus">Focus: ${s.kind === "vweak" ? "your weak spots" : esc(vgFocusName(s.kind, s.unitId))}</p>` : ""; // a focus session names its verb, tense or family
   return `<header class="hdr"><div class="hdr-t">${focus}<h1 class="title">Session complete</h1></div></header>
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
@@ -22616,8 +22699,23 @@ function renderStats() {
   ${lapsed.length ? table("Most missed", lapsed.map(([id, n]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapse${n === 1 ? "" : "s"}</td><td class="muted">box ${rec(id).box}</td></tr>`).join("")) : ""}
   ${tricky.length ? table("Tricky items", tricky.map(([id, n, box]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapses</td><td class="muted">box ${box}</td></tr>`).join(""), `<p class="small muted" id="tricky-note">Missed ${TRICKY_LAPSES} times or more and not yet past box ${TRICKY_BOX}: each one starts again with its introduction and explanation the next time it comes up, then a typed follow-up.</p>`) : ""}
   ${anyLapses ? `<button type="button" class="wide" data-start="hard">Practise the most-missed items<small>the 15 items you have got wrong most often, across all units</small></button>` : ""}
+  ${content.unitById.vb ? weakSpotsHtml() : ""}
   ${days.length ? table("Recent days", days.map(d => `<tr><td>${d}</td><td>${progress.days[d].xp || 0} XP</td><td class="muted">${progress.days[d].new || 0} new</td></tr>`).join("")) : ""}
   ${byType.length ? table("Accuracy by exercise type, 30 days", byType.map(([k, v]) => `<tr><td>${esc(typeName[k] || k)}</td><td>${Math.round(100 * v[0] / v[1])}%</td><td class="muted">${v[0]}/${v[1]}</td></tr>`).join(""), `<p class="small muted">Weakest types first.</p>`) : ""}`;
+}
+/* Verbs: weak spots on Stats (from 9.31): the verb forms missed on this device (itapp.vgmiss.v1), by person and by tense as
+   bars, each with its label and number (the bar is never the only signal), the 8 cells missed most, and Practise my weak spots. */
+function weakSpotsHtml() {
+  const list = [...vgMisses().values()].filter(e => content.items[vgId(e[0], VG_TENSES[e[1]])]);
+  if (!list.length) return groupHtml("Verbs: weak spots", `<div class="card weak"><p class="small muted">None yet. Each verb form you get wrong is noted here, and drops off as you get it right again.</p></div>`
+    + `<button type="button" class="wide" data-start="vweak" disabled aria-describedby="weak-none">Practise my weak spots</button><p class="small muted" id="weak-none">Nothing to practise yet.</p>`);
+  const byP = [0, 0, 0, 0, 0, 0], byT = VG_TENSES.map(() => 0);
+  for (const e of list) { byP[e[2]] += e[3]; byT[e[1]] += e[3]; }
+  const bars = (title, rows) => { const top = Math.max(1, ...rows.map(r => r[1])); return `<h3 class="wk-h">${esc(title)}</h3><div class="wkbars">` + rows.map(([l, n]) => `<div class="wkrow"><span class="wk-l">${esc(l)}</span>${bar(100 * n / top, "bar6")}<span class="wk-n">${fmtN(n)}</span></div>`).join("") + `</div>`; };
+  const top = list.slice().sort((a, b) => b[3] - a[3] || b[4] - a[4]).slice(0, 8).map(e => { const t = VG_TENSES[e[1]], it = content.items[vgId(e[0], t)]; return `<li><b>${esc(vgPerson(t, e[2]))} · ${esc(e[0])} · ${esc(TENSE_LABEL[t])}:</b> ${esc(it.forms[e[2]])}, missed ${e[3]} time${e[3] === 1 ? "" : "s"}</li>`; }).join("");
+  return groupHtml("Verbs: weak spots", `<div class="card weak">` + bars("By person", PERSONS.map((l, i) => [l, byP[i]])) + bars("By tense", VG_TENSES.map((t, i) => [TENSE_LABEL[t], byT[i]]))
+    + `<h3 class="wk-h">Missed most</h3><ol class="wk-top">${top}</ol></div>`
+    + `<button type="button" class="wide" data-start="vweak">Practise my weak spots<small>the verb tenses you get wrong most, asking for the forms you miss</small></button>`);
 }
 /* The forecast on Stats (from 9.5): a column for each of the next 7 days, tomorrow first, as tall as the number of items
    that fall due that day (the number on top), then the same days by kind in a table. One series in the accent colour, so
@@ -23579,7 +23677,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.31";
-const CHANGES = "Verbs practice is now balanced like the grammar units, with a different kind of exercise each time. On the Verbs page you can practise one tense, one verb or one family of verbs."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "Verbs practice is now balanced like the grammar units, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, with a button to practise just those."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());

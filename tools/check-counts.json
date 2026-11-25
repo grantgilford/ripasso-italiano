@@ -14,6 +14,6 @@
   "test-speedups.js": 64,
   "test-storage.js": 146,
   "test-storage.js --require-old": 146,
-  "test-ui.js": 1262,
-  "test-verbs.js": 5
+  "test-ui.js": 1300,
+  "test-verbs.js": 19
 }
