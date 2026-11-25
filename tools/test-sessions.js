@@ -58,6 +58,11 @@
        focus, ever takes a newer tense as new, while the started ones beyond it still come up for review;
        Today's Verbs tile, the Units card and the reference's rows count new tenses accordingly (worked out
        here the plain way); and set back to All, the next tense opens again.
+   10. The Verbs part of the summary (from 9.31): after a Verbs session in which one verb's presente
+       reaches box 5, another verb's last tense is learned and a third verb is missed, the summary lists
+       "New tense open: parlare · passato prossimo", "Every tense learned: guardare" and, under Verbs you
+       missed, andare with Practise this verb, which starts a session of that verb; no answer panel in the
+       session offers it.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -73,6 +78,7 @@ const { chromium } = loadPlaywright();
 const results = checks(), { check, section } = results;
 const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefined' && S.screen === 'home'";
 const DAY = 864e5;
+const vgIdOf = (verb, tense) => "vg-" + verb + "-" + tense; // a verb tense's id, as the app makes it
 
 // Run in the page before the app: a seeded Math.random (mulberry32) and a stand-in Italian voice, so canListen() is true.
 const INIT = `(() => {
@@ -600,6 +606,45 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check(`with the cap at the imperfetto, no session (Verbs, a tense, a family, a verb) takes a newer tense as new (${r.fresh} new ones taken), while those already started still come up for review (${r.reviews})`, !r.bad.length && r.fresh > 0 && r.reviews > 0, r.bad.slice(0, 5).join("\n"));
       check(`Today's Verbs tile, the Units card and the reference count new tenses within the cap (${r.plainNew} new)`, r.tile.includes(`${r.plainNew} new`) && r.card.includes(`${r.plainNew} new`) && /condizionale held back/.test(r.row) && !/ new/.test(r.row),JSON.stringify({ tile: r.tile, card: r.card, row: r.row }));
       check("set back to All, the next tense opens again", r.after > 0);
+      check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 10. The Verbs part of the summary */
+    {
+      const { page, context } = await open(browser, origin, { seed: false });
+      section("10. The Verbs part of the summary (from 9.31)");
+      const r = await page.evaluate(() => {
+        const T = Date.now(), put = (id, box, due) => { progress.items[pid(id)] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 6, lastRight: T - 864e5 }; };
+        put(vgId("parlare", "presente"), 4, T - 1000);
+        for (const t of VG_TENSES) if (vgItem("guardare", t)) put(vgId("guardare", t), t === "congiuntivo_imperfetto" ? 4 : 5, t === "congiuntivo_imperfetto" ? T - 2000 : T + 30 * 864e5);
+        put(vgId("andare", "presente"), 2, T - 3000);
+        saveProgress();
+        startSession("verbs");
+        const want = [vgId("parlare", "presente"), vgId("guardare", "congiuntivo_imperfetto")];
+        for (const q of session.queue) if (want.includes(q.ex.item.id)) q.ex = makeExercise(q.ex.item, rec(q.ex.item.id), "production"); // a table: a typed answer, which moves a tense at box 4
+        render();
+        const out = { inSession: session.queue.filter(q => want.concat(vgId("andare", "presente")).includes(q.ex.item.id)).length, panelLink: false };
+        for (let n = 0; S.screen === "session" && n < 300; n++) {
+          const q = current();
+          if (!S.feedback) { finishAnswer(!(q.ex.item.it === "andare" && !q.repeat), "", ""); if (document.querySelector(".fb [data-vfocus], .fb [data-start]")) out.panelLink = true; }
+          continueSession();
+        }
+        render();
+        out.screen = S.screen;
+        out.news = (session.vgNews && { opened: session.vgNews.opened.map(i => i.id), learned: session.vgNews.learned, missed: session.vgNews.missed }) || null;
+        out.lines = [...document.querySelectorAll(".vnews")].map(e => e.textContent);
+        const b = document.querySelector('.vmiss [data-vfocus="vverb:andare"]');
+        out.missBtn = !!b && b.textContent === "Practise this verb" && /andare/.test(b.closest(".vmiss").textContent);
+        return out;
+      });
+      check("the session holds the three verb tenses set up", r.inSession === 3, JSON.stringify(r));
+      check("after it the summary says New tense open: parlare · passato prossimo", r.screen === "summary" && r.lines.includes("New tense open: parlare · passato prossimo") && r.news && r.news.opened.includes(vgIdOf("parlare", "passato_prossimo")), JSON.stringify(r.lines));
+      check("…and Every tense learned: guardare", r.lines.includes("Every tense learned: guardare") && r.news.learned.join() === "guardare", JSON.stringify(r.news));
+      check("…and lists andare under Verbs you missed, with Practise this verb", r.missBtn && r.news.missed.join() === "andare", JSON.stringify(r.news));
+      check("no answer panel in the session offers a way out to another session", !r.panelLink);
+      await page.click('.vmiss [data-vfocus="vverb:andare"]');
+      const s2 = await page.evaluate(() => ({ screen: S.screen, kind: session && session.kind, unit: session && session.unitId, only: session && session.queue.every(q => q.ex.item.it === "andare") }));
+      check("Practise this verb there starts a session of that verb", s2.screen === "session" && s2.kind === "vverb" && s2.unit === "andare" && s2.only, JSON.stringify(s2));
       check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
     }

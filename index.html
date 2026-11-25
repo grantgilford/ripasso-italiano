@@ -781,6 +781,10 @@ u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-dec
 .tchip { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 8px 14px; border-radius: 14px; background: var(--card); color: var(--fg); text-align: left; }
 .tchip-t { font-size: 15px; font-weight: 600; line-height: 1.25; }
 .tchip-n { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.vnews { padding: 12px 16px; font-size: 15px; line-height: 1.4; } /* the summary's Verbs part (from 9.31) */
+.vmiss { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
+.vmiss-t { min-width: 0; }
+.vmiss > button { flex: none; }
 .weak { display: flex; flex-direction: column; gap: 6px; } /* Verbs: weak spots on Stats (from 9.31) */
 .weak p { margin: 0; }
 .wk-h { margin: 8px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -21591,10 +21595,28 @@ function buildSession(kind, unitId) {
   BUILDING = kind;
   try { return buildQueue(kind, unitId, ids); } finally { BUILDING = null; }
 }
+/* The Verbs part of a session's summary (from 9.31). As a session is built, each verb it holds is noted with the tenses
+   open or started and whether all of them are learned (vgVerbState); as it ends, the same again: a tense open now that
+   wasn't is a New tense open, a verb with every tense learned now that wasn't has learned them all. */
+function vgVerbState(verb) {
+  const ts = verbTenses(VERB_GYM.find(v => v.it === verb) || { it: verb });
+  return { open: ts.filter(i => rec(i.id).box >= 1 || vgOpens(i)).map(i => i.id), learned: ts.length > 0 && ts.every(i => rec(i.id).box >= 5) };
+}
+function vgSessionStart(queue) { const m = new Map(); for (const q of queue) if (q.ex && q.ex.item.type === "vtense" && !m.has(q.ex.item.it)) m.set(q.ex.item.it, vgVerbState(q.ex.item.it)); return m; }
+function vgSessionNews(s) { // { opened: [verb-tense items now open], learned: [verbs], missed: [verbs] }, in the order met
+  const out = { opened: [], learned: [], missed: [] };
+  for (const [verb, was] of s.vgStart || []) {
+    const now = vgVerbState(verb);
+    for (const id of now.open) if (!was.open.includes(id) && rec(id).box === 0) out.opened.push(content.items[id]);
+    if (now.learned && !was.learned) out.learned.push(verb);
+  }
+  for (const m of s.missed) if (m.item.type === "vtense" && !out.missed.includes(m.item.it)) out.missed.push(m.item.it);
+  return out;
+}
 function buildQueue(kind, unitId, ids) {
   const queue = BALANCED.has(kind) && !(kind === "unit" && isSideUnit(unitId)) ? planSession(ids)
     : ids.map(id => ({ ex: makeExercise(content.items[id], rec(id)), repeat: false })).filter(q => q.ex); // a vocab pack, as before
-  return { kind, unitId: kind === "continue" ? progress.currentUnit : unitId, queue, pos: 0, done: 0, total: queue.length, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+  return { kind, unitId: kind === "continue" ? progress.currentUnit : unitId, queue, pos: 0, done: 0, total: queue.length, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false, vgStart: vgSessionStart(queue) };
 }
 /* Balanced sessions (from 9.5; Verbs sessions from 9.31). Once a grammar session's items are picked and shuffled, each one's exercise is chosen with
    the session in view, through makeExercise's hint (pickKey): avoid the kind of exercise (typeKey) the item was last shown
@@ -21944,6 +21966,7 @@ function continueSession() {
     }
     saveProgress();
     session.again = sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length > 0; // the summary's Another round
+    session.vgNews = vgSessionNews(session); // its Verbs part (from 9.31)
     S.screen = "summary";
   }
   render();
@@ -22495,8 +22518,19 @@ function renderSummary() {
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
   ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}${m.item.type === "grammar_mc" ? "" : sayBtn(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" || m.item.type === "sort" || m.item.type === "match" ? `<div class="small muted">${esc(m.item.prompt || "")}</div>` : m.item.type === "reply" ? `<div class="small muted">${esc(m.item.line)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
+  ${verbNewsHtml(s.vgNews)}
   <div class="btnrow sumbtns"><button type="button" data-act="again"${s.again ? "" : ` disabled aria-describedby="again-none"`}>Another round</button><button type="button" class="primary" data-go="home">Back to Today</button></div>
   ${s.again ? "" : `<p class="small muted" id="again-none">Nothing left to practise in this kind of session right now.</p>`}`;
+}
+/* After a session with verb tenses in it (from 9.31): the tenses that opened, any verb that has now learned all its tenses, and
+   the verbs missed, each with Practise this verb: here, once the session is over, never in it, where it would end the session. */
+function verbNewsHtml(n) {
+  if (!n || !(n.opened.length || n.learned.length || n.missed.length)) return "";
+  const gloss = (verb) => arr((VERB_GYM.find(v => v.it === verb) || {}).en)[0] || "";
+  const lines = n.opened.map(i => `<div class="vnews">New tense open: <b>${esc(i.it)} · ${esc(TENSE_LABEL[i.tense])}</b></div>`)
+    .concat(n.learned.map(v => `<div class="vnews">Every tense learned: <b>${esc(v)}</b></div>`));
+  return (lines.length ? groupHtml("Verbs", `<div class="card rows">${lines.join("")}</div>`) : "")
+    + (n.missed.length ? groupHtml("Verbs you missed", `<div class="card rows">` + n.missed.map(v => `<div class="vmiss"><div class="vmiss-t"><span class="it">${esc(v)}</span> <span class="small muted">${esc(gloss(v))}</span></div><button type="button" data-vfocus="vverb:${esc(v)}">Practise this verb</button></div>`).join("") + `</div>`) : "");
 }
 function boxTag(id) { const r = rec(id); return r.box === 0 ? "" : ` <span class="box">box ${r.box}${r.box >= 5 ? " ✓" : ""}</span>`; }
 /* ---------- lessons ---------- */
@@ -23771,7 +23805,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.31";
-const CHANGES = "Verbs practice is now balanced like the grammar units, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, verb tables underline irregular forms, and Settings can stop new tenses opening after one you choose."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "Verbs practice is now balanced, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, tables underline irregular forms, Settings can stop new tenses opening, and the summary says which tenses opened."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());

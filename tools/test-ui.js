@@ -114,7 +114,9 @@
        chip starts a session of that tense, the back button then asks before
        leaving, and the summary names the focus; the back arrow returns to
        Units. An opened row's irregular forms are underlined, dotted, with the
-       legend under the first table that has them. Stats' Verbs: weak spots card (You › Stats), empty with its
+       legend under the first table that has them. The summary of a Verbs
+       session lists a verb missed under Verbs you missed, with Practise this
+       verb, which starts a session of it. Stats' Verbs: weak spots card (You › Stats), empty with its
        button disabled and saying why, then with misses saved: the bars by
        person and by tense, each with its label and number, the cells missed
        most, and Practise my weak spots, which starts that session.
@@ -259,10 +261,13 @@ async function verbsScreens(browser, origin) {
     await page.goBack(); await settle(page);
     check(L("…in which the back button asks before leaving"), (await page.evaluate("S.leaveAsk")) && !!(await page.$("#sheetBg")));
     await tap(page, '[data-act="stay"]');
-    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } render(); }); await settle(page);
+    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(n > 0 || current().repeat, "", ""); continueSession(); } render(); }); await settle(page); // the first one missed
     check(L("its summary names the focus"), (await screen(page)) === "summary" && /^Focus: presente$/.test(await page.textContent(".sumfocus")));
+    check(L("…and lists the verb missed under Verbs you missed, with Practise this verb"), await page.evaluate(() => { const b = document.querySelector(".vmiss [data-vfocus]"); return !!b && b.offsetParent !== null && b.dataset.vfocus === "vverb:" + session.missed[0].item.it; }));
     await layout(page, L("the summary of a focus session"), opts);
-    await tap(page, '.sumbtns [data-go="home"]');
+    await tap(page, '.vmiss [data-vfocus]');
+    check(L("…which starts a session of that verb"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vverb"));
+    await page.evaluate(() => { session = null; S.screen = "home"; render(); }); await settle(page);
     await page.evaluate(() => { S.screen = "reference"; S.refUnit = "vb"; render(); });
     await tap(page, '.hdr .back[data-go="units"]');
     check(L("the back arrow returns to Units"), (await screen(page)) === "units");

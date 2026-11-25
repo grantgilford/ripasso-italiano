@@ -10,10 +10,10 @@
   "test-reports.js": 40,
   "test-rules.js": 1448,
   "test-rules.js --no-browser": 1436,
-  "test-sessions.js": 106,
+  "test-sessions.js": 113,
   "test-speedups.js": 64,
   "test-storage.js": 146,
   "test-storage.js --require-old": 146,
-  "test-ui.js": 1305,
+  "test-ui.js": 1315,
   "test-verbs.js": 24
 }
