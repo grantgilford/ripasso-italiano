@@ -113,7 +113,8 @@
        Practise this verb in an opened row, each within the layout rules; a
        chip starts a session of that tense, the back button then asks before
        leaving, and the summary names the focus; the back arrow returns to
-       Units. Stats' Verbs: weak spots card (You › Stats), empty with its
+       Units. An opened row's irregular forms are underlined, dotted, with the
+       legend under the first table that has them. Stats' Verbs: weak spots card (You › Stats), empty with its
        button disabled and saying why, then with misses saved: the bars by
        person and by tense, each with its label and number, the cells missed
        most, and Practise my weak spots, which starts that session.
@@ -248,6 +249,10 @@ async function verbsScreens(browser, origin) {
     await layout(page, L("the Verbs reference"), opts);
     await tap(page, 'details.vref[data-verb="andare"] summary');
     check(L("an opened row starts with Practise this verb"), await page.evaluate(() => { const b = document.querySelector('details.vref[data-verb="andare"] [data-vfocus="vverb:andare"]'); return !!b && b.offsetParent !== null && !b.disabled; }));
+    check(L("its irregular forms are underlined (dotted, in the accent colour), with the legend under the first table that has them"), await page.evaluate(() => {
+      const d = document.querySelector('details.vref[data-verb="andare"]'), u = d.querySelector("u.irr"), k = d.querySelector(".vkey"), accent = getComputedStyle(d.querySelector(".vgo button")).color; // a secondary button's text is the accent colour
+      return !!u && getComputedStyle(u).textDecorationStyle === "dotted" && getComputedStyle(u).textDecorationColor === accent && !!k && k.offsetParent !== null && /Underlined: breaks the pattern/.test(k.textContent) && !!k.previousElementSibling.querySelector("u.irr");
+    }));
     await layout(page, L("the Verbs reference with a row open"), opts);
     await tap(page, '[data-vfocus="vtense:presente"]');
     check(L("a tense chip starts a session of that tense"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vtense" && session.unitId === "presente" && session.queue.every(q => q.ex.item.tense === "presente")));

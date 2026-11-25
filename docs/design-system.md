@@ -245,6 +245,8 @@ The open unit card (the current unit's, or the one just tapped) has a 2 px `--ac
 
 **Tables** (lessons, glossary, conjugations). No outer border; 1 px `--line` rules between rows; header row in `--muted` 13 px 600 (or `--accent` for column heads naming a verb, as in the lesson mockup); 8 px cell padding. Wide tables keep their `overflow-x: auto` wrapper.
 
+**Irregular forms** (from 9.31), in every Verbs section table (the New verb and New tense card, the answer panel, the Verbs reference and Look up): each form the regular pattern doesn't give has a dotted 2 px underline in `--accent`, 3 px below the text (`u.irr`), and a visually hidden "(irregular)" for a screen reader, which the table's speaker never reads; in the *passato prossimo* only the participle is underlined, never the auxiliary. Under the first table with marks (in the reference, the first in each opened row) a one-line legend in Small `--muted` (`.vkey`, 13 px): "Underlined: breaks the pattern.", the word "Underlined" itself underlined as the key. A verb irregular throughout (essere, avere, the verbs with built-in pronouns, and any verb nine of whose forms in ten would be underlined: fare, rifare, bere) has no underlining; the same line says "essere is irregular throughout, so its forms aren't underlined one by one." The colour is never the only signal: the underline is a shape, and the legend names it.
+
 ---
 
 ## 8. Screens

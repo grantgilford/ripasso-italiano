@@ -768,6 +768,8 @@ th { color: var(--muted); font-size: 13px; font-weight: 600; vertical-align: bot
 .conjtable span { display: inline-block; width: 4.5em; color: var(--muted); font-size: 14px; font-weight: 400; }
 .conjtable.subj span { width: 5.6em; white-space: nowrap; }
 .conjtable b { font-weight: 700; }
+u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; } /* a form that breaks the regular pattern (from 9.31) */
+.vkey { margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .vref { padding: 10px 16px; }
 .vref summary { min-height: 44px; padding: 4px 0; cursor: pointer; color: var(--fg); }
 .vref summary::marker { color: var(--muted); }
@@ -19874,7 +19876,8 @@ function conjWrap(table, forms, tense) {
 }
 function conjRead(b) {
   const t = b.previousElementSibling; if (!t) return "";
-  return [...t.children].map(r => { const p = r.querySelector("span"), f = r.textContent.slice(p ? p.textContent.length : 0).trim(); return !f || f === "—" || f === "-" ? "" : b.dataset.conj === "bare" || !p ? f : p.textContent.trim() + " " + f; }).filter(Boolean).join("\n");
+  const said = (el) => [...el.childNodes].map(n => n.nodeType === 3 ? n.nodeValue : n.classList && n.classList.contains("vh") ? "" : said(n)).join(""); // not the words only a screen reader hears, such as "(irregular)"
+  return [...t.children].map(r => { const p = r.querySelector("span"), f = said(r).slice(p ? p.textContent.length : 0).trim(); return !f || f === "—" || f === "-" ? "" : b.dataset.conj === "bare" || !p ? f : p.textContent.trim() + " " + f; }).filter(Boolean).join("\n");
 }
 function itemLabel(it) {
   if (it.type === "grammar_mc") return it.prompt;
@@ -20858,6 +20861,85 @@ function explainFor(ex, fb) {
   return out;
 }
 
+/* ---------- the regular pattern (from 9.31) ----------
+   What the -are, -ere and -ire endings give on an infinitive's stem, with the spelling rules that count as regular: -care and
+   -gare keep the hard sound (cerchi, pagherò), -ciare and -giare drop the i before e or i (mangi, mangerò), other -iare verbs
+   drop it before i unless it is stressed (studi, but invii, so both are accepted there), and -isc- verbs put -isc- in the
+   singular and loro of the presente, the congiuntivo presente and the commands. The one copy: tools/check-content.js loads it
+   to check the regular families, and the Verbs tables mark each form it doesn't give (vgIrregular). */
+const REG_END = {
+  are: { presente: ["o", "i", "a", "iamo", "ate", "ano"], imperfetto: ["avo", "avi", "ava", "avamo", "avate", "avano"], futuro: ["erò", "erai", "erà", "eremo", "erete", "eranno"], condizionale: ["erei", "eresti", "erebbe", "eremmo", "ereste", "erebbero"],
+    congiuntivo_presente: ["i", "i", "i", "iamo", "iate", "ino"], congiuntivo_imperfetto: ["assi", "assi", "asse", "assimo", "aste", "assero"], imperativo: [null, "a", "i", "iamo", "ate", "ino"] },
+  ere: { presente: ["o", "i", "e", "iamo", "ete", "ono"], imperfetto: ["evo", "evi", "eva", "evamo", "evate", "evano"], futuro: ["erò", "erai", "erà", "eremo", "erete", "eranno"], condizionale: ["erei", "eresti", "erebbe", "eremmo", "ereste", "erebbero"],
+    congiuntivo_presente: ["a", "a", "a", "iamo", "iate", "ano"], congiuntivo_imperfetto: ["essi", "essi", "esse", "essimo", "este", "essero"], imperativo: [null, "i", "a", "iamo", "ete", "ano"] },
+  ire: { presente: ["o", "i", "e", "iamo", "ite", "ono"], imperfetto: ["ivo", "ivi", "iva", "ivamo", "ivate", "ivano"], futuro: ["irò", "irai", "irà", "iremo", "irete", "iranno"], condizionale: ["irei", "iresti", "irebbe", "iremmo", "ireste", "irebbero"],
+    congiuntivo_presente: ["a", "a", "a", "iamo", "iate", "ano"], congiuntivo_imperfetto: ["issi", "issi", "isse", "issimo", "iste", "issero"], imperativo: [null, "i", "a", "iamo", "ite", "ano"] },
+};
+REG_END.isc = Object.assign({}, REG_END.ire, { presente: ["isco", "isci", "isce", "iamo", "ite", "iscono"], congiuntivo_presente: ["isca", "isca", "isca", "iamo", "iate", "iscano"], imperativo: [null, "isci", "isca", "iamo", "ite", "iscano"] });
+const REG_PP = { are: "ato", ere: "uto", ire: "ito", isc: "ito" }; // the regular participle
+function regJoin(stem, end, isAre) { // stem + ending, with the -are spelling rules: every spelling the rules allow
+  if (!isAre) return [stem + end];
+  if (/[cg]$/.test(stem) && /^[ei]/.test(end)) return [stem + "h" + end];
+  if (/[cg]i$/.test(stem) && /^[ei]/.test(end)) return [stem.slice(0, -1) + end];
+  if (/i$/.test(stem) && /^i/.test(end)) return end === "iamo" ? [stem.slice(0, -1) + end] : [stem.slice(0, -1) + end, stem + end];
+  return [stem + end];
+}
+function regForms(inf, conj, tense) { // the regular forms of a tense, per person (each a list of spellings; null for the imperativo's io), or null
+  const e = REG_END[conj] && REG_END[conj][tense];
+  return e ? e.map(x => x == null ? null : regJoin(inf.slice(0, -3), x, conj === "are")) : null;
+}
+/* Which forms of a verb the regular pattern doesn't give (from 9.31), for the dotted underline in its tables: { throughout,
+   marks: { tense: Set of persons } } (for the passato prossimo, the persons whose participle breaks the pattern: every one or
+   none, as the auxiliary is never marked). Worked out once per verb, when its first table is drawn.
+   - The pattern is regForms on the infinitive's stem, with its spelling rules and -isc- (for a verb whose io form takes it);
+     the participle's is -ato, -uto or -ito; a reflexive verb is judged without its pronouns (alzati as alza).
+   - -porre, -durre and -trarre verbs are judged on their longer old infinitive (proponere, producere, distraere), as their
+     family's note teaches (propongo, proponevo): on the short one every form would be marked.
+   - essere, avere and the verbs with built-in pronouns (andarsene, farcela, metterci) are irregular throughout: the table
+     says so once, under it, rather than underlining every form; so is any other verb whose marks would cover nine forms in
+     ten or more (fare, rifare, bere), where underlining would say no more than that. */
+const VG_THROUGHOUT = new Set(["aux", "pron"]);
+const VG_LONG_STEM = [[/porre$/, "ponere"], [/durre$/, "ducere"], [/trarre$/, "traere"]];
+const VG_IRR = new Map();
+function vgIrregular(verb) {
+  if (VG_IRR.has(verb)) return VG_IRR.get(verb);
+  const v = VERB_GYM.find(x => x.it === verb);
+  let out = null;
+  if (v && VG_THROUGHOUT.has(v.fam)) out = { throughout: true, marks: {} };
+  else if (v) {
+    const refl = /(ar|er|ir)si$/.test(v.it);
+    let base = refl ? v.it.replace(/(ar|er|ir)si$/, "$1e") : v.it;
+    for (const [re, long] of VG_LONG_STEM) if (re.test(base)) { base = base.replace(re, long); break; }
+    const bare = (f, t, p) => { // the form without its reflexive pronoun: mi alzo → alzo; alzati → alza, si alzi → alzi
+      let x = String(f).trim();
+      if (!refl) return x;
+      if (t === "imperativo" && p !== 2 && p !== 5) return x.replace(/(ti|ci|vi)$/, "");
+      return x.replace(/^(mi|ti|si|ci|vi) /, "");
+    };
+    const spell = (f) => String(f).split("/").filter((part, i) => i === 0 || !/^[aeio]$/.test(part)); // va'/vai: two forms; andato/a: one
+    const conj = /are$/.test(base) ? "are" : /ere$/.test(base) ? "ere" : /ire$/.test(base) ? (/isco$/.test(bare(v.f[0][0], "presente", 0)) ? "isc" : "ire") : null;
+    const marks = {};
+    if (conj) VG_TENSES.forEach((t, k) => {
+      const forms = v.f[k]; if (!forms) return;
+      const set = new Set();
+      if (t === "passato_prossimo") { if (!regJoin(base.slice(0, -3), REG_PP[conj], conj === "are").includes(v.pp)) forms.forEach((f, p) => { if (f !== "—") set.add(p); }); }
+      else { const reg = regForms(base, conj, t); if (reg) forms.forEach((f, p) => { if (f !== "—" && reg[p] && !spell(f).some(x => reg[p].includes(bare(x, t, p)))) set.add(p); }); }
+      if (set.size) marks[t] = set;
+    });
+    const all = v.f.filter(Boolean).flat().filter(f => f !== "—").length, n = Object.values(marks).reduce((k, x) => k + x.size, 0);
+    out = n >= 0.9 * all ? { throughout: true, marks: {} } : { throughout: false, marks };
+  }
+  VG_IRR.set(verb, out);
+  return out;
+}
+// Under a table: the legend where it has marks ("Underlined: breaks the pattern"), or, for a verb irregular throughout, a caption
+// saying so; "" otherwise.
+function vgKeyHtml(verb, tense) {
+  const r = vgIrregular(verb);
+  if (!r) return "";
+  if (r.throughout) return `<p class="vkey">${esc(verb)} is irregular throughout, so its forms aren't underlined one by one.</p>`;
+  return r.marks[tense] ? `<p class="vkey"><u class="irr">Underlined</u>: breaks the pattern.</p>` : "";
+}
 /* ---------- verb section ---------- */
 const vgId = (verb, tense) => "vg-" + verb + "-" + tense;
 function vgVerb(item) { return { it: item.it, en: item.en, group: item.group, forms: item.allForms, note: item.note }; }
@@ -20888,9 +20970,11 @@ function vgAccepted(form, p, tense) { // the form, with its subject pronoun, and
   const all = vars.concat(PRON_PREFIX[p].flatMap(pr => vars.map(v => pr + " " + v)));
   return /^congiuntivo/.test(tense || "") ? all.concat(all.map(v => "che " + v)) : all;
 }
-function vgTableHtml(item, tense, marks) { // marks: {p: true} bolded
-  const forms = item.allForms[tense];
-  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + esc(f) + "</b>" : esc(f)}</div>`).join("") + `</div>`, forms, tense);
+function vgTableHtml(item, tense, marks) { // marks: {p: true} bolded; a form the regular pattern doesn't give is underlined (from 9.31)
+  const forms = item.allForms[tense], irr = vgIrregular(item.it), odd = irr && irr.marks[tense];
+  const u = (t) => `<u class="irr">${esc(t)}<span class="vh"> (irregular)</span></u>`;
+  const cell = (f, i) => !odd || !odd.has(i) ? esc(f) : tense === "passato_prossimo" ? f.replace(/^(.*\s)?(\S+)$/, (m, a, b) => esc(a || "") + u(b)) : u(f); // the passato prossimo: only its participle
+  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + cell(f, i) + "</b>" : cell(f, i)}</div>`).join("") + `</div>`, forms, tense);
 }
 const VG_FORMS = new WeakMap(); // per verb (its allForms): each form's variants, normalised, in ladder order: [[tense, person, [variants]], …]
 function vgFormsElsewhere(item, form, exceptTense, exceptP) { // does this form also occur in another ladder tense / person?
@@ -21141,7 +21225,7 @@ function verbGymExercise(ex, item, r, force, opt) {
         + (item.note && (item.step === 0 || item.tense === "passato_prossimo" || /futur|stem|particip|essere|avere/i.test(item.note)) ? `<p>${esc(item.note)}</p>` : "")
         + `<h3>${esc(tl.charAt(0).toUpperCase() + tl.slice(1))}</h3><p class="muted small">${esc(TENSE_USE[item.tense])}</p>`
         + (item.tense === "passato_prossimo" ? `<p class="small">Auxiliary: <b>${item.aux === "e" ? "essere" : "avere"}</b>${item.aux === "e" ? ", so the participle agrees with the subject (-o/-a, -i/-e)" : ", so the participle never changes"}.</p>` : "")
-        + vgTableHtml(item, item.tense)
+        + vgTableHtml(item, item.tense) + vgKeyHtml(item.it, item.tense)
         + (vs0 ? vsHtml(vs0, "vs-in") : "") // the tense in a sentence (from 9.20)
         + `<p class="muted small" style="margin-top:10px">${ex0}</p>`,
       shownAnswer: item.forms.join(", ") });
@@ -21255,7 +21339,7 @@ function vgExplain(ex, fb, why, out) {
       if (same + more) why.push(`${same + more === 1 ? "The other right form is" : "The other right forms are"} under your answers${more ? "." : same === 1 ? "; it follows the same pattern." : "; they follow the same pattern."}`);
       if (!wrong.length) why.push(verbWhy(v, it.tense, 3));
       if (it.note) why.push(esc(it.note));
-      if (!wrong.length) out.table = vgTableHtml(it, it.tense);
+      if (!wrong.length) out.table = vgTableWithKey(it, it.tense);
       out.facts = `<b>${esc(fam[0])}:</b> ${esc(fam[1])}`;
       break;
     }
@@ -21266,7 +21350,7 @@ function vgExplain(ex, fb, why, out) {
       }
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vtenseid": {
@@ -21277,28 +21361,28 @@ function vgExplain(ex, fb, why, out) {
       why.push(esc(TENSE_CLUE[it.tense]));
       why.push(verbWhy(v, it.tense, ex.person));
       out.facts = esc(TENSE_USE[it.tense]);
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vaux": {
       if (it.aux === "e") why.push(it.fam === "refl" ? `${esc(it.it)} is reflexive, and every reflexive verb takes essere: the participle agrees with the subject (${esc(it.allForms.passato_prossimo[0])}).` : `${esc(it.it)} takes essere, like the verbs of going somewhere, staying, change of state, and happening or seeming (andare, restare, diventare, nascere, succedere, sembrare, piacere). The participle then agrees with the subject: ${esc(it.allForms.passato_prossimo[0])}, ${esc(it.allForms.passato_prossimo[3])}.`);
       else why.push(`${esc(it.it)} takes avere, like most verbs, and always verbs with a direct object (ho mangiato la pizza). With avere the participle doesn't change: ${esc(it.allForms.passato_prossimo[0])}, ${esc(it.allForms.passato_prossimo[3])}.`);
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, "passato_prossimo");
+      out.table = vgTableWithKey(it, "passato_prossimo");
       break;
     }
     case "vpick": {
       if (!fb.ok && fb.given && ex.optionNotes && ex.optionNotes[fb.given]) why.push(`<b>You chose ${esc(fb.given)}:</b> ${esc(ex.optionNotes[fb.given])}`);
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vmeaning": {
       why.push(`“${esc(arr(it.en)[0])}” is ${esc(it.it)}.` + (ex.others && ex.others.length ? ` ${ex.others.map(esc).join(", ")} ${ex.others.length === 1 ? "has" : "have"} that meaning too, so ${ex.others.length === 1 ? "its form is" : "their forms are"} right as well.` : ""));
       if (!fb.ok && fb.given) { const o = [...vgOwners(fb.given)].filter(x => x !== it.it); if (o.length) why.push(`<b>You wrote ${esc(fb.given)}:</b> that is a form of ${o.map(esc).join(" or ")}${o.some(x => vgItem(x, it.tense) && vgAcc(vgItem(x, it.tense), ex.person).map(normalize).includes(normalize(fb.given))) ? ", a different verb" : ""}.`); }
       why.push(verbWhy(v, it.tense, ex.person));
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vswitch": {
@@ -21306,7 +21390,7 @@ function vgExplain(ex, fb, why, out) {
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note && /futur|stem|particip|essere|avere/i.test(it.note)) why.push(esc(it.note));
       out.facts = esc(TENSE_USE[it.tense]);
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vinf": {
@@ -21319,7 +21403,7 @@ function vgExplain(ex, fb, why, out) {
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note) why.push(esc(it.note));
       out.facts = `<b>${esc(fam[0])}:</b> ${esc(fam[1])}`;
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vctx": case "vfit": {
@@ -21341,12 +21425,12 @@ function vgExplain(ex, fb, why, out) {
       if (sx.clue) why.push(`<b>${esc(sx.clue)}</b> points to ${esc(CLUE_POINTS[it.tense])}: ${esc(tl)}.`);
       why.push(verbWhy(v, it.tense, p));
       out.facts = esc(TENSE_USE[it.tense]);
-      out.table = vgTableHtml(it, it.tense, { [p]: true });
+      out.table = vgTableWithKey(it, it.tense, { [p]: true });
       break;
     }
     default: {
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, it.tense);
+      out.table = vgTableWithKey(it, it.tense);
     }
   }
 }
@@ -21399,6 +21483,7 @@ function renderVerbReference(u) {
     + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`
     + `<div class="results" id="refResults">${verbListHtml()}</div><button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`;
 }
+const vgTableWithKey = (item, tense, marks) => vgTableHtml(item, tense, marks) + vgKeyHtml(item.it, tense);
 // Every verb is a row that opens to show its tables. The tables are drawn when a row is opened (the listener below),
 // since all of them together would take several seconds on a phone; a filter opens the rows it leaves, so they come drawn.
 const filterVerbs = (f) => VERB_GYM.filter(v => !f || verbText(v).includes(f)); // f normalised
@@ -21420,7 +21505,8 @@ function verbListHtml() {
 }
 const verbTenses = (v) => VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
 function verbTablesHtml(v) {
-  return vgFocusBtn("vverb", v.it, "Practise this verb", vgVerbFocus(v), "vverb-none-" + v.it) + verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
+  let key = ""; // the legend of its underlining, or the caption of a verb irregular throughout: once, under the first table it belongs to (from 9.31)
+  return vgFocusBtn("vverb", v.it, "Practise this verb", vgVerbFocus(v), "vverb-none-" + v.it) + verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + (key ? "" : (key = vgKeyHtml(v.it, i.tense))) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
     + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "");
 }
 document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this listens on the way down
@@ -22581,7 +22667,7 @@ function glossaryHtml(u) { // a unit's items, by kind, as the filter leaves them
   return h;
 }
 function rowHtml(i) {
-  if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableHtml(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableWithKey(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "verb") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))}${i.group ? " · " + esc(i.group) : ""}</span> ${boxTag(i.id)}</div>` + Object.keys(i.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(i, t)).join("") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "vocab" && i.pos === "noun" && i.art) return `<div><span class="itx">${esc(joinArt(i.art, arr(i.it)[0]))}</span>${sayBtn(joinArt(i.art, arr(i.it)[0]))} <span class="muted">${esc(enList(i).join(", "))}</span> ${boxTag(i.id)}</div><div class="small">${esc(joinArt(i.indef, arr(i.it)[0]))} · ${esc(joinArt(i.artPl, i.plural))}</div>` + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "vocab") return `<div><span class="itx">${esc(arr(i.it).join(", "))}</span>${sayBtn(arr(i.it).join(", "))} <span class="small muted">${esc(posLabel(i.pos, i.gender))}</span> ${boxTag(i.id)}</div><div>${esc(enList(i).join(", "))}</div>` + (Array.isArray(i.forms) ? `<div class="small muted">${esc(formsText(i.forms))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
@@ -23677,7 +23763,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.31";
-const CHANGES = "Verbs practice is now balanced like the grammar units, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, with a button to practise just those."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "Verbs practice is now balanced like the grammar units, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, with a button to practise just those, and verb tables underline the irregular forms."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());

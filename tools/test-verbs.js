@@ -33,6 +33,14 @@
   only the persons missed and its drills on one form those persons; and elsewhere a drill on one form
   asks for a person missed in that tense about half the time.
 
+  Irregular forms marked (from 9.31): for 12 verbs checked by hand (HAND_MARKED below), exactly the forms
+  the regular pattern doesn't give are underlined in their rows of the Verbs reference, tense by tense
+  (the passato prossimo by its participle, never its auxiliary), each with "(irregular)" for a screen
+  reader that the speaker doesn't read; one legend in each row ("Underlined: breaks the pattern"), or a
+  caption for a verb irregular throughout (essere, and fare, nine forms in ten of which would be
+  underlined), and none for a regular verb; vgIrregular gives the same; and the New tense card and the
+  answer panel carry the legend under a table with marks.
+
   How much:
     (default)      every verb-tense (3,954 at 9.27), each kind it can give answered once: about four
                    minutes. Until 9.27 each kind was answered once at every box (158,397 exercises,
@@ -174,6 +182,7 @@ const SEEDER = (seed) => { let s = seed; Math.random = () => { s = (s + 0x6D2B79
   }
   // Weak spots (from 9.31), in a fresh page: the drills above have missed cells on purpose
   const weak = await weakSpots(browser, `http://127.0.0.1:${server.address().port}/index.html`);
+  const marks = await irregularMarks(browser, `http://127.0.0.1:${server.address().port}/index.html`);
   await browser.close(); server.close();
 
   const byKind = {};
@@ -188,9 +197,79 @@ const SEEDER = (seed) => { let s = seed; Math.random = () => { s = (s + 0x6D2B79
   const want = new Set(plan.items.map(([id]) => id.replace(/^vg-.*?-(presente|passato_prossimo|imperfetto|futuro|condizionale|imperativo|congiuntivo_presente|congiuntivo_imperfetto)$/, "$1")));
   T.check(`every tense of the verbs chosen is drilled (${drilled.size} of ${want.size})`, [...want].every(t => drilled.has(t)), "not drilled: " + [...want].filter(t => !drilled.has(t)).join(", "));
   T.check("no script errors", !errors.length, errors.slice(0, 5).join("\n"));
-  for (const [name, ok, detail] of weak) T.check(name, ok, detail);
+  for (const [name, ok, detail] of weak.concat(marks)) T.check(name, ok, detail);
   T.summary();
 })().catch(e => { T.stopped(e); T.summary(); });
+
+/* Irregular forms marked (from 9.31): the forms each of these verbs should have underlined, checked by hand against the regular
+   pattern (the -are, -ere or -ire endings on the infinitive's stem, the -care/-gare and -ciare/-giare spellings and -isc- counting as
+   regular, a reflexive verb without its pronouns; -porre verbs on their old infinitive, proponere): tense by tense, the forms as the
+   table shows them, the passato prossimo by its participle. "throughout": a caption instead of marks. */
+const HAND_MARKED = {
+  essere: "throughout",
+  parlare: {},
+  andare: { presente: "vado vai va vanno", futuro: "andrò andrai andrà andremo andrete andranno", condizionale: "andrei andresti andrebbe andremmo andreste andrebbero",
+    imperativo: "va'/vai vada vadano", congiuntivo_presente: "vada vada vada vadano" }, // va'/vai: the table shows both
+  fare: "throughout", // facevo, farò, fatto, faccia…: all but fa and fate would be underlined
+  venire: { presente: "vengo vieni viene vengono", passato_prossimo: "venuto/a venuto/a venuto/a venuti/e venuti/e venuti/e", futuro: "verrò verrai verrà verremo verrete verranno",
+    condizionale: "verrei verresti verrebbe verremmo verreste verrebbero", imperativo: "vieni venga vengano", congiuntivo_presente: "venga venga venga vengano" },
+  finire: {}, // finisco and finiscano: -isc- is the pattern of -isc- verbs
+  cercare: {}, // cerchi, cercherò: the h keeps the c hard
+  mangiare: {}, // mangi, mangerò: the i drops
+  prendere: { passato_prossimo: "preso preso preso preso preso preso" },
+  alzarsi: {}, // judged without its pronouns: alzati as alza
+  dire: { presente: "dico dici dice diciamo dicono", passato_prossimo: "detto detto detto detto detto detto", imperfetto: "dicevo dicevi diceva dicevamo dicevate dicevano",
+    imperativo: "di' dica diciamo dicano", congiuntivo_presente: "dica dica dica diciamo diciate dicano", congiuntivo_imperfetto: "dicessi dicessi dicesse dicessimo diceste dicessero" },
+  proporre: { presente: "propongo propongono", passato_prossimo: "proposto proposto proposto proposto proposto proposto", futuro: "proporrò proporrai proporrà proporremo proporrete proporranno",
+    condizionale: "proporrei proporresti proporrebbe proporremmo proporreste proporrebbero", imperativo: "proponga propongano", congiuntivo_presente: "proponga proponga proponga propongano" },
+};
+async function irregularMarks(browser, url) {
+  const out = [], check = (name, ok, detail) => out.push([name, !!ok, detail || ""]);
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await context.newPage();
+  const errors = []; page.on("pageerror", e => errors.push(String(e)));
+  await page.goto(url); await page.waitForFunction(() => typeof S !== "undefined" && S.screen === "home");
+  const r = await page.evaluate((HAND) => {
+    S.screen = "reference"; S.refUnit = "vb"; S.refFilter = ""; render();
+    const bad = [];
+    for (const [verb, want] of Object.entries(HAND)) {
+      const d = document.querySelector(`details.vref[data-verb="${verb}"]`); d.open = true; d.dispatchEvent(new Event("toggle"));
+      const tables = [...d.querySelectorAll(".conjtable")], items = verbTenses(VERB_GYM.find(v => v.it === verb));
+      if (tables.length !== items.length) { bad.push(`${verb}: ${tables.length} tables drawn for ${items.length} tenses`); continue; }
+      const keys = [...d.querySelectorAll(".vkey")].map(k => k.textContent);
+      items.forEach((it, k) => {
+        const got = [...tables[k].querySelectorAll("u.irr")].map(u => { const c = u.cloneNode(true); c.querySelectorAll(".vh").forEach(x => x.remove()); return c.textContent; }).join(" ");
+        const exp = want === "throughout" ? "" : (want[it.tense] || "");
+        if (got !== exp) bad.push(`${verb} · ${it.tense}: underlined “${got}”, by hand “${exp}”`);
+        if ([...tables[k].querySelectorAll("u.irr")].some(u => !/\(irregular\)/.test((u.querySelector(".vh") || {}).textContent || ""))) bad.push(`${verb} · ${it.tense}: a mark without its “(irregular)” for a screen reader`);
+        const fn = vgIrregular(verb), fnTxt = fn.throughout ? "" : [...(fn.marks[it.tense] || [])].sort((a, b) => a - b).map(p => it.tense === "passato_prossimo" ? it.forms[p].split(" ").pop() : it.forms[p]).join(" ");
+        if (fnTxt !== exp) bad.push(`${verb} · ${it.tense}: vgIrregular gives “${fnTxt}”, by hand “${exp}”`);
+      });
+      const caption = keys.filter(k => /irregular throughout/.test(k)).length, legend = keys.filter(k => /^Underlined: breaks the pattern\.$/.test(k)).length;
+      const marked = want !== "throughout" && Object.keys(want).length > 0;
+      if (want === "throughout" ? !(caption === 1 && keys.length === 1 && vgIrregular(verb).throughout) : marked ? !(legend === 1 && keys.length === 1) : keys.length !== 0) bad.push(`${verb}: its row's keys are ${JSON.stringify(keys)}`);
+      if (marked) { const first = [...d.children].find(e => e.matches(".vkey")), prev = first && first.previousElementSibling; if (!prev || !prev.querySelector("u.irr")) bad.push(`${verb}: the legend isn't under the first table with marks`); }
+    }
+    // the speaker reads the forms, not "(irregular)"
+    const b = document.querySelector('details.vref[data-verb="andare"] .conj > .say'), said = b && conjRead(b);
+    // the New tense card and the answer panel carry the legend
+    const item = vgItem("andare", "futuro"), intro = makeExercise(item, Object.assign({}, rec(item.id), { box: 0 }));
+    const div = document.createElement("div"); div.innerHTML = intro.introHtml;
+    const ex = makeExercise(item, Object.assign({}, rec(item.id), { box: 2 }), undefined, { prefer: ["vspot"], anyKind: true });
+    session = { kind: "verbs", unitId: "vb", queue: [{ ex, repeat: false }], pos: 0, done: 0, total: 1, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+    S.screen = "session"; S.feedback = null; resetExState(); render();
+    document.querySelector("#answer").value = "zzqx"; document.querySelector('[data-act="check"]').click();
+    const panel = document.querySelector(".fb");
+    return { bad, said, intro: !!div.querySelector("u.irr") && /Underlined: breaks the pattern/.test(div.textContent), panel: !!panel && !!panel.querySelector("u.irr") && /Underlined: breaks the pattern/.test(panel.textContent) };
+  }, HAND_MARKED);
+  check(`the forms underlined in the Verbs reference are exactly those checked by hand, tense by tense, for ${Object.keys(HAND_MARKED).length} verbs (${Object.keys(HAND_MARKED).join(", ")}), each with “(irregular)” for a screen reader`, !r.bad.filter(b => !/keys|legend/.test(b)).length, r.bad.filter(b => !/keys|legend/.test(b)).slice(0, 12).join("\n"));
+  check("each row has one legend under its first table with marks, or one caption for a verb irregular throughout, and a regular verb none", !r.bad.filter(b => /keys|legend/.test(b)).length, r.bad.filter(b => /keys|legend/.test(b)).join("\n"));
+  check("the table's speaker reads the forms, not “(irregular)”", r.said === "io vado\ntu vai\nlui/lei va\nnoi andiamo\nvoi andate\nloro vanno", JSON.stringify(r.said));
+  check("the New tense card and the answer panel underline the forms and carry the legend", r.intro && r.panel, JSON.stringify(r));
+  check("irregular forms: no script errors", !errors.length, errors.join("\n"));
+  await context.close();
+  return out;
+}
 
 /* Weak spots (from 9.31): itapp.vgmiss.v1 through the screen, Stats and Practise my weak spots. Returns [check name, ok, detail]. */
 async function weakSpots(browser, url) {

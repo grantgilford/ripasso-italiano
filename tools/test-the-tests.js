@@ -141,6 +141,11 @@ const FAULTS = [
   { id: "weak-spots-never-heal", what: "a verb form's weak spot never goes away, however often it is got right again (9.31)",
     find: `if (--e[3] <= 0) m.delete(k);`, put: `if (--e[3] <= 0) e[3] = 1;`,
     suite: "test-verbs.js", args: ["--verbs", "parlare"], expect: "a later right answer takes one off" },
+  { id: "reflexive-judged-with-pronoun", what: "a reflexive verb's forms are judged with their pronouns, so alzati and mi alzo are underlined as irregular (9.31)",
+    find: `      if (!refl) return x;
+      if (t === "imperativo"`, put: `      if (refl || !refl) return x;
+      if (t === "imperativo"`,
+    suite: "test-verbs.js", args: ["--verbs", "parlare"], expect: "exactly those checked by hand" },
   { id: "reviews-spread-30-percent", what: "reviews are spread by 30% either way, not 10%",
     find: `const SPREAD = 0.1;`, put: `const SPREAD = 0.3;`,
     suite: "test-sessions.js", expect: "within 10% of the interval" },

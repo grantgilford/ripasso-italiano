@@ -92,7 +92,9 @@ function REFERENCE() {
     const focus = { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i)).length }; // from 9.31, Practise this verb first
     return `<details class="vref"${open ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>`
       + vgFocusBtn("vverb", v.it, "Practise this verb", focus, "vverb-none-" + v.it)
-      + items.map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("") // from 9.20, each tense's example sentences under its table
+      + items.map((i, k) => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)
+        + (k === items.findIndex(x => vgKeyHtml(v.it, x.tense)) ? vgKeyHtml(v.it, i.tense) : "") // from 9.31, the legend of the underlining (or the caption of a verb irregular throughout) under the first table it belongs to
+        + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("") // from 9.20, each tense's example sentences under its table
       + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "") + `</details>`;
   };
   R.verbListHtml = (f) => {
