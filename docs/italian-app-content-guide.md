@@ -1,6 +1,6 @@
-# Italian Practice App: Content Pack Guide (v3.25)
+# Italian Practice App: Content Pack Guide (v3.26)
 
-Companion to `italian-app-spec.md`. This describes what the built app (v9.30, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
+Companion to `italian-app-spec.md`. This describes what the built app (v9.31, Ripasso Italiano) actually accepts, so new packs can be written in a build chat and imported from the Your data screen (You → Content packs), or baked into the app on republish. Published app: https://claude.ai/artifact/1d1Zqo9n8UtXgizSuxjVnJ
 
 ## Standard for every pack
 
