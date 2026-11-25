@@ -132,6 +132,9 @@ const FAULTS = [
   { id: "same-kind-three-in-a-row", what: "a session lets the same kind of exercise come three times running", // in noTriples, which has the last word: planSession's own hint against a run is a refinement the rule doesn't depend on
     find: `const r = k === a ? run + 1 : 1; if (r > 2) return false;`, put: `const r = k === a ? run + 1 : 1; if (r > 3) return false;`,
     suite: "test-sessions.js", expect: "three times in a row" },
+  { id: "verbs-hint-ignored", what: "a Verbs drill ignores the session's hint, so a verb tense can get the same kind as last time (9.31)",
+    find: `  make[pickKey(T, opt)]();`, put: `  make[pickKey(T)]();`,
+    suite: "test-sessions.js", expect: "so does a verb tense in a Verbs session" },
   { id: "reviews-spread-30-percent", what: "reviews are spread by 30% either way, not 10%",
     find: `const SPREAD = 0.1;`, put: `const SPREAD = 0.3;`,
     suite: "test-sessions.js", expect: "within 10% of the interval" },

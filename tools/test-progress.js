@@ -511,8 +511,8 @@ async function runSession(page, start, maxSteps = 200) {
     /* 8b. Far more than the old storage could hold */
     section("8b. Room: a course far bigger than the old storage could hold, with every other key full, still saves, reloads and syncs");
     {
-      // The app's other keys at their caps, each as long as it gets: the last kind of exercise for 2,000 grammar items and
-      // 500 mix-ups between words, under the longest ids; 20 problems the app noticed, each at the length the app cuts it to;
+      // The app's other keys at their caps, each as long as it gets: the last kind of exercise for 4,000 items (from 9.31
+      // verb tenses share it: 2,000 grammar items and 2,000 verb tenses) and 500 mix-ups between words, under the longest ids; 20 problems the app noticed, each at the length the app cuts it to;
       // and the per-device settings as a learner who has read every lesson would have them. No imported packs.
       const longest = (mode, n) => [...new Set(info.items.filter(i => i[2] === mode).map(i => canonicalOf(i[0])))].sort((a, b) => b.length - a.length || a.localeCompare(b)).slice(0, n);
       const typeKeys = ["conjugation", "preparticle", "translate", "transform", "cloze", "recall", "spot", "reply"];
@@ -526,7 +526,7 @@ async function runSession(page, start, maxSteps = 200) {
         "itapp.backup.v1": { at: T - 3 * DAY, snooze: T + 4 * DAY, welcomed: true },
         "itapp.reading.v1": Object.fromEntries(info.lessonUnits.map((u, k) => [u, 3 + (k % 5)])),
         "itapp.migratedV1": true,
-        "itapp.lasttype.v1": longest("grammar", 2000).map((id, k) => [id, typeKeys[k % typeKeys.length]]),
+        "itapp.lasttype.v1": longest("grammar", 2000).map((id, k) => [id, typeKeys[k % typeKeys.length]]).concat(longest("verbs", 2000).map((id, k) => [id, ["vtenseid", "vmeaning", "vswitch", "vperson"][k % 4]])),
         "itapp.confusions.v1": Array.from({ length: Math.floor(words.length / 2) }, (_, k) => [words[2 * k], words[2 * k + 1]].sort().concat(9999)),
         "itapp.errors.v1": Array.from({ length: 20 }, (_, k) => ({ m: errMsg, at: errAt, screen: "session", v: info.version, t: T - (20 - k) * 3600e3, n: 999 })),
       };

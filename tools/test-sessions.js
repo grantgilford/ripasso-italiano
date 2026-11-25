@@ -9,22 +9,27 @@
   type is among the choices, as on a phone), and checks:
 
     1. Balanced sessions: 12-exercise sessions of every grammar kind (Continue and a unit for each grammar unit,
-       Review, Wild card, Mistakes, most-missed), built many times: never the same kind of exercise (typeKey)
-       three times in a row; at least four kinds whenever the items can give four (as many as they can give
-       otherwise: worked out by asking each item for every kind and matching kinds to items); and about the
-       same share of typed exercises as the same items get without the session's hint (within 3 points).
-       makeExercise's hint keeps the kind: with the same random numbers, a hinted choice is typed exactly
-       when the plain one is. Flashcard and Verbs sessions are built as before (no hint, no new order).
-    2. Rotation: each answered grammar exercise is remembered per device in itapp.lasttype.v1 (record id and
-       typeKey, newest last, at most 2,000, never in progress); a vocab pack's cards are not; the next session
-       gives an item another kind of exercise wherever it has one of the same kind (typed or not); a damaged
-       value or a device that refuses to store it costs nothing.
+       Review, Wild card, Mistakes, most-missed) and, from 9.31, Verbs sessions (from Today and from Units),
+       built many times: never the same kind of exercise (typeKey) three times in a row; at least four kinds
+       whenever the items can give four (as many as they can give otherwise: worked out by asking each item
+       for every kind and matching kinds to items); and about the same share of typed exercises as the same
+       items get without the session's hint (within 3 points), for the grammar sessions and the Verbs sessions
+       each. makeExercise's hint keeps the kind: with the same random numbers, a hinted choice is typed exactly
+       when the plain one is, for words, sentences and verb tenses. Flashcard sessions are built as before (no
+       hint, no new order).
+    2. Rotation: each answered grammar exercise, and from 9.31 each answered verb tense, is remembered per
+       device in itapp.lasttype.v1 (record id and typeKey, newest last, at most 4,000 from 9.31, never in
+       progress; its size at the cap, with the longest ids, is printed and must stay under 200 KB); a vocab
+       pack's cards are not; the next session gives an item, or a verb tense, another kind of exercise
+       wherever it has one of the same kind (typed or not); a damaged value or a device that refuses to store
+       it costs nothing.
     3. Spread: a correct answer that sets the next review at box 3 or above lands within 10% of the interval
        either way, and the dates do spread; boxes 1 and 2, and a wrong answer, keep their exact intervals.
     4. Tricky items (4 or more lapses, box 3 or below): the next session introduces each again (the flip card
-       or first exercise, with its explanation); the introduction leaves the record as it was, and the typed
-       follow-up comes later in the session and moves the item as usual; an item with 3 lapses, or at box 4,
-       is not tricky; Stats lists up to 15, above the "Practise the most-missed items" button.
+       or first exercise, with its explanation; from 9.31 a verb tense's New tense card, called Look again,
+       then its whole table); the introduction leaves the record as it was, and the typed follow-up comes
+       later in the session and moves the item as usual; an item with 3 lapses, or at box 4, is not tricky;
+       Stats lists up to 15, above the "Practise the most-missed items" button.
     5. The forecast on Stats: for each of the next 7 days, the items that fall due that day, grammar, cards
        and verbs, are exactly what dueIds(), flashDueIds() and dueIds("vb") gain from the end of the day
        before to the end of that day; the numbers drawn on Stats are those.
@@ -95,9 +100,11 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         const kinds = [];
         for (const u of units) kinds.push(["continue", u], ["unit", u]);
         for (let k = 0; k < 6; k++) kinds.push(["review"], ["wild"], ["mistakes"], ["hard"]);
-        const out = { sessions: 0, exercises: 0, triples: [], unavoidable: 0, fewKinds: [], kindsHist: {}, typed: 0, typedPlain: 0, plainN: 0, flash: "", tooShort: 0 };
+        for (let k = 0; k < 20; k++) kinds.push(["verbs"], ["verbs", "vb"]); // from 9.31: Verbs from Today and from Units
+        const out = { sessions: 0, exercises: 0, triples: [], unavoidable: 0, fewKinds: [], kindsHist: {}, typed: 0, typedPlain: 0, plainN: 0, flash: "", tooShort: 0,
+          verbs: { sessions: 0, kindsHist: {}, typed: 0, typedPlain: 0, plainN: 0 } };
         // the kinds each item can give at its box: makeExercise asked for each kind in turn (anyKind), as the session's last pass asks
-        const can = (q) => q.reintro || isSideUnit(q.ex.item.unit) ? new Set([q.ex.typeKey]) : new Set(HINT_KEYS.concat([q.ex.typeKey]).map(k => (makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: [k], anyKind: true }) || {}).typeKey).filter(Boolean));
+        const can = (q) => q.reintro || !isBalancedUnit(q.ex.item.unit) ? new Set([q.ex.typeKey]) : new Set(HINT_KEYS.concat([q.ex.typeKey]).map(k => (makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: [k], anyKind: true }) || {}).typeKey).filter(Boolean));
         const matching = (sets) => { // the most kinds that distinct items can give (Kuhn's augmenting paths)
           const owner = {}, ks = [...new Set(sets.flatMap(s => [...s]))];
           const tryKind = (k, seen) => { for (let i = 0; i < sets.length; i++) if (sets[i].has(k) && !seen.has(i)) { seen.add(i); if (owner[i] == null || tryKind(owner[i], seen)) { owner[i] = k; return true; } } return false; };
@@ -108,22 +115,24 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
           const s = buildSession(kind, unit), keys = s.queue.map(q => q.ex.typeKey), n = keys.length;
           if (!n) continue;
           out.sessions++; out.exercises += n;
+          const v = kind === "verbs" ? out.verbs : null; if (v) v.sessions++;
           const tally = {}; keys.forEach(k => tally[k] = (tally[k] || 0) + 1);
           const avoidable = Object.values(tally).every(c => c <= 2 * (n - c) + 2);
           const at = keys.findIndex((k, i) => i >= 2 && keys[i - 1] === k && keys[i - 2] === k);
           if (at >= 0) { if (avoidable) out.triples.push(`${kind} ${unit || ""}: ${keys.join(" ")}`); else out.unavoidable++; }
           const distinct = Object.keys(tally).length, want = Math.min(4, Math.ceil(n / 3)), best = Math.min(want, matching(s.queue.map(can)));
           if (n === 12) out.kindsHist[distinct] = (out.kindsHist[distinct] || 0) + 1; else out.tooShort++;
+          if (v && n === 12) v.kindsHist[distinct] = (v.kindsHist[distinct] || 0) + 1;
           if (distinct < best) out.fewKinds.push(`${kind} ${unit || ""}: ${distinct} kinds, the items could give ${best}: ${keys.join(" ")}`);
           // the same items without the session's hint, as 9.4 built them (tricky items' introductions left out of both)
           for (const q of s.queue) if (!q.reintro) {
-            if (q.ex.kind === "production") out.typed++;
+            if (q.ex.kind === "production") { out.typed++; if (v) v.typed++; }
             const plain = makeExercise(q.ex.item, rec(q.ex.item.id));
-            if (plain) { out.plainN++; if (plain.kind === "production") out.typedPlain++; }
+            if (plain) { out.plainN++; if (plain.kind === "production") out.typedPlain++; if (v) { v.plainN++; if (plain.kind === "production") v.typedPlain++; } }
           }
         }
-        // Flashcard and Verbs sessions: with the same random numbers, the same items and exercises as plain makeExercise in shuffled order
-        for (const [kind, unit] of [["flashcards"], ["flashcards", "fc01"], ["verbs"], ["verbs", "vb"]]) {
+        // Flashcard sessions: with the same random numbers, the same items and exercises as plain makeExercise in shuffled order
+        for (const [kind, unit] of [["flashcards"], ["flashcards", "fc01"]]) {
           window.__reseed(4242); const s = buildSession(kind, unit);
           window.__reseed(4242); const plain = shuffle(uniqueByPid(sessionIds(kind, unit))).map(id => makeExercise(content.items[id], rec(id))).filter(Boolean);
           const a = s.queue.map(q => q.ex.item.id + ":" + q.ex.typeKey).join(), b = plain.map(ex => ex.item.id + ":" + ex.typeKey).join();
@@ -136,21 +145,25 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check(`no session has the same kind three times in a row where its mix allows another order (${r.sessions} sessions${r.unavoidable ? `; ${r.unavoidable} whose items give one kind too often to avoid it` : ""})`, r.sessions > 150 && !r.triples.length, r.triples.slice(0, 5).join("\n"));
       check("every session has at least four kinds of exercise when its items can give four (or as many as they can)", !r.fewKinds.length, r.fewKinds.slice(0, 5).join("\n"));
       check(`about the same share of typed exercises as without the hint (${share(r.typed, r.plainN)} against ${share(r.typedPlain, r.plainN)}, within 3 points)`, Math.abs(r.typed - r.typedPlain) / r.plainN <= 0.03);
-      check("flashcard and Verbs sessions are built as before: the same items and exercises, in the shuffled order", !r.flash, r.flash);
+      const vb = r.verbs;
+      console.log(`         Verbs: ${vb.sessions} sessions; kinds in a 12-exercise session: ${Object.entries(vb.kindsHist).map(([k, v]) => `${k}: ${v}`).join(", ")}; typed ${share(vb.typed, vb.plainN)} (without the hint ${share(vb.typedPlain, vb.plainN)})`);
+      check(`Verbs sessions are balanced too (from 9.31): ${vb.sessions} built, counted in the checks above, each of 12 with at least four kinds`, vb.sessions === 160 && Object.keys(vb.kindsHist).length && Object.keys(vb.kindsHist).every(k => Number(k) >= 4), JSON.stringify(vb.kindsHist));
+      check(`…with about the same share of typed exercises as without the hint (${share(vb.typed, vb.plainN)} against ${share(vb.typedPlain, vb.plainN)}, within 3 points)`, vb.plainN > 300 && Math.abs(vb.typed - vb.typedPlain) / vb.plainN <= 0.03);
+      check("flashcard sessions are built as before: the same items and exercises, in the shuffled order", !r.flash, r.flash);
 
       const kept = await page.evaluate(() => { // the hint never changes the kind: the same random numbers, with and without a hint
-        const ids = Object.keys(content.items).filter(id => !isSideUnit(content.items[id].unit) && ["vocab", "sentence"].includes(content.items[id].type)).filter((_, k) => k % 9 === 0);
-        let n = 0; const bad = [];
+        const ids = Object.keys(content.items).filter(id => isBalancedUnit(content.items[id].unit) && ["vocab", "sentence", "vtense"].includes(content.items[id].type)).filter((_, k) => k % 9 === 0);
+        let n = 0, verbs = 0; const bad = [];
         for (const id of ids) for (const box of [0, 1, 2, 3, 5]) for (const force of [undefined, "production"]) {
           const item = content.items[id], r = Object.assign({}, rec(id), { box }), hint = { avoid: [HINT_KEYS[n % HINT_KEYS.length]], prefer: HINT_KEYS.filter((_, k) => (k + n) % 3 === 0) };
           window.__reseed(n * 7919 + 1); const a = makeExercise(item, r, force);
           window.__reseed(n * 7919 + 1); const b = makeExercise(item, r, force, hint);
-          n++;
+          n++; if (item.type === "vtense") verbs++;
           if (a && b && a.kind !== b.kind) bad.push(`${id} box ${box}${force ? " follow-up" : ""}: ${a.typeKey} (${a.kind}) became ${b.typeKey} (${b.kind})`);
         }
-        return { n, bad };
+        return { n, bad, verbs };
       });
-      check(`makeExercise's hint keeps the kind: of ${kept.n} exercises built with the same random numbers, a hinted one is typed exactly when the plain one is`, kept.n > 1000 && !kept.bad.length, kept.bad.slice(0, 5).join("\n"));
+      check(`makeExercise's hint keeps the kind: of ${kept.n} exercises built with the same random numbers (words, sentences and from 9.31 verb tenses), a hinted one is typed exactly when the plain one is`, kept.n > 1000 && kept.verbs > 2000 && !kept.bad.length, kept.bad.slice(0, 5).join("\n"));
 
       section("2. Rotation: another kind of exercise for an item, per device");
       const rot = await page.evaluate(() => {
@@ -163,6 +176,13 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         const last = new Map(); answered.forEach(([id, k]) => { last.delete(id); last.set(id, k); });
         out.saved = Array.isArray(saved) && saved.length === last.size && saved.every(([id, k]) => last.get(id) === k) && saved.map(p => p[0]).join() === [...last.keys()].join();
         out.notInProgress = !JSON.stringify(progress).includes("lasttype") && !JSON.stringify(Store.get("itapp.progress.v1")).includes("lasttype");
+        S.screen = "home"; session = null;
+        // a Verbs session's verb tenses are remembered too (from 9.31), each as its last kind
+        startSession("verbs");
+        const vAnswered = [];
+        for (let n = 0; S.screen === "session" && n < 60; n++) { const q = current(); if (!S.feedback) { vAnswered.push([pid(q.ex.item.id), q.ex.typeKey]); finishAnswer(true, "", ""); } continueSession(); }
+        const vSaved = new Map(Store.get("itapp.lasttype.v1")), vLast = new Map(); vAnswered.forEach(([id, k]) => vLast.set(id, k));
+        out.verbsSaved = vLast.size >= 8 && [...vLast].every(([id, k]) => id.startsWith("vg-") && vSaved.get(id) === k);
         S.screen = "home"; session = null;
         // a vocab pack's cards are not remembered
         const before = JSON.stringify(Store.get("itapp.lasttype.v1"));
@@ -177,26 +197,36 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         const plan = [];
         for (let rep = 0; rep < 40; rep++) plan.push(["review"]);
         for (let rep = 0; rep < 6; rep++) for (const u of content.units.filter(u => !isSideUnit(u.id) && !u.mode && u.id !== "vb")) plan.push(["unit", u.id]);
+        for (let rep = 0; rep < 40; rep++) plan.push(["verbs"]); // from 9.31
+        const v = { could: 0, same: 0, plainSame: 0 };
         for (const [kind, unit] of plan) {
           const s = buildSession(kind, unit);
           for (const q of s.queue) {
-            if (q.reintro || isSideUnit(q.ex.item.unit)) continue;
-            const id = pid(q.ex.item.id), was = lastTypes().get(id), r = rec(q.ex.item.id);
+            if (q.reintro || !isBalancedUnit(q.ex.item.unit)) continue;
+            const id = pid(q.ex.item.id), was = lastTypes().get(id), r = rec(q.ex.item.id), isV = q.ex.item.type === "vtense";
             if (was) {
               const m = kindsAt(q.ex.item, r), cls = m[q.ex.typeKey], alts = Object.keys(m).filter(k => m[k] === cls && k !== was);
-              if (cls && m[was] === cls && alts.length) { could++; if (q.ex.typeKey === was) same++; const p = makeExercise(q.ex.item, r); if (p && p.typeKey === was) plainSame++; }
+              if (cls && m[was] === cls && alts.length) {
+                const p = makeExercise(q.ex.item, r);
+                could++; if (q.ex.typeKey === was) same++; if (p && p.typeKey === was) plainSame++;
+                if (isV) { v.could++; if (q.ex.typeKey === was) v.same++; if (p && p.typeKey === was) v.plainSame++; }
+              }
             }
             noteType(q.ex);
           }
         }
-        Object.assign(out, { could, same, plainSame });
-        // capped at 2,000, newest last
-        const many = Array.from({ length: 2100 }, (_, k) => ["old-" + k, "recall"]);
+        Object.assign(out, { could, same, plainSame, v });
+        // capped at 4,000 (from 9.31; 2,000 before), newest last
+        const many = Array.from({ length: 4100 }, (_, k) => ["old-" + k, "recall"]);
         Store.set("itapp.lasttype.v1", many); LAST_TYPES = null;
         const g = Object.values(content.items).find(i => i.unit === "u02" && i.type === "grammar_mc");
         noteType({ item: g, typeKey: "grammar" });
         const capped = Store.get("itapp.lasttype.v1");
-        out.capped = capped.length === 2000 && capped[capped.length - 1][0] === pid(g.id) && capped[0][0] === "old-101";
+        out.capped = capped.length === 4000 && capped[capped.length - 1][0] === pid(g.id) && capped[0][0] === "old-101";
+        // its size at the cap: the longest record ids (half grammar items, half verb tenses) with the longest kinds
+        const longest = (f, n) => [...new Set(Object.keys(content.items).filter(id => f(content.items[id])).map(pid))].sort((a, b) => b.length - a.length).slice(0, n);
+        const fullList = longest(i => !isSideUnit(i.unit), 2000).map(id => [id, "translate"]).concat(longest(i => i.type === "vtense", 2000).map(id => [id, "vtenseid"]));
+        out.capSize = JSON.stringify(fullList).length;
         // damaged values are ignored (a row whose text can't be read at all is the storage test's: it reads as nothing saved)
         out.damaged = [];
         for (const v of ["\"not a list\"", "{\"a\":1}", "[1,2,[3]]", "null", "[[\"x\"]]"]) {
@@ -206,10 +236,13 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         return out;
       });
       check("each answered grammar exercise is remembered in itapp.lasttype.v1, as [record id, typeKey], newest last", rot.saved);
+      check("…and so is each answered verb tense in a Verbs session (from 9.31)", rot.verbsSaved);
       check("…never in progress, so it never syncs", rot.notInProgress);
       check("…and a vocab pack's cards are not", rot.cardsLeftOut);
       check(`the next time, an item that has another exercise of the same kind gets another one (${rot.same} of ${rot.could} the same as last time; ${rot.plainSame} without the memory)`, rot.could > 100 && rot.same <= rot.could * 0.03 && rot.plainSame > rot.could * 0.15);
-      check("the memory is capped at 2,000 items, the oldest dropped first", rot.capped);
+      check(`…and so does a verb tense in a Verbs session (${rot.v.same} of ${rot.v.could} the same as last time; ${rot.v.plainSame} without the memory)`, rot.v.could > 100 && rot.v.same <= rot.v.could * 0.03 && rot.v.plainSame > rot.v.could * 0.1);
+      check("the memory is capped at 4,000 items (from 9.31, as verb tenses share it), the oldest dropped first", rot.capped);
+      check(`at the cap, with the longest ids, it takes ${(rot.capSize / 1024).toFixed(0)} KB: under 200 KB`, rot.capSize > 0 && rot.capSize < 200 * 1024);
       check("a damaged memory is ignored, and sessions still build", !rot.damaged.length, rot.damaged.join("\n"));
       check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
@@ -257,9 +290,10 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       const { page, context } = await open(browser, origin, { seed: false });
       section("4. Tricky items are introduced again");
       const r = await page.evaluate(() => {
-        const T = Date.now(), pick = (f) => Object.values(content.items).find(i => !isSideUnit(i.unit) && pid(i.id) === i.id && f(i)).id;
+        const T = Date.now(), pick = (f) => Object.values(content.items).find(i => isBalancedUnit(i.unit) && pid(i.id) === i.id && f(i)).id;
         const cases = [["a word", pick(i => i.type === "vocab"), 2], ["a sentence", pick(i => i.type === "sentence" && i.cloze), 3], ["a verb", pick(i => i.type === "verb"), 1],
-          ["a transform", pick(i => i.type === "transform"), 2], ["a grammar question", pick(i => i.type === "grammar_mc"), 2], ["a number", pick(i => i.type === "number"), 3]];
+          ["a transform", pick(i => i.type === "transform"), 2], ["a grammar question", pick(i => i.type === "grammar_mc"), 2], ["a number", pick(i => i.type === "number"), 3],
+          ["a verb tense (from 9.31)", pick(i => i.type === "vtense" && i.tense === "imperfetto"), 2]];
         const ids0 = cases.map(c => c[1]), notTricky = [pick(i => i.type === "vocab" && !ids0.includes(i.id)), pick(i => i.type === "sentence" && i.cloze && !ids0.includes(i.id))];
         progress.items = {};
         for (const [, id, box] of cases) progress.items[id] = { box, due: T - 1000, lapses: 4 + box, lastSeen: T - 864e5, lastWrong: T - 3 * 864e5, seenCount: 12, lastRight: T - 864e5 };
@@ -272,6 +306,7 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
           const q = s.queue.find(x => x.ex.item.id === id);
           const want = content.items[id].type === "vocab" ? ["flip", "meaning"] : [makeExercise(content.items[id], Object.assign({}, rec(id), { box: 0 })).typeKey];
           if (!q || !q.reintro || !q.ex.showWhy || !want.includes(q.ex.typeKey)) out.intro.push(`${label} (${id}, box ${box}): ${q ? q.ex.typeKey + (q.reintro ? "" : ", not marked") : "missing"}`);
+          else if (q.ex.mode === "vintro" && !/^Look again · /.test(q.ex.type)) out.intro.push(`${label}: called “${q.ex.type}”, not Look again`);
         }
         for (const id of notTricky) { const q = s.queue.find(x => x.ex.item.id === id); if (!q || q.reintro) out.notTricky.push(id); }
         // answer every introduction right: a recognition one on an item with a typed exercise leaves the record alone and brings a typed follow-up
@@ -280,15 +315,18 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         for (let n = 0; S.screen === "session" && n < 80; n++) {
           const q = current(), id = q.ex.item.id, before = JSON.stringify(progress.items[pid(id)]);
           if (!S.feedback) {
+            const card = q.ex.mode === "vintro" && document.querySelector(".card.vintro"); // a verb tense's card is its explanation: Got it moves straight on
+            const cardWhy = !!card && card.textContent.includes(TENSE_USE[q.ex.item.tense]) && !!card.querySelector(".conjtable");
             finishAnswer(true, "", "");
             const c = cases.find(x => x[1] === id);
             if (c && q.reintro) {
               const teach = q.ex.kind === "recognition" && itemHasProduction(q.ex.item);
               seen[id] = { teach, at: session.pos };
               if (teach && JSON.stringify(progress.items[pid(id)]).replace(/"(lastSeen|seenCount)":\d+/g, "") !== before.replace(/"(lastSeen|seenCount)":\d+/g, "")) out.moved.push(`${c[0]}: ${before} → ${JSON.stringify(progress.items[pid(id)])}`);
-              if (!document.querySelector(".fb .why, .fb .facts")) out.why.push(c[0]);
+              if (q.ex.mode === "vintro" ? !cardWhy : !document.querySelector(".fb .why, .fb .facts")) out.why.push(c[0]);
               const f = session.queue.findIndex((x, i) => i > session.pos && x.followup && x.ex.item.id === id);
               if (teach && !(f > session.pos && (f >= session.pos + 3 || f === session.queue.length - 1) && f <= session.pos + 6 && session.queue[f].ex.kind === "production")) out.follow.push(`${c[0]}: follow-up at ${f}, now ${session.pos}`);
+              else if (teach && q.ex.item.type === "vtense" && session.queue[f].ex.typeKey !== "vtable") out.follow.push(`${c[0]}: the follow-up is ${session.queue[f].ex.typeKey}, not the whole table`);
               if (!teach && f >= 0) out.follow.push(`${c[0]}: a follow-up after a typed or rule exercise`);
             } else if (c && q.followup) {
               const was = JSON.parse(before), now = progress.items[pid(id)];
@@ -315,7 +353,7 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check("an item with 3 lapses, or at box 4, is not tricky", !r.notTricky.length, r.notTricky.join(", "));
       check("the introduction shows the explanation", !r.why.length, r.why.join(", "));
       check("an introduction that isn't typed leaves the record as it was (only seen again)", !r.moved.length, r.moved.join("\n"));
-      check("…and the usual typed follow-up comes 3 to 6 exercises later (none after a typed or rule exercise)", !r.follow.length, r.follow.join("\n"));
+      check("…and the usual typed follow-up comes 3 to 6 exercises later (none after a typed or rule exercise; for a verb tense, its whole table)", !r.follow.length, r.follow.join("\n"));
       check("the follow-up, answered right, moves the item up a box as usual", !r.promoted.length, r.promoted.join("\n"));
       check("Stats lists the tricky items, above the Practise the most-missed items button", r.stats);
       check("…at most 15, most lapses first", r.fifteen);

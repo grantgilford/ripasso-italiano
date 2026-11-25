@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.30)
+# Exercise types: the catalogue (v9.31)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -14,17 +14,19 @@ Content authors write **items**; the app turns each item into an **exercise** ev
 
 A wrong answer puts the item back at the end of the session. Every wrong answer gets a reason in the answer panel; from 9.7 the wrong choices themselves are chosen to teach (Wrong options that teach, below).
 
-### Balanced sessions (from v9.5)
+### Balanced sessions (from v9.5; Verbs sessions from v9.31)
 
-The rules above are each item's own chances. A grammar session (Continue, a unit, Review, Wild card, Mistakes, most-missed) then chooses each item's exercise with the whole session in view (`planSession`), through a hint to `makeExercise` (`opt.avoid`, `opt.prefer`; `pickKey` applies it):
+The rules above are each item's own chances. A grammar session (Continue, a unit, Review, Wild card, Mistakes, most-missed) and, from v9.31, a Verbs session then chooses each item's exercise with the whole session in view (`planSession`), through a hint to `makeExercise` (`opt.avoid`, `opt.prefer`; `pickKey` applies it):
 
-- **Rotation.** Each device remembers the kind (`typeKey`) each grammar item was last answered with, in `itapp.lasttype.v1` (never synced, at most 2,000 items), and the hint avoids it, so a noun typed as *recall* last time gets its article or plural this time.
+- **Rotation.** Each device remembers the kind (`typeKey`) each grammar item, and each verb tense, was last answered with, in `itapp.lasttype.v1` (never synced, at most 4,000 items from v9.31, 2,000 before; about 150 KB at the cap), and the hint avoids it, so a noun typed as *recall* last time gets its article or plural this time, and a verb tense drilled as a whole table last time gets Verb form, From English or Change the tense this time.
 - **Variety.** The hint prefers kinds the session hasn't used yet, and if a session still has fewer than four kinds in 12 exercises (a third of the number in a shorter one) while its items can give more, the items whose kinds come most often are asked again.
 - **No three in a row.** The exercises are ordered as shuffled, except that no kind comes three times running wherever the mix allows (`noTriples`).
 - **The same share of typed exercises.** A hint only moves between exercises of the same kind, typed or not (`kind`), so how often an item is typed, and so what can promote it, is as before; only the last pass for variety may cross over, and over many sessions the share stays within a point or so.
-- **Tricky items.** An item with 4 or more lapses, at box 3 or below, starts again with its introduction (the box-0 exercise, its explanation shown), which only teaches when a typed follow-up will come; the usual typed follow-up later in the session is the answer that counts.
+- **Tricky items.** An item with 4 or more lapses, at box 3 or below, starts again with its introduction (the box-0 exercise, its explanation shown), which only teaches when a typed follow-up will come; the usual typed follow-up later in the session is the answer that counts. For a verb tense (from v9.31) that is its New tense card again, headed **Look again · imperfetto**, and then, 3 to 6 exercises later, its whole table; the card leaves the record as it was, and the table moves it.
 
-Follow-ups, repeats and Can't listen now keep their own rules, and vocab pack and Verbs sessions are built as before. Only items whose type offers a choice (vocab and sentences) can be steered: the more kinds of item a unit has, the more varied its sessions. `tools/test-sessions.js` checks all of this.
+Follow-ups, repeats and Can't listen now keep their own rules (a Verb table with mistakes still comes back as **the forms you missed**), and vocab pack sessions are built as before. Only items whose type offers a choice (vocab, sentences and, from v9.31, verb tenses) can be steered: the more kinds of item a unit has, the more varied its sessions.
+
+**Verbs sessions (from v9.31).** A verb tense's drill is chosen from a `pickKey` table with exactly the chances it had before (below, under The Verbs section's sentence drills, and in `verbGymExercise`'s comment), so a session can steer it kind for kind: a typed drill (the table, Verb form, From English, Change the tense, Which verb?, Verb in a sentence from box 2, Which tense fits? from box 4) is only swapped for another typed drill, a choice (Pick the form, Which tense?, Which person?, essere or avere?, Verb in a sentence at box 1, Which tense fits? at box 3) for another choice. A drill that can't be built for the item (no second tense started, a form other tenses share, not the *passato prossimo*…) is never in its table; its chance goes where it always went, to Verb form, so the mix and the share of typed exercises are as before (measured over every verb tense at boxes 1–5: within half a point of 9.30's for each drill). With seeded progress a 12-exercise Verbs session now has 4 to 7 kinds where it had 4 to 9 with two of the same kind three in a row in one session in eight, and never three in a row; with every tense started, 7 to 10 kinds. `tools/test-sessions.js` checks all of this.
 
 ### Wrong options that teach (from 9.7)
 
