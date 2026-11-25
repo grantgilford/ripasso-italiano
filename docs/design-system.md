@@ -327,6 +327,11 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 - **Practise this unit:** a primary button at the end of both tabs (`data-unit`).
 - **Practise this section (N items)** (from 9.6): a full-width secondary button at the end of each lesson section with items linked to it (`.secgo`, `data-practise="u05#6"`, the unit and the section's index from 0), starting a session of those items. When they are all new and today's new items are used up it is disabled, with a muted line under it saying so.
 - **Verbs reference:** the same frame. Each verb is a row (`details.vref`) that opens to its tables; the tables are drawn when the row is opened (from 9.3), and a filter opens, and draws, the rows it leaves. From 9.20 each tense's example sentence sits under its table as a verb sentence card (section 7) on the page colour (`.fb-ctx.vs-in`, `--bg` inside the row's `--card`).
+- **Focus sessions on the Verbs reference** (from 9.31), each starting a Verbs session aimed at one thing (`data-vfocus="kind:key"`):
+  - **Practise a tense:** a group (Eyebrow heading "Practise a tense") under Practise verbs, before Rules: eight tense chips in a two-column grid (`.tchips`, 8 px gaps), one per tense of the ladder in order. Each chip (`.tchip`) is a `--card` button with a 14 px radius, at least 52 px tall, the tense in Label weight at 15 px and "N started" (the verbs with that tense started) in Small `--muted` beneath; a long name wraps to two lines rather than being cut. Not pills: two lines and a grid keep all eight in view at 360 px, where a scrolling row would hide most of them. A tense with nothing started and nothing able to open is disabled (55%), with one muted line under the grid saying why.
+  - **Practise this family:** under each family's heading and description, before its card of verbs, a full-width secondary button (`.secgo.vgo`).
+  - **Practise this verb:** the first thing in an opened row, above the presente table: the same full-width secondary button.
+  - A focus that has nothing to practise is disabled, with a muted line under it saying why (`aria-describedby`), as Practise this section is.
 
 ### 8.5 Practice session (`renderSession`), see `mockups/exercise-wrong-*.html`
 
@@ -351,7 +356,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 
 ### 8.6 Session summary (`renderSummary`)
 
-- A title, "Session complete".
+- A title, "Session complete"; after a focus session (from 9.31), an Eyebrow line above it naming the focus (`.sumfocus`): "Focus: imperfetto", "Focus: andare", "Focus: -ire with -isc-".
 - A card with three big numbers: accuracy, XP earned, items promoted. Below them, today's XP against the goal as a bar.
 - The missed items as a card list (Italian in DM Sans 500, English muted).
 - A primary "Back to Today" button (`data-go="home"`), and beside it, as wide, a secondary **Another round** (`data-act="again"`, from 9.5) that starts another session of the same kind and unit. When nothing is left to practise it is disabled, with a muted line under the row saying so.

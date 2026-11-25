@@ -106,6 +106,14 @@
        progress couldn't be opened (IndexedDB unavailable after the move) and
        Progress saved by an older version (the old copy changed since the
        move). What the storage itself does is tools/test-storage.js's.
+   14. the Verbs section's new screens (from 9.31), in light and dark at 390 and
+       360 px and at 120% text, reached by tapping (Units › Verbs › Read lesson):
+       the reference's Practise a tense chips (eight, each with its number of
+       verbs started), Practise this family under each family's heading, and
+       Practise this verb in an opened row, each within the layout rules; a
+       chip starts a session of that tense, the back button then asks before
+       leaving, and the summary names the focus; the back arrow returns to
+       Units.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -222,6 +230,38 @@ async function layout(page, label, { zoomOnly } = {}) {
   if (zoomOnly) return;
   check(`${label}: nothing is hidden behind the tab bar`, !r.hidden, r.hidden);
   check(`${label}: every control is at least 44 × 44 px`, !r.small.length, r.small.slice(0, 8).join("\n"));
+}
+
+/* The Verbs section's new screens (from 9.31): reached by tapping, in each layout, within the layout rules. */
+async function verbsScreens(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verbs, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-ref="vb"]'))) await tap(page, '.ulist [data-upick="vb"]'); await tap(page, '.ucard [data-ref="vb"]');
+    check(L("Units › Verbs › Read lesson opens the Verbs reference"), (await screen(page)) === "reference" && (await page.evaluate("S.refUnit")) === "vb");
+    const chips = await page.evaluate(() => [...document.querySelectorAll(".tchip")].map(b => ({ t: b.dataset.vfocus, text: b.textContent, off: b.disabled })));
+    check(L("Practise a tense has a chip for each of the eight tenses, each saying how many verbs have it started"), chips.length === 8 && chips.every(c => /^vtense:/.test(c.t) && /\d+ started$/.test(c.text)), JSON.stringify(chips));
+    check(L("Practise this family sits under every family's heading"), await page.evaluate(() => [...document.querySelectorAll('[data-vfocus^="vfam:"]')].length === Object.keys(VERB_FAMILIES).length && [...document.querySelectorAll('[data-vfocus^="vfam:"]')].every(b => b.closest("section.group").querySelector("h2"))));
+    await layout(page, L("the Verbs reference"), opts);
+    await tap(page, 'details.vref[data-verb="andare"] summary');
+    check(L("an opened row starts with Practise this verb"), await page.evaluate(() => { const b = document.querySelector('details.vref[data-verb="andare"] [data-vfocus="vverb:andare"]'); return !!b && b.offsetParent !== null && !b.disabled; }));
+    await layout(page, L("the Verbs reference with a row open"), opts);
+    await tap(page, '[data-vfocus="vtense:presente"]');
+    check(L("a tense chip starts a session of that tense"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vtense" && session.unitId === "presente" && session.queue.every(q => q.ex.item.tense === "presente")));
+    await page.goBack(); await settle(page);
+    check(L("…in which the back button asks before leaving"), (await page.evaluate("S.leaveAsk")) && !!(await page.$("#sheetBg")));
+    await tap(page, '[data-act="stay"]');
+    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } render(); }); await settle(page);
+    check(L("its summary names the focus"), (await screen(page)) === "summary" && /^Focus: presente$/.test(await page.textContent(".sumfocus")));
+    await layout(page, L("the summary of a focus session"), opts);
+    await tap(page, '.sumbtns [data-go="home"]');
+    await page.evaluate(() => { S.screen = "reference"; S.refUnit = "vb"; render(); });
+    await tap(page, '.hdr .back[data-go="units"]');
+    check(L("the back arrow returns to Units"), (await screen(page)) === "units");
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verbs screens checked, ${label}`);
+  }
 }
 
 /* Storage (from 9.26): Your data's Storage card and Today's notices about where progress is kept, in each layout.
@@ -1384,6 +1424,9 @@ async function readAloud(browser, origin) {
 
     /* Storage (from 9.26) */
     await storage(browser, origin);
+
+    /* The Verbs section's new screens (from 9.31) */
+    await verbsScreens(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

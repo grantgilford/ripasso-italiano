@@ -44,6 +44,14 @@
        with linked items, its session takes only those items, up to the lesson length: the due ones first
        (soonest due first), then new ones, no more than today's new items allow, then the rest, least known
        first; with today's new items used up it takes no new ones.
+    8. Focus sessions (from 9.31): Practise this verb, a tense and a family, from the Verbs reference. For
+       every tense, every family and 60 verbs, on a new device and with the seeded progress, each session
+       takes only matching verb tenses, up to a Verbs session's length: the due ones first (soonest due
+       first), then the others started (least known first), then new ones that can open now, in the order of
+       VERB_GYM and no more than a Verbs session's new ones; never a tense that hasn't opened; its exercises
+       are its items. The chips show each tense's number of verbs started; a focus with nothing started and
+       nothing able to open is disabled, with its reason. Another round (section 6) works after each, and the
+       summary names the focus ("Focus: imperfetto").
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -397,14 +405,19 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         ["Wild card", "home", '[data-start="wild"]'], ["Mistakes", "home", '[data-start="mistakes"]'], ["the most-missed items", "stats", '[data-start="hard"]'],
         ["Flashcards", "home", '[data-start="flashcards"]'], ["a vocab pack", "units:vocab:fc01", '.ucard [data-unit]'], ["Verbs", "home", '[data-start="verbs"]'], ["the Verbs section from Units", "units:verbs:vb", '.ucard [data-unit]'],
         ["a lesson section", "reference:lesson:u06", '[data-practise]:not([disabled])'],
+        ["a tense, from the Verbs reference", "reference:lesson:vb", '[data-vfocus="vtense:imperfetto"]', "Focus: imperfetto"],
+        ["a family, from the Verbs reference", "reference:lesson:vb", '[data-vfocus="vfam:isc"]', "Focus: -ire with -isc-"],
+        ["a verb, from its row in the Verbs reference", "reference:lesson:vb", 'details.vref[data-verb="andare"] [data-vfocus]', "Focus: andare"],
       ];
-      for (const [label, where, sel] of ways) {
-        await page.evaluate((w) => { session = null; S.feedback = null; const [scr, seg, pickU] = w.split(":"); S.screen = scr; if (scr === "reference") { S.refTab = seg; S.refUnit = pickU; render(); return; } if (seg) S.unitSeg = seg; render(); S.unitPick = pickU || null; render(); }, where);
+      for (const [label, where, sel, focus] of ways) {
+        await page.evaluate((w) => { session = null; S.feedback = null; S.refFilter = ""; const [scr, seg, pickU] = w.split(":"); S.screen = scr; if (scr === "reference") { S.refTab = seg; S.refUnit = pickU; render(); return; } if (seg) S.unitSeg = seg; render(); S.unitPick = pickU || null; render(); }, where);
+        if (/details\.vref/.test(sel)) await page.evaluate(() => { document.querySelector('details.vref[data-verb="andare"]').open = true; }); // its tables, and its button, are drawn as it opens
         await page.click(sel);
         const started = await page.evaluate(() => S.screen === "session" && { kind: session.kind, unit: session.unitId });
         const end = await page.evaluate(FINISH);
-        const sum = await page.evaluate(() => { const b = document.querySelector('[data-act="again"]'), home = document.querySelector('.sumbtns [data-go="home"]'); return { b: !!b, disabled: b && b.disabled, beside: !!(b && home && b.parentElement === home.parentElement), left: sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length }; });
+        const sum = await page.evaluate(() => { const b = document.querySelector('[data-act="again"]'), home = document.querySelector('.sumbtns [data-go="home"]'), f = document.querySelector(".sumfocus"); return { b: !!b, disabled: b && b.disabled, beside: !!(b && home && b.parentElement === home.parentElement), left: sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length, focus: f ? f.textContent.replace(/\u2011/g, "-") : null }; }); // nbHyphens keeps -ire in one piece
         check(`${label}: the summary has Another round beside Back to Today, enabled while something is left`, started && end === "summary" && sum.b && sum.beside && sum.disabled === !sum.left, JSON.stringify({ started, end, sum }));
+        check(`${label}: the summary ${focus ? `names the focus (“${focus}”)` : "names no focus"}`, sum.focus === (focus || null), JSON.stringify(sum.focus));
         if (!sum.b || sum.disabled) continue;
         await page.evaluate(() => { window.__prev = session; });
         await page.click('[data-act="again"]');
@@ -492,6 +505,56 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       });
       check(`${who}: Practise this section takes only the section's items, due first, then new (within today's limit), then the rest, least known first, up to the lesson length (${sec.sections} sections: ${sec.due} due, ${sec.fresh} new, ${sec.rest} others)`, sec.sections > 250 && !sec.bad.length && (seeded ? sec.due > 0 && sec.rest > 0 : sec.fresh > 0), sec.bad.slice(0, 5).join("\n"));
       check(`${who}: with today's new items used up, Practise this section takes no new ones`, sec.none);
+      check(`${who}: no script errors`, !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 8. Focus sessions */
+    for (const seeded of [false, true]) {
+      const { page, context } = await open(browser, origin, { seed: seeded });
+      if (!seeded) section("8. Focus sessions: a verb, a tense, a family (from 9.31)");
+      const who = seeded ? "with the seeded progress" : "on a new device";
+      const r = await page.evaluate(() => {
+        progress.settings.verbsPerSession = 12; progress.settings.verbNewPerSession = 3;
+        const out = { sessions: 0, bad: [], due: 0, rest: 0, fresh: 0, full: 0, empty: [] }, t = now(), vb = content.byUnit.vb, per = 12, nNew = 3;
+        const kindOf = (id) => isDue(id, t) ? 0 : rec(id).box >= 1 ? 1 : 2; // due, started, new
+        const keys = [...VG_TENSES.map(x => ["vtense", x]), ...Object.keys(VERB_FAMILIES).map(x => ["vfam", x]), ...VERB_GYM.filter((v, k) => k % 8 === 0).slice(0, 60).map(v => ["vverb", v.it])];
+        for (const [kind, key] of keys) {
+          const match = vb.filter(i => kind === "vtense" ? i.tense === key : kind === "vfam" ? i.fam === key : i.it === key);
+          const ids = sessionIds(kind, key), ks = ids.map(kindOf), tag = kind + " " + key;
+          out.sessions++;
+          if (ids.some(id => !match.some(i => i.id === id))) out.bad.push(`${tag}: an item that isn't one of its verb tenses`);
+          if (ks.some((k, i) => i && k < ks[i - 1])) out.bad.push(`${tag}: not due, then started, then new: ${ks.join("")}`);
+          const due = ids.filter(id => kindOf(id) === 0), rest = ids.filter(id => kindOf(id) === 1), fresh = ids.filter(id => kindOf(id) === 2);
+          if (due.some((id, i) => i && rec(id).due < rec(due[i - 1]).due)) out.bad.push(`${tag}: the due ones not soonest first`);
+          if (rest.some((id, i) => i && rec(id).box < rec(rest[i - 1]).box)) out.bad.push(`${tag}: the started ones not least known first`);
+          const rank = (id) => content.items[id].rank * 10 + content.items[id].step;
+          if (fresh.some((id, i) => i && rank(id) < rank(fresh[i - 1]))) out.bad.push(`${tag}: the new ones not in the order of VERB_GYM`);
+          if (fresh.length > nNew) out.bad.push(`${tag}: ${fresh.length} new ones, more than a Verbs session's ${nNew}`);
+          if (fresh.some(id => !vgUnlocked(content.items[id]))) out.bad.push(`${tag}: a tense that hasn't opened`);
+          const opens = match.filter(i => rec(i.id).box === 0 && vgUnlocked(i)), started = match.filter(i => rec(i.id).box >= 1);
+          const want = Math.min(per, started.length + Math.min(nNew, opens.length));
+          if (ids.length !== want) out.bad.push(`${tag}: ${ids.length} items, expected ${want}`);
+          if (started.filter(i => isDue(i.id, t)).length > due.length && ids.length < per) out.bad.push(`${tag}: a due one left out`);
+          if (rest.length && due.length < Math.min(per, started.filter(i => isDue(i.id, t)).length)) out.bad.push(`${tag}: a started one before a due one`);
+          if (fresh.length && rest.length < Math.min(per - due.length, started.length - due.length)) out.bad.push(`${tag}: a new one before a started one`);
+          const q = buildSession(kind, key).queue;
+          if (q.length !== ids.length || q.some(x => !ids.includes(x.ex.item.id))) out.bad.push(`${tag}: its session's exercises aren't its items`);
+          if (!ids.length) out.empty.push(tag);
+          out.due += due.length; out.rest += rest.length; out.fresh += fresh.length; if (ids.length === per) out.full++;
+        }
+        // the screen: the chips' numbers, and disabled exactly where there is nothing to practise, with the reason
+        S.screen = "reference"; S.refUnit = "vb"; S.refFilter = ""; render();
+        const chips = [...document.querySelectorAll(".tchip")].map(b => ({ t: b.dataset.vfocus.split(":")[1], n: Number(b.querySelector(".tchip-n").textContent.replace(/\D/g, "")), off: b.disabled, why: b.getAttribute("aria-describedby") }));
+        out.chips = chips.length === 8 && chips.every(c => c.n === vb.filter(i => i.tense === c.t && rec(i.id).box >= 1).length && c.off === !sessionIds("vtense", c.t).length && (!c.off || (c.why && document.getElementById(c.why))));
+        out.offChips = chips.filter(c => c.off).length;
+        const fams = [...document.querySelectorAll('[data-vfocus^="vfam:"]')];
+        out.fams = fams.length === Object.keys(VERB_FAMILIES).length && fams.every(b => b.disabled === !sessionIds("vfam", b.dataset.vfocus.slice(5)).length);
+        return out;
+      });
+      check(`${who}: each focus session takes only its verb tenses, due first (soonest first), then the others started (least known first), then new ones that can open, in VERB_GYM order and within a Verbs session's new ones, up to a Verbs session's length (${r.sessions} focuses: ${r.due} due, ${r.rest} started, ${r.fresh} new)`, r.sessions > 70 && !r.bad.length && (seeded ? r.due > 0 && r.rest > 0 : r.fresh > 0), r.bad.slice(0, 6).join("\n"));
+      check(`${who}: no focus session opens a tense that hasn't opened, and its exercises are its items`, !r.bad.some(b => /hasn't opened|aren't its items/.test(b)));
+      check(`${who}: the tense chips show each tense's verbs started, and are disabled, with the reason, exactly where nothing can be practised (${r.offChips} of 8 disabled)`, r.chips && (seeded || r.offChips === 7), JSON.stringify(r.empty));
+      check(`${who}: Practise this family is under every family's heading, disabled exactly where nothing can be practised`, r.fams);
       check(`${who}: no script errors`, !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
     }
