@@ -396,7 +396,7 @@ async function tour(page, label, opts = {}) {
   await layout(page, L("Stats"), opts);
   await tap(page, '.hdr .back[data-go="you"]');
   await tap(page, '.srow[data-go="settings"]:not([data-to])');
-  check(L("More settings opens Settings with all 13 options"), (await screen(page)) === "settings" && (await page.$$("select[data-set]")).length === 13);
+  check(L("More settings opens Settings with all 14 options"), (await screen(page)) === "settings" && (await page.$$("select[data-set]")).length === 14 && !!(await page.$('select[data-set="verbTenseCap"]'))); // from 9.31, Open new tenses up to
   await layout(page, L("Settings"), opts);
   await tap(page, '.hdr .back[data-go="you"]');
   await tap(page, '.srow[data-to="sec-flags"]');

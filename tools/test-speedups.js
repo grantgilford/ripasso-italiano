@@ -89,7 +89,7 @@ function REFERENCE() {
   R.verbRow = (v, open) => {
     const items = VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
     const summ = items.map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
-    const focus = { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i)).length }; // from 9.31, Practise this verb first
+    const focus = { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= (progress.settings.verbTenseCap || 7)).length }; // from 9.31, Practise this verb first
     return `<details class="vref"${open ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>`
       + vgFocusBtn("vverb", v.it, "Practise this verb", focus, "vverb-none-" + v.it)
       + items.map((i, k) => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)
@@ -101,7 +101,7 @@ function REFERENCE() {
     const famOrder = Object.keys(VERB_FAMILIES);
     const sorted = R.verbs(f).slice().sort((a, b) => famOrder.indexOf(a.fam) - famOrder.indexOf(b.fam) || a.it.localeCompare(b.it));
     let h = "", fam = null, rows = "";
-    const famFocus = (fam) => { const items = (content.byUnit.vb || []).filter(i => i.fam === fam); return { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i)).length }; };
+    const famFocus = (fam) => { const items = (content.byUnit.vb || []).filter(i => i.fam === fam); return { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= (progress.settings.verbTenseCap || 7)).length }; };
     const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p>` + vgFocusBtn("vfam", fam, "Practise this family", famFocus(fam), "vfam-none-" + fam) + `<div class="card rows">${rows}</div>`); rows = ""; }; // from 9.31, Practise this family
     for (const v of sorted) { if (v.fam !== fam) { flush(); fam = v.fam; } rows += R.verbRow(v, f); }
     flush();
@@ -117,7 +117,8 @@ function REFERENCE() {
       unit[u.id] = { total: items.length, learned, started, pct: items.length ? Math.round(100 * learned / items.length) : 0, due: dueIds(u.id).length, fresh: newIds(u.id).length };
     }
     const all = Object.values(content.items).filter(i => isBuiltinPack(i.pack)), vi = content.byUnit.vb || [];
-    const by = (list, k) => { const o = {}; for (const i of list) { const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0 }); if (rec(i.id).box >= 1) c.started++; if (rec(i.id).box === 0 && vgUnlocked(i)) c.open++; } return o; };
+    const cap = progress.settings.verbTenseCap || 7; // from 9.31, the ladder cap: a tense after it never opens as new
+    const by = (list, k) => { const o = {}; for (const i of list) { const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0 }); if (rec(i.id).box >= 1) c.started++; if (rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap) c.open++; } return o; };
     const ids = Object.keys(progress.items).filter(id => content.items[id]);
     return {
       unit, due: dueIds().length, mistakes: Object.keys(progress.items).filter(id => isRecentMistake(id)).length,

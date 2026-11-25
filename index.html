@@ -19117,7 +19117,7 @@ function idleJob(steps, done) {
 }
 
 function defaultProgress() {
-  return { v: 2, items: {}, days: {}, flags: {}, currentUnit: null, settings: { accents: "lenient", typos: true, goal: 30, newPerDay: 10, flipDir: "both", explain: "wrong", cardsPerSession: 25, newCardsPerSession: 15, fcDir: "it-en", lessonLength: 12, verbsPerSession: 12, verbNewPerSession: 3, verbUnlockBox: 5 }, settingsUpdatedAt: 0, updatedAt: 0 };
+  return { v: 2, items: {}, days: {}, flags: {}, currentUnit: null, settings: { accents: "lenient", typos: true, goal: 30, newPerDay: 10, flipDir: "both", explain: "wrong", cardsPerSession: 25, newCardsPerSession: 15, fcDir: "it-en", lessonLength: 12, verbsPerSession: 12, verbNewPerSession: 3, verbUnlockBox: 5, verbTenseCap: 7 }, settingsUpdatedAt: 0, updatedAt: 0 };
 }
 let progress = defaultProgress();
 let packs = {};      // imported packs by pack id
@@ -19487,7 +19487,7 @@ function countPlan() { // kept while the content is the same (buildContent drops
     if (it.unit === "vb") { // as vgUnlocked: the nearest earlier tense the verb has
       let before = null;
       for (let k = it.step - 1; k >= 0; k--) if (content.items[vgId(it.it, VG_TENSES[k])]) { before = pid(vgId(it.it, VG_TENSES[k])); break; }
-      verbs.push({ p, verb: it.it, before, tense: it.tense, fam: it.fam });
+      verbs.push({ p, verb: it.it, before, tense: it.tense, fam: it.fam, step: it.step });
     }
     every.add(p);
   }
@@ -19514,12 +19514,12 @@ function counts() {
   }
   let course = 0, courseLearned = 0;
   plan.course.ids.forEach((p, k) => { course += plan.course.n[k]; if ((recs[p] || none).box >= 5) courseLearned += plan.course.n[k]; });
-  const unlockBox = progress.settings.verbUnlockBox || 5, verbsStarted = new Set();
+  const unlockBox = progress.settings.verbUnlockBox || 5, cap = vgCap(), verbsStarted = new Set();
   let verbsNew = 0;
   const byTense = {}, byFam = {}; // for the focus sessions (from 9.31): per tense and per family, the verb tenses started and those that can open now
   const tally = (o, k, b, open) => { const c = o[k] || (o[k] = { started: 0, open: 0 }); if (b >= 1) c.started++; if (open) c.open++; };
   for (const v of plan.verbs) {
-    const b = (recs[v.p] || none).box, open = b === 0 && (!v.before || (recs[v.before] || none).box >= unlockBox);
+    const b = (recs[v.p] || none).box, open = b === 0 && v.step <= cap && (!v.before || (recs[v.before] || none).box >= unlockBox); // within the ladder cap (from 9.31)
     if (b >= 1) verbsStarted.add(v.verb); if (open) verbsNew++;
     tally(byTense, v.tense, b, open); tally(byFam, v.fam, b, open);
   }
@@ -20943,6 +20943,12 @@ function vgKeyHtml(verb, tense) {
 /* ---------- verb section ---------- */
 const vgId = (verb, tense) => "vg-" + verb + "-" + tense;
 function vgVerb(item) { return { it: item.it, en: item.en, group: item.group, forms: item.allForms, note: item.note }; }
+/* The ladder cap (from 9.31): Settings › Verbs › "Open new tenses up to", the last tense of the ladder that may open as new, by
+   its place (1 passato prossimo … 6 congiuntivo presente; 7, the default: all). A tense after it never comes up as new, in any
+   session, and isn't counted as new on Today, Units or the reference; one already started keeps its reviews. A setting like
+   the others, so it syncs. */
+const vgCap = () => { const c = progress.settings.verbTenseCap; return Number.isInteger(c) && c >= 1 && c <= 7 ? c : 7; };
+const vgWithinCap = (item) => item.step <= vgCap();
 function vgUnlocked(item) { // the verb's previous tense (skipping one it doesn't have) is learned
   for (let k = item.step - 1; k >= 0; k--) if (content.items[vgId(item.it, VG_TENSES[k])]) return rec(vgId(item.it, VG_TENSES[k])).box >= (progress.settings.verbUnlockBox || 5);
   return true;
@@ -20951,7 +20957,7 @@ function vgUnlocked(item) { // the verb's previous tense (skipping one it doesn'
 const vgPerson = (tense, p) => tense === "imperativo" ? ["io", "tu", "Lei", "noi", "voi", "Loro"][p] : /^congiuntivo/.test(tense) ? "che " + PERSONS[p] : PERSONS[p];
 const vgPersons = (item, tense) => { const f = tense ? item.allForms[tense] : item.forms; return f ? [0, 1, 2, 3, 4, 5].filter(p => f[p] && f[p] !== "—") : []; };
 function verbNewIds() {
-  const fresh = (content.byUnit.vb || []).filter(i => rec(i.id).box === 0 && vgUnlocked(i));
+  const fresh = (content.byUnit.vb || []).filter(i => rec(i.id).box === 0 && vgUnlocked(i) && vgWithinCap(i));
   const up = fresh.filter(i => i.step > 0).sort((a, b) => a.rank - b.rank || a.step - b.step);
   const nu = fresh.filter(i => i.step === 0).sort((a, b) => a.rank - b.rank);
   const out = [];
@@ -21440,7 +21446,7 @@ function vgExplain(ex, fb, why, out) {
    first), then those that can open now, in the order of VERB_GYM (no more than a Verbs session's new ones), up to a
    Verbs session's length; a tense that hasn't opened (vgUnlocked) never comes. buildSession then shuffles them. */
 const VG_FOCUS = { vverb: (i, k) => i.it === k, vtense: (i, k) => i.tense === k, vfam: (i, k) => i.fam === k };
-const vgOpens = (i) => rec(i.id).box === 0 && vgUnlocked(i); // a new verb tense that can open now
+const vgOpens = (i) => rec(i.id).box === 0 && vgUnlocked(i) && vgWithinCap(i); // a new verb tense that can open now (within the ladder cap)
 function vgFocusName(kind, key) { return kind === "vtense" ? TENSE_LABEL[key] || key : kind === "vfam" ? (VERB_FAMILIES[key] || [key])[0] : key; }
 function vgFocusIds(kind, key) {
   const per = progress.settings.verbsPerSession || 12, nNew = progress.settings.verbNewPerSession ?? 3, t = now();
@@ -21467,12 +21473,13 @@ function tenseChipsHtml(st) { // Practise a tense: a chip per tense of the ladde
     const c = st.byTense[t] || { started: 0, open: 0 }, off = !c.started && !c.open; shut = shut || off;
     return `<button type="button" class="tchip" data-vfocus="vtense:${esc(t)}"${off ? ` disabled aria-describedby="tchips-none"` : ""}><span class="tchip-t">${esc(TENSE_LABEL[t])}</span><span class="tchip-n">${fmtN(c.started)} started</span></button>`;
   }).join("");
-  return groupHtml("Practise a tense", `<div class="tchips">${chips}</div>` + (shut ? `<p class="small muted" id="tchips-none">A tense with nothing started is greyed out until a verb opens it: a verb's tenses open one at a time, each once the one before it is learned.</p>` : ""));
+  const cap = vgCap(), held = cap < 7 ? ` Tenses after the ${TENSE_LABEL[VG_TENSES[cap]]} don't open as new, as Settings has it.` : "";
+  return groupHtml("Practise a tense", `<div class="tchips">${chips}</div>` + (shut ? `<p class="small muted" id="tchips-none">A tense with nothing started is greyed out until a verb opens it: a verb's tenses open one at a time, each once the one before it is learned.${held}</p>` : ""));
 }
 function vgStatus(i) {
   const r = rec(i.id);
   if (r.box >= 1) return "box " + r.box + (r.box >= 5 ? " ✓" : "");
-  return vgUnlocked(i) ? "new" : "locked";
+  return !vgUnlocked(i) ? "locked" : vgWithinCap(i) ? "new" : "held back"; // held back: opened, but after the tense Settings opens up to
 }
 function renderVerbReference(u) {
   const st = counts().verbs;
@@ -22839,7 +22846,8 @@ function renderSettings() {
     + group("Verbs", [
       row("verbsPerSession", "Verb session length", [[8, "8 exercises"], [12, "12 exercises"], [16, "16 exercises"], [24, "24 exercises"]]),
       row("verbNewPerSession", "New verbs and tenses per session", [[1, "1"], [2, "2"], [3, "3"], [5, "5"], [8, "8"]]),
-      row("verbUnlockBox", "A verb's next tense opens at", [[5, "Box 5 (tense learned)"], [4, "Box 4 (sooner)"], [3, "Box 3 (much sooner)"]], "The box the tense before it has to reach.")]);
+      row("verbUnlockBox", "A verb's next tense opens at", [[5, "Box 5 (tense learned)"], [4, "Box 4 (sooner)"], [3, "Box 3 (much sooner)"]], "The box the tense before it has to reach."),
+      row("verbTenseCap", "Open new tenses up to", [[7, "All"], [6, "congiuntivo presente"], [5, "imperativo"], [4, "condizionale"], [3, "futuro"], [2, "imperfetto"], [1, "passato prossimo"]], "Tenses after this one never open as new. Ones you have started keep coming back for review.")]);
 }
 /* Your data's Storage card (from 9.26): where this device keeps what is saved (Store.status()), how much is saved and how
    much room is left (Store.usage(), asked for as the screen is drawn and filled in when it answers), whether the phone has
@@ -23763,7 +23771,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.31";
-const CHANGES = "Verbs practice is now balanced like the grammar units, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, with a button to practise just those, and verb tables underline the irregular forms."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "Verbs practice is now balanced like the grammar units, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, verb tables underline irregular forms, and Settings can stop new tenses opening after one you choose."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());

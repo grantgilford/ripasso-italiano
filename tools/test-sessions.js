@@ -52,6 +52,12 @@
        are its items. The chips show each tense's number of verbs started; a focus with nothing started and
        nothing able to open is disabled, with its reason. Another round (section 6) works after each, and the
        summary names the focus ("Focus: imperfetto").
+    9. The ladder cap (from 9.31): Settings › Verbs › Open new tenses up to, chosen by tapping, is stored
+       with the settings (so it syncs, in the cloud's documents) and drawn as chosen; with it set to the
+       imperfetto, on a device with every verb's presente and passato prossimo learned, no session, Verbs or
+       focus, ever takes a newer tense as new, while the started ones beyond it still come up for review;
+       Today's Verbs tile, the Units card and the reference's rows count new tenses accordingly (worked out
+       here the plain way); and set back to All, the next tense opens again.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -530,8 +536,9 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
           const rank = (id) => content.items[id].rank * 10 + content.items[id].step;
           if (fresh.some((id, i) => i && rank(id) < rank(fresh[i - 1]))) out.bad.push(`${tag}: the new ones not in the order of VERB_GYM`);
           if (fresh.length > nNew) out.bad.push(`${tag}: ${fresh.length} new ones, more than a Verbs session's ${nNew}`);
-          if (fresh.some(id => !vgUnlocked(content.items[id]))) out.bad.push(`${tag}: a tense that hasn't opened`);
-          const opens = match.filter(i => rec(i.id).box === 0 && vgUnlocked(i)), started = match.filter(i => rec(i.id).box >= 1);
+          const cap = progress.settings.verbTenseCap || 7;
+          if (fresh.some(id => !vgUnlocked(content.items[id]) || content.items[id].step > cap)) out.bad.push(`${tag}: a tense that hasn't opened`);
+          const opens = match.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap), started = match.filter(i => rec(i.id).box >= 1);
           const want = Math.min(per, started.length + Math.min(nNew, opens.length));
           if (ids.length !== want) out.bad.push(`${tag}: ${ids.length} items, expected ${want}`);
           if (started.filter(i => isDue(i.id, t)).length > due.length && ids.length < per) out.bad.push(`${tag}: a due one left out`);
@@ -556,6 +563,44 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check(`${who}: the tense chips show each tense's verbs started, and are disabled, with the reason, exactly where nothing can be practised (${r.offChips} of 8 disabled)`, r.chips && (seeded || r.offChips === 7), JSON.stringify(r.empty));
       check(`${who}: Practise this family is under every family's heading, disabled exactly where nothing can be practised`, r.fams);
       check(`${who}: no script errors`, !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 9. The ladder cap */
+    {
+      const { page, context } = await open(browser, origin, { seed: false });
+      section("9. The ladder cap: Open new tenses up to (from 9.31)");
+      // every verb's presente and passato prossimo learned, the first 30 verbs' imperfetto and futuro started and due
+      await page.evaluate(() => {
+        const T = Date.now(), put = (i, box, due) => { progress.items[pid(i.id)] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 6, lastRight: T - 864e5 }; };
+        for (const i of content.byUnit.vb) if (i.step <= 1) put(i, 5, T + 30 * 864e5);
+        VERB_GYM.slice(0, 30).forEach(v => { for (const t of ["imperfetto", "futuro"]) { const i = vgItem(v.it, t); if (i) put(i, 5, T - 1000); } });
+        saveProgress(); S.screen = "settings"; render();
+      });
+      await page.selectOption('select[data-set="verbTenseCap"]', "2");
+      const st = await page.evaluate(async () => { await Store.flush(); return { set: progress.settings.verbTenseCap, stored: (await Store.read("itapp.progress.v1")).settings.verbTenseCap, cloud: JSON.stringify(progressToDocs(progress)).includes('"verbTenseCap":2'), shown: document.querySelector('select[data-set="verbTenseCap"]').value }; });
+      check("Settings › Verbs › Open new tenses up to, chosen by tapping, is stored with the settings, in the cloud's documents too, and drawn as chosen", st.set === 2 && st.stored === 2 && st.cloud && st.shown === "2", JSON.stringify(st));
+      const r = await page.evaluate(() => {
+        const out = { bad: [], fresh: 0, reviews: 0 }, cap = 2, vb = content.byUnit.vb;
+        for (let k = 0; k < 30; k++) for (const [kind, key] of [["verbs"], ["vtense", "futuro"], ["vtense", "condizionale"], ["vfam", "irr"], ["vverb", VERB_GYM[k].it], ["vverb", VERB_GYM[100 + k].it]]) {
+          const s = buildSession(kind, key);
+          for (const q of s.queue) { const i = q.ex.item; if (rec(i.id).box === 0) { out.fresh++; if (i.step > cap) out.bad.push(`${kind} ${key || ""}: ${i.id}, a tense after the imperfetto, as new`); } else if (i.step > cap) out.reviews++; }
+        }
+        if (verbNewIds().some(id => content.items[id].step > cap)) out.bad.push("verbNewIds takes a tense after the imperfetto");
+        out.plainNew = vb.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap).length;
+        S.screen = "home"; render();
+        out.tile = (document.querySelector('.tile[data-start="verbs"]') || {}).textContent || "";
+        S.screen = "units"; S.unitSeg = "verbs"; render(); S.unitPick = "vb"; render();
+        out.card = (document.querySelector(".ucard") || {}).textContent || "";
+        S.screen = "reference"; S.refUnit = "vb"; S.refFilter = "andare"; render();
+        out.row = (document.querySelector('details.vref[data-verb="andare"] summary') || {}).textContent || "";
+        S.refFilter = ""; progress.settings.verbTenseCap = 7; progress.settingsUpdatedAt = now(); saveProgress();
+        out.after = verbNewIds().filter(id => content.items[id].tense === "imperfetto").length;
+        return out;
+      });
+      check(`with the cap at the imperfetto, no session (Verbs, a tense, a family, a verb) takes a newer tense as new (${r.fresh} new ones taken), while those already started still come up for review (${r.reviews})`, !r.bad.length && r.fresh > 0 && r.reviews > 0, r.bad.slice(0, 5).join("\n"));
+      check(`Today's Verbs tile, the Units card and the reference count new tenses within the cap (${r.plainNew} new)`, r.tile.includes(`${r.plainNew} new`) && r.card.includes(`${r.plainNew} new`) && /condizionale held back/.test(r.row) && !/ new/.test(r.row),JSON.stringify({ tile: r.tile, card: r.card, row: r.row }));
+      check("set back to All, the next tense opens again", r.after > 0);
+      check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
     }
   } catch (e) {

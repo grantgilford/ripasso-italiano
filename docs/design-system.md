@@ -386,7 +386,7 @@ A new `S.screen = "you"` with its own render function and a `data-go="you"` tab.
    - **New items per day:** current value, e.g. "No limit".
    - **Vocab direction:** current value, e.g. "Italian → English".
    - **More settings:** opens the full `settings` screen.
-   - *Each row opens* the full Settings screen, which keeps every existing option, restyled as grouped rows with their hints beneath.
+   - *Each row opens* the full Settings screen, which keeps every existing option, restyled as grouped rows with their hints beneath. From 9.31 its Verbs group ends with **Open new tenses up to** (All, then the tenses from the *congiuntivo presente* back to the *passato prossimo*), a select like the others; a tense after it shows as "held back" in the Verbs reference.
 4. **Your data** (card of rows):
    - **Sync:** a status dot plus words; the dot is never the only signal. It opens `data`.
    - **Flagged items:** the count; opens `data`, scrolled to that section.

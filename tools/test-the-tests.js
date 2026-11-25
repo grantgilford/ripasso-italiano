@@ -146,6 +146,9 @@ const FAULTS = [
       if (t === "imperativo"`, put: `      if (refl || !refl) return x;
       if (t === "imperativo"`,
     suite: "test-verbs.js", args: ["--verbs", "parlare"], expect: "exactly those checked by hand" },
+  { id: "ladder-cap-ignored", what: "Open new tenses up to is ignored: a tense after it still opens as new (9.31)",
+    find: `const vgWithinCap = (item) => item.step <= vgCap();`, put: `const vgWithinCap = (item) => item.step <= 7;`,
+    suite: "test-sessions.js", expect: "takes a newer tense as new" },
   { id: "reviews-spread-30-percent", what: "reviews are spread by 30% either way, not 10%",
     find: `const SPREAD = 0.1;`, put: `const SPREAD = 0.3;`,
     suite: "test-sessions.js", expect: "within 10% of the interval" },
