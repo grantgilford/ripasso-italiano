@@ -136,7 +136,7 @@ const FAULTS = [
     find: `  make[pickKey(T, opt)]();`, put: `  make[pickKey(T)]();`,
     suite: "test-sessions.js", expect: "so does a verb tense in a Verbs session" },
   { id: "focus-opens-locked-tense", what: "a focus session on the Verbs reference opens a tense whose tense before it isn't learned yet (9.31)",
-    find: `const vgOpens = (i) => rec(i.id).box === 0 && vgUnlocked(i);`, put: `const vgOpens = (i) => rec(i.id).box === 0;`,
+    find: `const vgOpens = (i) => rec(i.id).box === 0 && vgUnlocked(i) && vgWithinCap(i);`, put: `const vgOpens = (i) => rec(i.id).box === 0 && vgWithinCap(i);`,
     suite: "test-sessions.js", expect: "no focus session opens a tense that hasn't opened" },
   { id: "weak-spots-never-heal", what: "a verb form's weak spot never goes away, however often it is got right again (9.31)",
     find: `if (--e[3] <= 0) m.delete(k);`, put: `if (--e[3] <= 0) e[3] = 1;`,
