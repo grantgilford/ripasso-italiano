@@ -66,8 +66,11 @@ function checks({ onlyFailures = false } = {}) {
   T.section = (title) => console.log("\n" + title);
   T.stopped = (e) => { T.failures++; console.log("\n  FAIL the test itself stopped: " + (e && e.stack || e)); };
   T.summary = () => { // the runner (tools/run-tests.js) reads the number of checks from this line, passed or failed
-    console.log(T.failures ? `\n${T.failures} of ${T.total} check(s) failed.` : `\nAll ${T.total} checks passed.`);
-    process.exit(T.failures ? 1 : 0);
+    const code = T.failures ? 1 : 0;
+    process.exitCode = code;
+    // the process ends once this line is written (from 9.32): through a pipe that is slow to be read, as when
+    // tools/test-the-tests.js runs suites side by side, exiting at once could lose the last lines of a long output
+    process.stdout.write((T.failures ? `\n${T.failures} of ${T.total} check(s) failed.` : `\nAll ${T.total} checks passed.`) + "\n", () => process.exit(code));
   };
   return T;
 }
