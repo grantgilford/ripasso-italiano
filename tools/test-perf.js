@@ -84,10 +84,10 @@ const BUDGETS = {
   "Draw You": 26,
   "Draw Verb tenses lesson": 290,
   "Draw Verb tenses glossary": 832,
-  "Draw Verbs reference": 544,
+  "Draw Verbs reference": 365, // 9.32: was 544 (see below)
   "Draw a 1,000-card glossary": 739,
-  "Open a verb in the Verbs reference": 165,
-  "Verbs filter: andare": 199,
+  "Open a verb in the Verbs reference": 105, // 9.32: was 165
+  "Verbs filter: andare": 150, // 9.32: was 199
   "1,000-card glossary filter: casa": 107,
   "Look up: c": 3,
   "Look up: ca": 1055,
@@ -141,10 +141,14 @@ const BUDGETS = {
   // 9.32: the Verb map. Opening it draws its tense rows, filters and first 40 rows (the rest are drawn as the grid scrolls
   // near its end, 40 at a time, each held to the 50 ms limit of a slice of idle work); a keystroke in its filter, "a", leaves
   // nearly every verb, so it draws the most. Set from five runs on a computer that ran this test's other figures at about
-  // half their budgets: the slowest plus 25%, doubled, to match them
-  "Open the Verb map": 0,
+  // half their budgets (Draw Units 14 ms against 38, Look up: casa 38 against 89): the slowest plus 25%, doubled, to match
+  // them (37–40 ms and 22–26 ms there). The Verbs reference's rows, like the map's, are laid out only when they come near
+  // the screen from 9.32, so on that computer drawing the reference took 116–124 ms where 9.31 took 185, opening a verb
+  // 34–38 ms where it took 60–63, and the Verbs filter 72–77 ms where it took 99–105: their budgets were lowered in the
+  // same proportion as their slowest runs
+  "Open the Verb map": 100,
   "Verb map: the next 40 rows": 50,
-  "Verb map filter: one keystroke": 0,
+  "Verb map filter: one keystroke": 64,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work, and no

@@ -1,4 +1,4 @@
-# Exercise types: the catalogue (v9.31)
+# Exercise types: the catalogue (v9.32)
 
 Every kind of exercise the app can put in front of the learner, where it comes from, and how to add more. Read this before writing content (to choose a good mix of types for a unit) and before building a new type (the checklist at the end lists every place in the code and tests a type touches). The item formats themselves are in `italian-app-content-guide.md`; the look of each exercise is in `design-system.md`.
 
@@ -89,6 +89,7 @@ Everything else either shows the English already (typed recall, the sentence typ
 | Verbs section drills | `vtable`, `vspot`, `vpick`, `vmeaning`, `vswitch`, `vinf`, `vaux`, `vtenseid`, `vperson` | the Verbs section (`VERB_GYM`) | R and P | by tense ladder | full tables, single forms, pick the form, from English, change the tense, which verb, essere or avere, which tense, which person |
 | **Verb in a sentence** (new, 9.20) | `vctx` | a verb-tense item with an example sentence (`VERB_SENTENCES`) | R, then P | about 15% at box 1 (chosen from four), 12% from box 2 (typed) | fills the blank in the sentence with the form, given the infinitive, person and tense, with the English beneath |
 | **Which tense fits?** (new, 9.20) | `vfit` | a verb-tense item whose sentence has a clue, two or more other tenses started | R, then P | about 12% from box 3 (chosen at box 3, typed from box 4); not for commands | fills the blank given only the infinitive and person, the English hidden: the clue in the sentence decides the tense |
+| **Verb sprint** (9.32; never touches progress) | none (its own screen, not a session) | the verb tenses started (box 2 and up, or 1 and up while that gives fewer than 20) | P | from the Sprint button, against the clock | types single forms, *andare · noi · futuro*, for 60, 90 or 120 seconds; see The Verb sprint, below |
 
 ### The types added in v8.6, in more detail
 
@@ -108,6 +109,18 @@ Every verb-tense item (3,954 as of 9.25; the first 100 verbs, 793 items, from 9.
 - **Which tense fits?** (`vfit`). The same blank with only *andare · noi*; the English and the tense stay hidden until after the answer, so the clue decides. From box 3, for sentences with a clue, never commands, when at least two other tenses are started; the options are the person's forms in two or three of those tenses (never one listed in the sentence's `also`). Box 3 chosen; box 4 and up typed, where a tense in `also` is accepted with a note. The panel names the clue and why the tense chosen doesn't fit. 12% from box 3, from the others in proportion.
 
 Where a tense has no sentence, or neither drill can be built, the choice is drawn again as before. Over the 100 verbs with sentences (measured at 9.20 with a seeded generator), box 1 gives Verb in a sentence about 15% and the full table 43% (59% before); from box 2 Verb in a sentence about 12% and Which tense fits? about 9% (a sentence without a clue, or a command, falls back). The share of typed exercises from box 2 is about 87% (86% before): 87% at box 2, 80% at box 3, where Which tense fits? is chosen, and 89% from box 4, where it is typed. `tools/test-verbs.js` answers every kind of Verbs exercise right through the screen; `tools/test-choices.js` checks the two drills' options and prompts over every sentence.
+
+### The Verb sprint (from 9.32): practice that never touches progress
+
+A game-like side practice on its own screen (`S.screen` `"sprint"`), from the **Sprint** button beside Verb map on the Verbs reference and on the Verbs card on Units. It is not a session and builds no exercise with `makeExercise`: it asks single typed forms, one after another, against a clock, and **never changes progress, the daily log or the streak** (no `applyResult`, no `today()`, no `saveProgress()`), so it can't make a review come sooner or later, add XP or keep a streak alive.
+
+- **Which forms.** Every person of the verb tenses started at box 2 and up, or at box 1 and up while that gives fewer than 20 tenses; never a new one. Each form is weighted: a tense started more recently counts up to three times (by its number of answers so far, as a record has no date it was started), and a form missed before (`itapp.vgmiss.v1`) three to five times more. A form comes once a round until all have come (so the weights decide which come up in a minute), never the same verb twice running.
+- **Answering.** The prompt reads *andare · noi · futuro* with the meaning beneath. Enter (or Check) checks with `checkAnswer` against the form's accepted answers (`vgAcc`, with or without the subject pronoun), with the Accents setting and no typo tolerance, as the Verb form drill. Right: straight on to the next, the field emptied but kept, so the keyboard stays up, and the form just answered shown under the prompt. Wrong, or Don't know: **the clock stops**, and "Not quite", the right form, what was typed and the first sentence of its explanation (`verbWhy`) stay on screen until Next or Enter.
+- **The clock.** 60, 90 or 120 seconds, chosen on the sprint's screen or in Settings › Verbs › Verb sprint length; a plain number counting down, nothing animated.
+- **What it keeps.** On this device only, in `itapp.sprint.v1` (`{ "60": 23, "90": 31, len: 60 }`: the best score per length and the length chosen; never synced, never in a backup, a damaged value ignored). When the clock runs out, the round's misses are noted as weak spots in `itapp.vgmiss.v1` and its right answers heal them, as any answer outside a repeat does. Leaving mid-round (back, the close button, putting the app away) keeps nothing.
+- **The end.** The score (forms right), accuracy, the best for that length ("A new best" when beaten), and each miss with its right form and what was typed. **Practise these** starts an ordinary Verbs session (kind `vsprint`) of the verb tenses missed, balanced like the others and asking the persons missed, which counts as any session does.
+
+`tools/test-rules.js` (3e) checks its rules in Node, `tools/test-ui.js` plays a round by typing, `tools/test-progress.js` (12) checks that progress, the log, the streak and the cloud are untouched, and `tools/test-sessions.js` (11) checks its weighting and Practise these.
 
 ## Where the new types could go next
 

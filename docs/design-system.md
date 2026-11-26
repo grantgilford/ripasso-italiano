@@ -154,6 +154,8 @@ Keeping the old token names where they still fit saves churn; new tokens are mar
 | `--note-bg` | `#E1EFE8` | `#183229` | Lesson tip boxes (`.ltip`), notes |
 | `--note-title` *new* | `#0A4F37` | `#5FD3A2` | Tip-box heading |
 | `--placeholder` *new* | `#46816A` | `#52987B` | "Your answer" inside the empty answer box (a faded green; from 8.3) |
+| `--vm1` … `--vm5` *9.32* | `#E2EDE9` `#BCD6CD` `#8CB8A9` `#277A5D` `#0F6B4B` | `#233D32` `#2B5342` `#346852` `#4BA17D` `#5FD3A2` | The Verb map's cells, box 1 to box 5 and up: the accent mixed into the card at rising strength (light 12, 28, 48, 90, 100%; dark 16, 28, 40, 72, 100%) |
+| `--vm-lo`, `--vm-hi` *9.32* | `#10201A`, `#FFFFFF` | `#E9F0EC`, `#0E1512` | The box number on cells 1–3 (`--vm-lo`) and the number or ✓ on 4–5 (`--vm-hi`): each at least 5.2:1 on its fill |
 
 Every text pairing above was checked: all are at least 4.5:1, most well over 6:1. Keep it that way for anything you add.
 
@@ -169,7 +171,7 @@ Every text pairing above was checked: all are at least 4.5:1, most well over 6:1
 - **No shadows and no gradients.** Cards sit on the background by colour alone. Borders only on inputs, the open unit card on Units (2 px `--accent`) and answer states.
 - **Tap targets:** at least 44 × 44 px everywhere, including the accent keys, chips and the Quit button.
 - **Motion:** only purposeful and small: the feedback panel slides up (about 180 ms), pressed buttons dim slightly. Wrap all of it in `@media (prefers-reduced-motion: no-preference)`. No mascots, confetti, sound effects or decorative animation (the spec's "no decoration" principle still holds). Italian read aloud (7, Speakers) is content, not decoration: it plays only when a speaker is tapped.
-- **Icons:** inline stroke SVG, 24-unit viewBox, stroke 1.8, round caps and joins, `currentColor`. Copy the exact paths from the mockups (Today, Units, Rules, Look up, You, Review, Verbs, Flashcards, Mistakes, the flame, settings rows). No emoji. Icon-only buttons get an `aria-label`.
+- **Icons:** inline stroke SVG, 24-unit viewBox, stroke 1.8, round caps and joins, `currentColor`. Copy the exact paths from the mockups (Today, Units, Rules, Look up, You, Review, Verbs, Flashcards, Mistakes, the flame, settings rows). No emoji. Icon-only buttons get an `aria-label`. From 9.32, `grid` (nine small rounded squares) marks the Verb map and `timer` the Verb sprint.
 
 ---
 
@@ -245,6 +247,16 @@ The open unit card (the current unit's, or the one just tapped) has a 2 px `--ac
 
 **Tables** (lessons, glossary, conjugations). No outer border; 1 px `--line` rules between rows; header row in `--muted` 13 px 600 (or `--accent` for column heads naming a verb, as in the lesson mockup); 8 px cell padding. Wide tables keep their `overflow-x: auto` wrapper.
 
+**Verb map cells** (from 9.32, `.vc`, one `span` each, no SVG). A 24 × 24 px square, 6 px radius, one per tense of the ladder, in its order, side by side with 2 px gaps; a cell is never tapped on its own (the row it is in is). Five states, each told by shape and words as well as colour:
+- *locked* (and a tense *held back* by Settings' cap): a 1 px dashed `--muted` outline, empty;
+- *new*, able to open: a 1.5 px `--accent` outline with a 6 px `--accent` dot in the middle;
+- *box 1–4*: fills of rising strength (`--vm1` … `--vm4`) with the box number (12 px, 700, tabular), boxes 1–3 with a 1.5 px `--accent` edge so the lightest still shows on the card;
+- *learned* (box 5 and up): solid `--vm5` with a ✓;
+- *due now*, on any started cell: a 7 px dot on its top right corner, `--fg`, ringed 2 px in the card colour so it shows on every fill;
+- a tense the verb doesn't have: an empty square with nothing in it.
+
+Where they stand for a verb (a Verb map row, a closed row of the Verbs reference), the cells are `aria-hidden` and the row says the same in words for a screen reader. A key above the Verb map's grid shows each state beside its name.
+
 **Irregular forms** (from 9.31), in every Verbs section table (the New verb and New tense card, the answer panel, the Verbs reference and Look up): each form the regular pattern doesn't give has a dotted 2 px underline in `--accent`, 3 px below the text (`u.irr`), and a visually hidden "(irregular)" for a screen reader, which the table's speaker never reads; in the *passato prossimo* only the participle is underlined, never the auxiliary. Under the first table with marks (in the reference, the first in each opened row) a one-line legend in Small `--muted` (`.vkey`, 13 px): "Underlined: breaks the pattern.", the word "Underlined" itself underlined as the key. A verb irregular throughout (essere, avere, the verbs with built-in pronouns, and any verb nine of whose forms in ten would be underlined: fare, rifare, bere) has no underlining; the same line says "essere is irregular throughout, so its forms aren't underlined one by one." The colour is never the only signal: the underline is a shape, and the legend names it.
 
 ---
@@ -258,7 +270,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 | Tab | Screens | Notes |
 |---|---|---|
 | **Today** | `home` | |
-| **Units** | `units`, `reference` (a unit's Lesson / Glossary) | The unit screen shows Units as the active tab. |
+| **Units** | `units`, `reference` (a unit's Lesson / Glossary), `vmap` (the Verb map, 9.32), `sprint` (the Verb sprint, 9.32) | The unit screen, the Verb map and the sprint's first screen show Units as the active tab; a sprint under way, and its end, show no tab bar. |
 | **Rules** | `rules` | |
 | **Look up** | `lookup` | |
 | **You** | **new** `you`, then `stats`, `settings`, `data` as sub-screens with a back arrow to You | Replaces the old Stats / Settings / Data buttons on Home. |
@@ -302,6 +314,7 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
   - **Tapping a closed card** (`data-upick`) opens it in place and closes the other, for any unit: grammar, vocab pack or Verbs. The tapped card stays where it was under the finger, and its buttons are scrolled clear of the tab bar. The choice lasts while Grant stays in Units and its unit screens (so it is still open after Read lesson and back), and goes back to the current unit once he leaves for another tab or a session.
   - **The current unit** says "Current unit" at the start of its muted line, open or closed, so it is easy to find while another card is open.
   - **"Make this my Continue unit"** (`data-setunit`) moves to the unit screen.
+  - **The Verbs card** (from 9.32), when open, also has **Verb map** (`data-go="vmap"`, `grid` icon) and **Sprint** (`data-go="sprint"`, `timer` icon), secondary buttons in the same two-column grid under Practise and Open unit. The card stays open while Grant is in the Verb map or the sprint, so it is still open when he comes back.
 
 ### 8.4 Unit screen (`renderReference`, `renderVerbReference`), see `mockups/lesson-*.html`
 
@@ -329,6 +342,10 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 - **Practise this unit:** a primary button at the end of both tabs (`data-unit`).
 - **Practise this section (N items)** (from 9.6): a full-width secondary button at the end of each lesson section with items linked to it (`.secgo`, `data-practise="u05#6"`, the unit and the section's index from 0), starting a session of those items. When they are all new and today's new items are used up it is disabled, with a muted line under it saying so.
 - **Verbs reference:** the same frame. Each verb is a row (`details.vref`) that opens to its tables; the tables are drawn when the row is opened (from 9.3), and a filter opens, and draws, the rows it leaves. From 9.20 each tense's example sentence sits under its table as a verb sentence card (section 7) on the page colour (`.fb-ctx.vs-in`, `--bg` inside the row's `--card`).
+- **The Verbs reference's tools** (from 9.32): under Practise verbs, two secondary buttons side by side (`.vtools`, a grid that keeps both on one row at 360 px): **Verb map** and **Sprint**.
+- **Closed rows** (from 9.32): under the verb and its meanings, the Verb map's eight cells (`.vref-c`) in place of the line "presente box 3 · passato prossimo locked · …", which stays as text for a screen reader only (`.vh`), with ", due" after a tense that is due. Rows out of sight are laid out only when they come near (`content-visibility: auto`), so the 4,000 cells cost nothing until then.
+- **Sort** (from 9.32): a select under the filter field, labelled "Sort" (Eyebrow), with **By family** (the grouping as before, the default), **Course order**, **A–Z** and **Weakest first** (the lowest average box among the tenses started; none started last). The last three show one list, headed "Verbs, A–Z" and so on, without the family headings and their buttons. Kept for the visit; changing it redraws only the results.
+- **Compare** (from 9.32): in an opened row, straight after Practise this verb, a closed `details` "Compare with another verb" (`.vcmp`, its summary 44 px, `--accent` 600). Opened (drawn then): "Often mixed up with *verb*, or sharing a meaning:" and up to six filter chips (`.fchip`, `aria-pressed`): the fixed pairs (sapere / conoscere, uscire / partire, portare / prendere, vedere / guardare, sentire / ascoltare, restare / rimanere, cominciare / iniziare) first, then verbs with an English meaning in common; then "Or find another verb:" and a field (name, meaning or form), its matches as chips beneath. A chip shows the comparison under them: a line "*a* and *b*, tense by tense. **Bold**: where the two differ (an ending, the stem or the auxiliary)." then, per tense, a Label heading and both tables, each headed by its verb in `--accent` 13 px 600, one under the other below 480 px and side by side from 480 px. Bold marks a form the two verbs build differently: another auxiliary or pronoun, another ending after each verb's own stem (*rest-o*, *riman-go*), or a form that leaves its stem (*esco* from *uscire*); two verbs of one pattern show none. Each bold form has a visually hidden "(differs)", which the table's speaker never reads.
 - **Focus sessions on the Verbs reference** (from 9.31), each starting a Verbs session aimed at one thing (`data-vfocus="kind:key"`):
   - **Practise a tense:** a group (Eyebrow heading "Practise a tense") under Practise verbs, before Rules: eight tense chips in a two-column grid (`.tchips`, 8 px gaps), one per tense of the ladder in order. Each chip (`.tchip`) is a `--card` button with a 14 px radius, at least 52 px tall, the tense in Label weight at 15 px and "N started" (the verbs with that tense started) in Small `--muted` beneath; a long name wraps to two lines rather than being cut. Not pills: two lines and a grid keep all eight in view at 360 px, where a scrolling row would hide most of them. A tense with nothing started and nothing able to open is disabled (55%), with one muted line under the grid saying why.
   - **Practise this family:** under each family's heading and description, before its card of verbs, a full-width secondary button (`.secgo.vgo`).
@@ -387,7 +404,7 @@ A new `S.screen = "you"` with its own render function and a `data-go="you"` tab.
    - **New items per day:** current value, e.g. "No limit".
    - **Vocab direction:** current value, e.g. "Italian → English".
    - **More settings:** opens the full `settings` screen.
-   - *Each row opens* the full Settings screen, which keeps every existing option, restyled as grouped rows with their hints beneath. From 9.31 its Verbs group ends with **Open new tenses up to** (All, then the tenses from the *congiuntivo presente* back to the *passato prossimo*), a select like the others; a tense after it shows as "held back" in the Verbs reference.
+   - *Each row opens* the full Settings screen, which keeps every existing option, restyled as grouped rows with their hints beneath. From 9.31 its Verbs group ends with **Open new tenses up to** (All, then the tenses from the *congiuntivo presente* back to the *passato prossimo*), a select like the others; a tense after it shows as "held back" in the Verbs reference. From 9.32 it is followed by **Verb sprint length** (60, 90 or 120 seconds), the same choice as on the sprint's screen, kept per device in `itapp.sprint.v1` (never in `progress`).
 4. **Your data** (card of rows):
    - **Sync:** a status dot plus words; the dot is never the only signal. It opens `data`.
    - **Flagged items:** the count; opens `data`, scrolled to that section.
@@ -403,6 +420,66 @@ The Stats screen keeps all its current tables and the "Practise the most-missed 
 - **Due in the next 7 days**, after the figures: one card with a column per day, tomorrow first, as tall as the number of items falling due that day (grammar, cards and verbs together), the number on top in `--fg`, columns at most 24 px wide in `--accent` with 4 px rounded tops on a hairline `--line` baseline, and the weekday and date beneath in Small; one series, so no legend. Under it, a table of the same days by kind (Grammar, Cards, Verbs), numbers right-aligned in tabular figures, which also gives screen readers the figures (the chart itself is one `role="img"` with a spoken summary).
 - **Tricky items**, between Most missed and the button: up to 15 items with 4 or more lapses at box 3 or below, as a table like Most missed, with a muted line saying they start again with their introduction.
 - **Verbs: weak spots** (from 9.31), after Practise the most-missed items: a group with that Eyebrow heading and one card (`.weak`). In it, under small `--muted` 600 headings (13 px), **By person** (io … loro) and **By tense** (the eight, in ladder order): one row per label in a three-column grid, the label (14 px), a 6 px bar (`--track`, `--accent` fill, scaled to the largest in its group) and the number (14 px 600, tabular figures, right-aligned), so the bar is never the only signal; then **Missed most**, a numbered list of up to 8 cells, most first: "**voi · andare · futuro:** andrete, missed 4 times" (the person as the tables label it, *che voi*, *Lei*). Under the card, a full-width secondary **Practise my weak spots** (`button.wide`, `data-start="vweak"`) with a small line saying what it does. With nothing missed yet, the card says so in one muted line and the button is disabled, with a muted line under it saying why.
+
+### 8.9 Verb map (`renderVerbMap`, from 9.32)
+
+Every verb's progress on one screen (`S.screen = "vmap"`), from the Verbs reference's tools and the Verbs card on Units; the header's back arrow returns to whichever opened it (`S.vmapFrom`), and the tab bar shows Units. Top to bottom:
+
+```
+ ←  Verbs                                     (eyebrow, back arrow)
+    Verb map                                  (Title S)
+ 500 verbs · 96 started · 128 of 3,954 verb tenses learned   (Small, muted)
+ TENSES                                       (Eyebrow)
+ ┌───────────────────────────────────────────┐
+ │ pres  presente                          ✓ │  ← a row per tense, a button; the chosen one tinted, with a tick
+ │       learned 41 of 500 · started 96 ▬▬▬──│     the code (11 px, muted), the name (15 px 600), the counts (13 px muted),
+ ├───────────────────────────────────────────┤     a 4 px bar beside them: started in --vm3, learned in --accent
+ │ pp    passato prossimo …                  │
+ └───────────────────────────────────────────┘
+ Tap a tense to filter the verbs below by it; tap it again for every tense.
+ FIND A VERB
+ (All 500) (Due 12) (Learning 43) (Learned 34) (Not started 404)   ← filter chips with counts, wrapping
+ Family [All families ▾]   Sort [Course order ▾]                    ← side by side where both fit, else stacked
+ [ Verb, meaning or form…                      ]
+ 41 of 500 verbs with the imperfetto learned · matching “and”       ← the summary (Small, muted, role=status)
+ [⬚] Locked  [·] New  [2] Box 1–4  [✓] Learned  [3•] Due now        ← the key, with the cells themselves
+      pres pp impf fut cond imp c.pr c.imp    ← column heads (11 px 600, muted), sticky at the top as the grid scrolls
+ ┌───────────────────────────────────────────┐
+ │ andare        [✓][✓•][·][⬚][⬚][⬚][⬚][⬚]   │  ← a row per verb: the whole row one button, at least 48 px high
+ │ to go                                     │     infinitive 15 px 600, first meaning 13 px muted, both cut with …
+ └───────────────────────────────────────────┘
+```
+
+- **Tense rows**: "imperfetto · learned 41 of 437 · started 96" in a card of rows, from `counts().verbs.byTense`. A tap picks that tense for the status filter (its row `aria-pressed`, `--tint` with a tick; its column head underlined in `--accent`); a second tap goes back to any tense.
+- **Status chips** (`.fchip`, 44 px, `aria-pressed`, selected in `--accent` with `--accent-fg`): with no tense chosen, *Due* means a tense due, *Learning* a tense in boxes 1–4, *Learned* a tense at box 5 or above, *Not started* nothing started; with a tense chosen, that tense. Each chip counts the verbs it would leave.
+- **The grid**: the cells (section 7, Verb map cells) in a card with `--line` rules between rows. Each row's `aria-label` sums it up: "andare: presente learned; passato prossimo box 3, due; imperfetto new; five locked". Rows are drawn 40 at a time as the grid scrolls near its end (an IntersectionObserver on a marker after the last row), and rows out of sight are laid out only when they come near (`content-visibility: auto`), so opening the map draws only the first ones. At 349 px and below (about 120% text on a phone) the cells go under the name.
+- **The sheet** a row opens: the rule sheet's frame (section 7) with the family as its eyebrow, the infinitive in Title S and its meanings in Small `--muted`; then Practise this verb, and for each tense a Label heading with its status in `--muted` ("imperfetto · box 3, due"), its table (irregular forms underlined, the key under the first), its example sentences and a secondary **Practise this tense** (the tense across all Grant's verbs, said so in its accessible name); a primary Close at the foot. The focus moves into it and the map behind is `inert`; Close, a tap beside it, Escape and the back button close it and put the focus back on the row.
+- Typing in the field redraws only the summary, the chips' counts and the grid, once typing pauses; the filters last for the visit.
+
+### 8.10 Verb sprint (`renderSprint`, from 9.32)
+
+A timed round of single typed forms (`S.screen = "sprint"`), from the Sprint buttons; side practice that never touches progress (`docs/exercise-types.md`, The Verb sprint). Three states:
+
+```
+ First screen (tab bar shown)      Under way (no tab bar)                 Wrong (clock stopped)
+ ←  Verbs                          ✕  55  seconds left       3 right     ✕  55  Clock stopped       3 right
+    Verb sprint                    ┌──────────────────────────────┐      ┌──────────────────────────────┐
+ Type as many verb forms…          │ andare · noi · futuro        │      │ andare · noi · futuro        │
+ LENGTH                            │ to go                        │      └──────────────────────────────┘
+ [ 60 s | 90 s | 120 s ]           └──────────────────────────────┘      [ andaremo                  ] (--bad)
+ ┌──────────────────────────┐      ✓ andavamo                            ┌ ✕ Not quite ─────────────────┐
+ │ Best for 60 seconds: 23  │      [ Your answer               ]         │ Answer: noi andremo          │
+ │ From the 214 verb tenses │      [à][è][é][ì][ò][ù]                    │ You typed: andaremo          │
+ └──────────────────────────┘      [ Don't know ][   Check   ]          │ futuro semplice: andare has… │
+ [          Start          ]                                            └──────────────────────────────┘
+ A sprint is side practice…                                             [            Next            ]
+```
+
+- **First screen**: the header (back arrow to where it was opened), a short description, **Length** as a segmented control (`data-splen`, `aria-pressed`), a card with the best for that length and where the forms come from, a primary **Start** (disabled, saying why, when no verb tense is started), and a Small muted line that a sprint never changes progress, the daily goal or the streak. After a round left early, a flash card says nothing from it was kept.
+- **Under way**: the session's top row with the close button (`data-act="spQuit"`), the seconds left as a plain number (Bricolage 700 28 px, tabular figures, `role="timer"`) with "seconds left" beside it, and "N right" at the right; the prompt card in the Prompt style (*andare* then · noi · futuro in the hint style, the meaning beneath); the form just answered right in `--ok-title` with a ✓; the answer field ("Your answer", 22 px), the accent keys and Don't know beside a primary Check. A right answer changes the prompt, score and line in place and empties the field, so the keyboard stays up; Check and Don't know end within the top 460 px at Pixel 8 size.
+- **Wrong** (or Don't know): the field shows what was typed, disabled, with a `--bad` border; under it a card in the wrong panel's colours (`--bad-bg`; the ✕ circle and "Not quite" heading of section 7's feedback panel), "Answer: **noi andremo**", "You typed: …" and the first sentence of the form's explanation in `--panel-text`; then a full-width primary **Next**, which has the focus, so Enter moves on. The clock reads "Clock stopped" and doesn't move. Nothing slides or animates.
+- **The end** (no tab bar): an Eyebrow "Verb sprint · 60 seconds" and the title "Time's up"; the summary card's three big numbers: right, accuracy (right / answered), best for that length; "✓ A new best for 60 seconds." in `--accent` 600 when beaten; **Missed**, a card list of each miss (verb · person · tense in Small muted, the right form in the Italian face with its speaker, "You typed …"); then **Practise these** (primary) beside **Another sprint**, a Small line saying Practise these is an ordinary Verbs session that counts, and a quiet **Back to Verbs** (or Units).
+- Leaving mid-round, by the close button, the back button or putting the app away, ends the round and keeps nothing.
 
 ---
 

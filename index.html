@@ -24309,7 +24309,7 @@ function leaveSheetHtml() {
 let STARTED = false;
 function putAway() { if (!STARTED) return; Store.set(LS_PROGRESS, progress, true); Store.flush(); }
 document.addEventListener("visibilitychange", () => { if (document.hidden) { putAway(); clearTimeout(syncTimer); pushProgress(true); } });
-document.addEventListener("visibilitychange", () => { if (document.hidden && spAbort("The sprint ended when the app was put away: nothing from it was kept.") && S.screen === "sprint") render(); }); // a sprint under way ends
+document.addEventListener("visibilitychange", () => { if (document.hidden && SP && SP.phase !== "done" && spAbort("The sprint ended when the app was put away: nothing from it was kept.") && S.screen === "sprint") render(); }); // a sprint under way ends (its end screen stays)
 window.addEventListener("pagehide", putAway);
 /* Another window of Ripasso (the installed app and a browser tab share the storage) has saved: Store has read the storage
    again and hands over that window's progress, which is merged with this one's as a copy from the cloud is (the newest

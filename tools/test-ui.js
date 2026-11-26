@@ -517,6 +517,8 @@ async function sprint(browser, origin) {
     check(L("…the best kept on this device, and the form missed noted as a weak spot"), JSON.stringify(k[0]) === JSON.stringify({ 60: 1, len: 60 }) && Array.isArray(k[1]) && k[1].length === 1 && k[1][0][0] === missed.id.replace(/^vg-|-[a-z_]+$/g, "") && k[1][0][2] === missed.p, JSON.stringify(k));
     check(L("…and saved progress is untouched"), (await savedProgress(page)) === progressBefore);
     await layout(page, L("the sprint's end"), opts);
+    await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, get: () => true }); document.dispatchEvent(new Event("visibilitychange")); delete document.hidden; }); await settle(page);
+    check(L("putting the app away on the end screen keeps it"), await page.evaluate(() => SP && SP.phase === "done" && document.querySelector("h1").textContent === "Time's up"));
     await tap(page, '[data-act="spPractise"]');
     check(L("Practise these starts an ordinary Verbs session of the verb tense missed"), (await screen(page)) === "session" && await page.evaluate((id) => session.kind === "vsprint" && session.queue.every(q => q.ex.item.id === id), missed.id));
     await page.evaluate(() => { session = null; S.screen = "reference"; S.refUnit = "vb"; render(); }); await settle(page);
@@ -541,6 +543,11 @@ async function sprint(browser, origin) {
     await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
     check(L("a damaged itapp.sprint.v1 is harmless: 60 seconds, no best"), await page.evaluate(() => document.querySelector('[data-splen="60"]').getAttribute("aria-pressed") === "true" && /none yet/.test(document.querySelector(".sp-info").textContent)));
     check(L("…and is never part of progress"), await page.evaluate(() => !/sprint/.test(JSON.stringify(progress)) && !/sprint/.test(backupText())));
+    await page.evaluate(() => { const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (v, k) { if (k === "itapp.sprint.v1") throw new DOMException("no room", "QuotaExceededError"); return put.call(this, v, k); }; window.__t = 0; sprintClock.now = () => window.__t; });
+    await tap(page, '[data-act="spStart"]');
+    await page.fill("#spAnswer", await page.evaluate(() => SP.cur.i.forms[SP.cur.p])); await page.keyboard.press("Enter");
+    await page.evaluate(() => { window.__t = 61000; spTick(); }); await settle(page);
+    check(L("a device that refuses to store itapp.sprint.v1: the round still ends with its score, and no script error"), !page.errors.length && await page.evaluate(() => SP && SP.phase === "done" && SP.right === 1 && document.querySelector("h1").textContent === "Time's up"), page.errors.join("\n"));
     check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
     await context.close();
     console.log(`  Verb sprint checked, ${label}`);
