@@ -799,7 +799,7 @@ async function runSession(page, start, maxSteps = 200) {
         await page.evaluate(() => { window.__t = 0; sprintClock.now = () => window.__t; S.screen = "sprint"; render(); });
         await page.click('[data-act="spStart"]');
         for (const how of ["right", "wrong", "right", "right", "wrong"]) { // through the screen, by typing, as a learner would
-          const form = await page.evaluate(() => SP.cur.i.forms[SP.cur.p]);
+          const form = await page.evaluate(() => vgAcc(SP.cur.i, SP.cur.p)[0]); // an accepted answer, as a learner types it (sono stato for the table's sono stato/a)
           await page.fill("#spAnswer", how === "right" ? form : "zzz"); await page.press("#spAnswer", "Enter");
           if (how === "wrong") await page.click('[data-act="spNext"]');
         }

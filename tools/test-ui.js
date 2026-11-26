@@ -490,10 +490,11 @@ async function sprint(browser, origin) {
     check(L("Start: the clock at 60, no tab bar, the field focused, and a prompt like “andare · noi · futuro”"), run.phase === "run" && !run.bar && run.focus === "spAnswer" && run.clock === "60" && run.prompt.startsWith(run.want), JSON.stringify(run));
     await layout(page, L("a sprint under way"), opts);
     // right, by typing
-    const right = await page.evaluate(() => SP.cur.i.forms[SP.cur.p]);
+    // typed as a learner types it, one accepted answer (sono stato for the table's sono stato/a), never the table's own spelling
+    const { typed, form: right } = await page.evaluate(() => ({ typed: vgAcc(SP.cur.i, SP.cur.p)[0], form: SP.cur.i.forms[SP.cur.p] }));
     const first = await page.evaluate(() => SP.cur.i.it);
     await page.evaluate(() => { window.__t = 4000; spTick(); });
-    await page.type("#spAnswer", right); await page.keyboard.press("Enter"); await settle(page);
+    await page.type("#spAnswer", typed); await page.keyboard.press("Enter"); await settle(page);
     const r1 = await page.evaluate(() => ({ score: document.getElementById("spScore").textContent, last: document.getElementById("spLast").textContent, focus: document.activeElement.id, value: document.getElementById("spAnswer").value, verb: SP.cur.i.it, clock: document.getElementById("spClock").textContent }));
     check(L("a right answer typed with Enter: the score goes up and the next form comes at once, the field empty and still focused"), r1.score === "1 right" && r1.last.includes(right) && r1.focus === "spAnswer" && r1.value === "" && r1.verb !== first && r1.clock === "56", JSON.stringify(r1));
     // an accent key types into the field
@@ -545,7 +546,7 @@ async function sprint(browser, origin) {
     check(L("…and is never part of progress"), await page.evaluate(() => !/sprint/.test(JSON.stringify(progress)) && !/sprint/.test(backupText())));
     await page.evaluate(() => { const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (v, k) { if (k === "itapp.sprint.v1") throw new DOMException("no room", "QuotaExceededError"); return put.call(this, v, k); }; window.__t = 0; sprintClock.now = () => window.__t; });
     await tap(page, '[data-act="spStart"]');
-    await page.fill("#spAnswer", await page.evaluate(() => SP.cur.i.forms[SP.cur.p])); await page.keyboard.press("Enter");
+    await page.fill("#spAnswer", await page.evaluate(() => vgAcc(SP.cur.i, SP.cur.p)[0])); await page.keyboard.press("Enter");
     await page.evaluate(() => { window.__t = 61000; spTick(); }); await settle(page);
     check(L("a device that refuses to store itapp.sprint.v1: the round still ends with its score, and no script error"), !page.errors.length && await page.evaluate(() => SP && SP.phase === "done" && SP.right === 1 && document.querySelector("h1").textContent === "Time's up"), page.errors.join("\n"));
     check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
