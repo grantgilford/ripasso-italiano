@@ -124,10 +124,19 @@ const FAULTS = [
   { id: "theme-not-applied", what: "choosing Light or Dark in Appearance changes nothing",
     find: `if (v === "light" || v === "dark") root.setAttribute("data-theme", v);`, put: `if (v === "light" || v === "dark") root.setAttribute("data-theme-x", v);`,
     suite: "test-ui.js", expect: "Appearance: Dark switches to the dark colours" },
+  { id: "vmap-due-never-marked", what: "the Verb map never marks a tense as due (9.32)",
+    find: `const r = rec(i.id), b = r.box, due = b >= 1 && r.due <= t;`, put: `const r = rec(i.id), b = r.box, due = false;`,
+    suite: "test-ui.js", expect: "a verb's row: its cells in ladder order" },
+  { id: "vmap-sheet-ignores-escape", what: "Escape no longer closes the Verb map's sheet (9.32)",
+    find: `if (S.vsheet) { if (e.key === "Escape") closeVmSheet(); return; }`, put: `if (S.vsheet) { return; }`,
+    suite: "test-ui.js", expect: "Escape closes it" },
   // ---- what the app keeps ready (test-speedups.js)
   { id: "counts-gone-stale", what: "the counts on Today, Units, Stats and You are not worked out again after an answer",
     find: `COUNTS = null; // whatever changed, the counts on Today, Units, Stats and You are worked out again`, put: `// whatever changed, the counts on Today, Units, Stats and You are worked out again`,
     suite: "test-speedups.js", expect: "the same counts after" },
+  { id: "vmap-box4-learned", what: "the Verb map's tense rows count a tense in box 4 as learned (9.32)",
+    find: `if (b >= 5) c.learned++;`, put: `if (b >= 4) c.learned++;`,
+    suite: "test-speedups.js", expect: "the same counts" },
   // ---- sessions (test-sessions.js)
   { id: "same-kind-three-in-a-row", what: "a session lets the same kind of exercise come three times running", // in noTriples, which has the last word: planSession's own hint against a run is a refinement the rule doesn't depend on
     find: `const r = k === a ? run + 1 : 1; if (r > 2) return false;`, put: `const r = k === a ? run + 1 : 1; if (r > 3) return false;`,

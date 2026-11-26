@@ -118,7 +118,10 @@ function REFERENCE() {
     }
     const all = Object.values(content.items).filter(i => isBuiltinPack(i.pack)), vi = content.byUnit.vb || [];
     const cap = progress.settings.verbTenseCap || 7; // from 9.31, the ladder cap: a tense after it never opens as new
-    const by = (list, k) => { const o = {}; for (const i of list) { const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0 }); if (rec(i.id).box >= 1) c.started++; if (rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap) c.open++; } return o; };
+    const by = (list, k) => { const o = {}; for (const i of list) { // from 9.32 also every verb tense, those learned and those due (the Verb map's tense rows)
+      const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0, learned: 0, total: 0, due: 0 }), r = rec(i.id);
+      c.total++; if (r.box >= 1) c.started++; if (r.box >= 5) c.learned++; if (r.box >= 1 && r.due <= t) c.due++; if (r.box === 0 && vgUnlocked(i) && i.step <= cap) c.open++;
+    } return o; };
     const ids = Object.keys(progress.items).filter(id => content.items[id]);
     return {
       unit, due: dueIds().length, mistakes: Object.keys(progress.items).filter(id => isRecentMistake(id)).length,

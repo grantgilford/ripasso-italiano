@@ -23,6 +23,8 @@
       reference and Vocab pack 1's glossary (1,000 cards), each until the layout is done, with the
       counts already worked out (a visit to a screen that is no longer the first since a change);
     - opening a verb in the Verbs reference (its tables are drawn then, from 9.20 with their example sentences);
+    - from 9.32, opening the Verb map (its tense rows, filters and first 40 rows), drawing its next 40 rows (as it does when
+      the grid scrolls near its end, held to the 50 ms of a slice of idle work), and one keystroke in its filter;
     - typing "casa" into Look up, one keystroke at a time (c, ca, cas, casa), each until its results
       are drawn (leaving out the pause the app waits for typing to stop): "ca" is the first search
       since buildContent, typed the moment Look up opens, so it includes building the search index;
@@ -136,11 +138,18 @@ const BUDGETS = {
   "Save an answer": 21,
   "Save an answer: in the storage": 24,
   "Put away: everything compared": 76,
+  // 9.32: the Verb map. Opening it draws its tense rows, filters and first 40 rows (the rest are drawn as the grid scrolls
+  // near its end, 40 at a time, each held to the 50 ms limit of a slice of idle work); a keystroke in its filter, "a", leaves
+  // nearly every verb, so it draws the most. Set from five runs on a computer that ran this test's other figures at about
+  // half their budgets: the slowest plus 25%, doubled, to match them
+  "Open the Verb map": 0,
+  "Verb map: the next 40 rows": 50,
+  "Verb map filter: one keystroke": 0,
 };
 
 // Budgets that are limits rather than measurements, which --new-budgets leaves as they are: no slice of idle work, and no
 // index built while an answer is shown, may keep a tap waiting longer than this (the usual threshold for a "long task").
-const FIXED = { "Idle work: longest slice": 50, "Flashcard sentence, first lookup": 50, "Verb sentences, first lookup": 50 };
+const FIXED = { "Idle work: longest slice": 50, "Flashcard sentence, first lookup": 50, "Verb sentences, first lookup": 50, "Verb map: the next 40 rows": 50 };
 
 const args = process.argv.slice(2);
 const HEADED = args.includes("--headed");
@@ -210,6 +219,13 @@ async function measure(runs) {
       const t0 = performance.now(); row.open = true; await new Promise(r => row.addEventListener("toggle", r, { once: true })); layout();
       add("Open a verb in the Verbs reference", performance.now() - t0); }
     add("Verbs filter: andare", time(() => type("refFilter", "andare")));
+    if (typeof renderVerbMap === "function") { // 9.32 on: the Verb map opened (its first rows), the next rows as it scrolls, and a keystroke in its filter that leaves nearly every verb
+      draw({ screen: "home", vm: null });
+      add("Open the Verb map", draw({ screen: "vmap" }));
+      add("Verb map: the next 40 rows", time(() => { vmMore(); layout(); }));
+      add("Verb map filter: one keystroke", time(() => type("vmFilter", "a")));
+      draw({ screen: "home", vm: null });
+    }
     draw({ screen: "reference", refUnit: fc, refTab: "glossary", refFilter: "" });
     add("1,000-card glossary filter: casa", time(() => type("refFilter", "casa")));
     draw({ screen: "lookup", lookup: "", refFilter: "" }); // then one keystroke at a time, as the box's input handler sees them

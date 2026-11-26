@@ -501,6 +501,7 @@ const Store = (() => {
   --ok: #0F6B4B; --ok-fg: #FFFFFF; --ok-bg: #E3F1EA; --ok-title: #0A5A3E;
   --panel-text-ok: #3B4A43; --panel-text-bad: #3B4A43;
   --note-bg: #E1EFE8; --note-title: #0A4F37;
+  --vm1: #E2EDE9; --vm2: #BCD6CD; --vm3: #8CB8A9; --vm4: #277A5D; --vm5: #0F6B4B; --vm-lo: #10201A; --vm-hi: #FFFFFF; /* the Verb map's cells, box 1 to 5 (9.32) */
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%2355655D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   --display: "Bricolage Grotesque", system-ui, sans-serif;
   --sans: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -517,6 +518,7 @@ const Store = (() => {
     --ok: #5FD3A2; --ok-fg: #0E1512; --ok-bg: #12291F; --ok-title: #7FE0B4;
     --panel-text-ok: #C9D6CF; --panel-text-bad: #D9C9CB;
     --note-bg: #183229; --note-title: #5FD3A2;
+    --vm1: #233D32; --vm2: #2B5342; --vm3: #346852; --vm4: #4BA17D; --vm5: #5FD3A2; --vm-lo: #E9F0EC; --vm-hi: #0E1512;
     --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239DB0A7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   }
 }
@@ -531,6 +533,7 @@ const Store = (() => {
   --ok: #5FD3A2; --ok-fg: #0E1512; --ok-bg: #12291F; --ok-title: #7FE0B4;
   --panel-text-ok: #C9D6CF; --panel-text-bad: #D9C9CB;
   --note-bg: #183229; --note-title: #5FD3A2;
+  --vm1: #233D32; --vm2: #2B5342; --vm3: #346852; --vm4: #4BA17D; --vm5: #5FD3A2; --vm-lo: #E9F0EC; --vm-hi: #0E1512;
   --chev: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%239DB0A7' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
 }
 /* ---------- base ---------- */
@@ -785,6 +788,68 @@ u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-dec
 .vmiss { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
 .vmiss-t { min-width: 0; }
 .vmiss > button { flex: none; }
+/* ---------- the Verb map (from 9.32): tense rows, filters, and a grid of every verb with a cell per tense ---------- */
+.vtools { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.vtools > button { min-width: 0; }
+.vmt { display: grid; grid-template-columns: 2.6em minmax(0, 1fr) auto; gap: 3px 8px; align-items: center; width: 100%; min-height: 44px; padding: 9px 16px 10px 14px; color: var(--fg); text-align: left; }
+.vmt[aria-pressed="true"] { background: var(--tint); }
+.vmt-k { grid-area: 1 / 1; align-self: baseline; font-size: 11px; font-weight: 600; color: var(--muted); letter-spacing: -.3px; }
+.vmt-n { grid-area: 1 / 2; align-self: baseline; font-size: 15px; font-weight: 600; line-height: 1.3; }
+.vmt-l2 { grid-area: 2 / 2; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.vmt-c { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.vmt .ico { grid-area: 1 / 3 / 3 / 4; display: none; color: var(--accent); }
+.vmt[aria-pressed="true"] .ico { display: block; } /* the chosen tense: a tick as well as the tint */
+.vmbar { position: relative; display: block; flex: 1 1 36px; height: 4px; border-radius: 999px; background: var(--track); overflow: hidden; }
+.vmbar > span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; }
+.vmbar > .s { background: var(--vm3); }
+.vmbar > .l { background: var(--accent); }
+.fchips { display: flex; flex-wrap: wrap; gap: 8px; }
+.fchip { display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px; background: var(--card); color: var(--fg); font-size: 14px; font-weight: 500; }
+.fchip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); font-weight: 600; }
+.fchip-n { font-variant-numeric: tabular-nums; opacity: .85; }
+.vmsel { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; } /* side by side where both menus' words fit, else one under the other */
+.vmsel label { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.vmsel .eyebrow { padding-left: 4px; }
+.vmsum { margin: 0; padding: 0 4px; }
+.vmkey { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0 4px; font-size: 13px; color: var(--muted); }
+.vmkey > span { display: inline-flex; align-items: center; gap: 6px; }
+.vmhead { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; gap: 8px; margin: -8px -20px -10px; padding: 8px 28px 6px 32px; background: var(--bg); }
+.vmh { display: flex; justify-content: center; width: 24px; font-size: 11px; font-weight: 600; line-height: 1.2; color: var(--muted); white-space: nowrap; letter-spacing: -.3px; }
+.vmh.on { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.vmlist { padding: 0; }
+.vmrow { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; padding: 6px 8px 6px 12px; color: var(--fg); text-align: left; content-visibility: auto; contain-intrinsic-size: auto 49px; } /* a row out of sight is laid out only when it comes near: drawing the next rows stays light */
+.vmrow + .vmrow { border-top: 1px solid var(--line); }
+.vmrow:focus-visible { outline-offset: -2px; border-radius: 12px; }
+.vm-n { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.vm-n .it { font-size: 15px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-g { font-size: 13px; line-height: 1.3; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-c { flex: none; display: grid; grid-template-columns: repeat(8, 24px); gap: 2px; }
+.vc { position: relative; display: inline-flex; flex: none; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 6px; font-size: 12px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.vc.lock { border: 1px dashed var(--muted); }
+.vc.open { border: 1.5px solid var(--accent); }
+.vc.open::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
+.vc.b1, .vc.b2, .vc.b3 { border: 1.5px solid var(--accent); color: var(--vm-lo); }
+.vc.b1 { background: var(--vm1); }
+.vc.b2 { background: var(--vm2); }
+.vc.b3 { background: var(--vm3); }
+.vc.b4 { background: var(--vm4); color: var(--vm-hi); }
+.vc.b5 { background: var(--vm5); color: var(--vm-hi); font-size: 13px; }
+.vc.due::after { content: ""; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--fg); border: 2px solid var(--card); } /* due now: a dot on the corner, ringed in the card colour so it shows on every fill */
+.vmkey .vc.due::after { border-color: var(--bg); }
+.vmmore { height: 1px; }
+.vmsheet .rs-head p { margin: 4px 0 0; }
+.vms-t { padding: 12px 0 14px; }
+.vms-t + .vms-t { border-top: 1px solid var(--line); }
+.vms-t > h3 { margin: 0 0 6px; }
+.vms-t > h3 .muted { font-weight: 400; }
+.vms-t .secgo { margin: 12px 0 0; }
+.vmsheet .rs-body > .secgo:first-child { margin: 4px 0 6px; }
+@media (max-width: 349px) { /* about 120% text on a 390 px phone: the cells go under the name */
+  .vmrow { flex-wrap: wrap; row-gap: 6px; }
+  .vm-n { flex-basis: 100%; }
+  .vmhead .vm-n { display: none; }
+  .vmhead { padding-left: 32px; }
+}
 .weak { display: flex; flex-direction: column; gap: 6px; } /* Verbs: weak spots on Stats (from 9.31) */
 .weak p { margin: 0; }
 .wk-h { margin: 8px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
@@ -19520,12 +19585,12 @@ function counts() {
   plan.course.ids.forEach((p, k) => { course += plan.course.n[k]; if ((recs[p] || none).box >= 5) courseLearned += plan.course.n[k]; });
   const unlockBox = progress.settings.verbUnlockBox || 5, cap = vgCap(), verbsStarted = new Set();
   let verbsNew = 0;
-  const byTense = {}, byFam = {}; // for the focus sessions (from 9.31): per tense and per family, the verb tenses started and those that can open now
-  const tally = (o, k, b, open) => { const c = o[k] || (o[k] = { started: 0, open: 0 }); if (b >= 1) c.started++; if (open) c.open++; };
+  const byTense = {}, byFam = {}; // for the focus sessions (from 9.31): per tense and per family, the verb tenses started and those that can open now; from 9.32 also all of them, those learned and those due, for the Verb map
+  const tally = (o, k, b, open, due) => { const c = o[k] || (o[k] = { started: 0, open: 0, learned: 0, total: 0, due: 0 }); c.total++; if (b >= 1) c.started++; if (b >= 5) c.learned++; if (due) c.due++; if (open) c.open++; };
   for (const v of plan.verbs) {
-    const b = (recs[v.p] || none).box, open = b === 0 && v.step <= cap && (!v.before || (recs[v.before] || none).box >= unlockBox); // within the ladder cap (from 9.31)
+    const r = recs[v.p] || none, b = r.box, open = b === 0 && v.step <= cap && (!v.before || (recs[v.before] || none).box >= unlockBox), due = isDueNow(r); // within the ladder cap (from 9.31); a due record's moment of change is noted with the unit's
     if (b >= 1) verbsStarted.add(v.verb); if (open) verbsNew++;
-    tally(byTense, v.tense, b, open); tally(byFam, v.fam, b, open);
+    tally(byTense, v.tense, b, open, due); tally(byFam, v.fam, b, open, due);
   }
   const vb = unit.vb || { learned: 0, total: 0, due: 0 }, flash = flashUnits().map(u => unit[u.id] || { due: 0, fresh: 0 });
   let learned = 0, started = 0, dueToday = 0, dueWeek = 0, mistakes = 0, anyLapses = false;
@@ -21461,9 +21526,9 @@ function vgFocusIds(kind, key) {
   return uniqueByPid(due.concat(rest, fresh).map(i => i.id)).slice(0, per);
 }
 // A focus's button: disabled, with its reason beside it, when nothing of it is started and nothing can open yet (c: { started, open })
-function vgFocusBtn(kind, key, label, c, id) {
+function vgFocusBtn(kind, key, label, c, id, aria) { // aria: a fuller accessible name, starting with the label (the Verb map's Practise this tense)
   const shut = !c.started && !c.open;
-  return `<div class="secgo vgo"><button type="button" data-vfocus="${esc(kind + ":" + key)}"${shut ? ` disabled aria-describedby="${esc(id)}"` : ""}>${esc(label)}</button>`
+  return `<div class="secgo vgo"><button type="button" data-vfocus="${esc(kind + ":" + key)}"${aria ? ` aria-label="${esc(aria)}"` : ""}${shut ? ` disabled aria-describedby="${esc(id)}"` : ""}>${esc(label)}</button>`
     + (shut ? `<p class="small muted" id="${esc(id)}">Nothing open yet: ${kind === "vverb" ? "its first tense opens in a Verbs session" : "a verb's tenses open one at a time, each once the one before it is learned"}.</p>` : "") + `</div>`;
 }
 function vgVerbFocus(v) { // the verb's tenses started, and whether its next one can open now
@@ -21487,8 +21552,8 @@ function vgStatus(i) {
 }
 function renderVerbReference(u) {
   const st = counts().verbs;
-  return unitHead(u) + `<p class="small muted">${st.totalVerbs} verbs · ${st.verbs} started · ${st.learned} of ${st.total} verb tenses learned</p>
-  <button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`
+  return unitHead(u) + `<p class="small muted">${fmtN(st.totalVerbs)} verbs · ${fmtN(st.verbs)} started · ${fmtN(st.learned)} of ${fmtN(st.total)} verb tenses learned</p>
+  <button type="button" class="primary wide" data-start="verbs">Practise verbs</button><div class="vtools"><button type="button" data-go="vmap">${icon("grid", 18)}Verb map</button></div>`
     + tenseChipsHtml(st)
     + groupHtml("Rules", `<div class="card notes">` + (u.notes || []).map(n => `<p>${esc(n)}</p>`).join("") + `</div>`)
     + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`
@@ -21498,6 +21563,14 @@ const vgTableWithKey = (item, tense, marks) => vgTableHtml(item, tense, marks) +
 // Every verb is a row that opens to show its tables. The tables are drawn when a row is opened (the listener below),
 // since all of them together would take several seconds on a phone; a filter opens the rows it leaves, so they come drawn.
 const filterVerbs = (f) => VERB_GYM.filter(v => !f || verbText(v).includes(f)); // f normalised
+/* Sorting the verbs (from 9.32), for the Verb map: course order (VERB_GYM's own, the order verbs open in), A–Z, or weakest
+   first (the lowest average box among the tenses started; a verb with none started comes last, and ties keep course order). */
+function vgAvgBox(v) { let s = 0, k = 0; for (const i of verbTenses(v)) { const b = rec(i.id).box; if (b >= 1) { s += b; k++; } } return k ? s / k : Infinity; }
+function sortVerbs(list, how) { // list in VERB_GYM order
+  if (how === "az") return list.slice().sort((a, b) => a.it.localeCompare(b.it, "it"));
+  if (how === "weak") { const w = new Map(list.map(v => [v, vgAvgBox(v)])); return list.slice().sort((a, b) => w.get(a) - w.get(b)); }
+  return list.slice();
+}
 function verbListHtml() {
   const f = normalize(S.refFilter || ""), byVerb = filterVerbs(f);
   const famOrder = Object.keys(VERB_FAMILIES);
@@ -21527,6 +21600,165 @@ document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this l
   d.insertAdjacentHTML("beforeend", verbTablesHtml(v)); nbHyphens(d); markSaying(); wire(d); // its Practise this verb
 }, true);
 
+/* ---------- the Verb map (from 9.32) ----------
+   Every verb's progress on one screen (S.screen "vmap"), opened from the Verbs reference's header and the Verbs card on
+   Units, its back arrow returning there (S.vmapFrom). At the top, a row per tense of the ladder: how many verbs have it
+   learned and started (counts().verbs.byTense); tapping one makes the status filter mean that tense, tapping it again
+   any tense. Then the filters (status, family, sort, and text matched against the search index's verbText) and one row per
+   verb, with a cell per tense in ladder order. A cell is one span: locked (a dashed outline; also a tense held back by the
+   ladder cap), new and able to open (an outline and a dot), box 1–4 (fills of rising strength with the box number), learned
+   (solid, with ✓), and due now (a dot on its corner); never colour alone, and the row, a button at least 44 px high, says
+   the same in its aria-label. Rows are drawn VM_CHUNK at a time as the grid scrolls near its end (an IntersectionObserver
+   on a marker after the last row), so opening the map draws only the first ones; typing redraws only the results. A row
+   opens a sheet in the rule sheet's frame with the verb's tables, sentences and focus buttons. The filters keep for the
+   visit (S.vm); nothing is saved. */
+const VM_CHUNK = 40; // rows drawn at a time
+const VM_CODE = { presente: "pres", passato_prossimo: "pp", imperfetto: "impf", futuro: "fut", condizionale: "cond", imperativo: "imp", congiuntivo_presente: "c.pr", congiuntivo_imperfetto: "c.imp" }; // the grid's column heads, short enough to stand apart over 24 px cells (and beside each tense row, to learn them)
+const VM_STATUS = [["all", "All"], ["due", "Due"], ["learning", "Learning"], ["learned", "Learned"], ["none", "Not started"]];
+const VM_SORT = [["course", "Course order"], ["az", "A–Z"], ["weak", "Weakest first"]];
+const NUM_WORD = ["no", "one", "two", "three", "four", "five", "six", "seven", "eight"];
+const vmState = () => S.vm || (S.vm = { tense: "", status: "all", fam: "", sort: "course", q: "" });
+let VM_LIST = null, VM_OBS = null; // the verbs the map shows, how many rows are drawn; the observer that draws more
+function vmCell(i, t) { // a verb tense's cell: its classes, the text in it, and what it says
+  if (!i) return { c: "none", x: "", say: "" };
+  const r = rec(i.id), b = r.box, due = b >= 1 && r.due <= t;
+  if (b >= 5) return { c: "b5" + (due ? " due" : ""), x: "✓", say: "learned" + (due ? ", due" : "") };
+  if (b >= 1) return { c: "b" + b + (due ? " due" : ""), x: String(b), say: "box " + b + (due ? ", due" : "") };
+  if (!vgUnlocked(i)) return { c: "lock", x: "", say: "locked" };
+  return vgWithinCap(i) ? { c: "open", x: "", say: "new" } : { c: "lock held", x: "", say: "held back" };
+}
+// A verb's eight cells, and what they say together: "presente learned; passato prossimo box 3, due; imperfetto new; five locked"
+function vmCells(v, t = now()) {
+  let html = "";
+  const said = [], n = { locked: 0, "held back": 0 }, missing = [];
+  for (const tense of VG_TENSES) {
+    const i = content.items[vgId(v.it, tense)], c = vmCell(i, t);
+    html += `<span class="vc ${c.c}">${c.x}</span>`;
+    if (!i) missing.push(TENSE_LABEL[tense]);
+    else if (c.say in n) n[c.say]++;
+    else said.push(TENSE_LABEL[tense] + " " + c.say);
+  }
+  for (const k of ["locked", "held back"]) if (n[k]) said.push(NUM_WORD[n[k]] + " " + k);
+  if (missing.length) said.push("no " + missing.join(" or "));
+  return { html, say: said.join("; ") };
+}
+function vmRowHtml(v, t) {
+  const c = vmCells(v, t);
+  return `<button type="button" class="vmrow" data-vmverb="${esc(v.it)}" aria-label="${esc(v.it + ": " + c.say)}"><span class="vm-n"><span class="it">${esc(v.it)}</span><span class="vm-g">${esc(arr(v.en)[0] || "")}</span></span><span class="vm-c" aria-hidden="true">${c.html}</span></button>`;
+}
+// The verbs the filters leave, in the order chosen, with how many each status would leave (for its chip). A status with
+// no tense chosen means any tense (Due: a tense due; Not started: nothing started); with one, that tense.
+function vmList() {
+  const s = vmState(), t = now(), f = normalize(s.q || ""), n = { all: 0, due: 0, learning: 0, learned: 0, none: 0 }, list = [];
+  for (const v of VERB_GYM) {
+    if ((s.fam && v.fam !== s.fam) || (f && !verbText(v).includes(f))) continue;
+    let due = false, learning = false, learned = false, any = false, has = false;
+    for (const tense of VG_TENSES) {
+      if (s.tense && tense !== s.tense) continue;
+      const i = content.items[vgId(v.it, tense)]; if (!i) continue;
+      const r = rec(i.id);
+      has = true;
+      if (r.box >= 1) { any = true; if (r.due <= t) due = true; if (r.box >= 5) learned = true; else learning = true; }
+    }
+    const is = { all: true, due, learning, learned, none: has && !any };
+    for (const x in n) if (is[x]) n[x]++;
+    if (is[s.status]) list.push(v);
+  }
+  return { list: sortVerbs(list, s.sort), n };
+}
+function vmSumText(shown) {
+  const s = vmState(), tl = s.tense && TENSE_LABEL[s.tense];
+  const what = { all: "", due: tl ? `the ${tl} due` : "a tense due", learning: tl ? `the ${tl} in boxes 1–4` : "a tense in boxes 1–4", learned: tl ? `the ${tl} learned` : "a tense learned", none: tl ? `the ${tl} not started` : "nothing started" }[s.status];
+  return [`${fmtN(shown)} of ${fmtN(VERB_GYM.length)} verbs${what ? " with " + what : ""}`, s.fam && VERB_FAMILIES[s.fam] ? VERB_FAMILIES[s.fam][0] : "", s.q.trim() ? `matching “${s.q.trim()}”` : ""].filter(Boolean).join(" · ");
+}
+const vmBar = (c) => `<span class="vmbar" aria-hidden="true"><span class="s" style="width:${c.total ? Math.round(100 * c.started / c.total) : 0}%"></span><span class="l" style="width:${c.total ? Math.round(100 * c.learned / c.total) : 0}%"></span></span>`;
+function vmTensesHtml(st) {
+  const s = vmState();
+  return `<div class="card rows">` + VG_TENSES.map(t => {
+    const c = st.byTense[t] || { learned: 0, total: 0, started: 0 };
+    return `<button type="button" class="vmt" data-vmtense="${t}" aria-pressed="${s.tense === t}"><span class="vmt-k" aria-hidden="true">${VM_CODE[t]}</span><span class="vmt-n">${esc(TENSE_LABEL[t])}</span><span class="vmt-l2"><span class="vmt-c">learned ${fmtN(c.learned)} of ${fmtN(c.total)} · started ${fmtN(c.started)}</span>${vmBar(c)}</span>${icon("tick", 18, 2.4)}</button>`;
+  }).join("") + `</div>`;
+}
+const vmChipsHtml = (n) => VM_STATUS.map(([k, l]) => `<button type="button" class="fchip" data-vmstatus="${k}" aria-pressed="${vmState().status === k}">${esc(l)} <span class="fchip-n">${fmtN(n[k])}</span></button>`).join("");
+const VM_KEY = `<div class="vmkey"><span><span class="vc lock" aria-hidden="true"></span>Locked</span><span><span class="vc open" aria-hidden="true"></span>New</span><span><span class="vc b2" aria-hidden="true">2</span>Box 1–4</span><span><span class="vc b5" aria-hidden="true">✓</span>Learned</span><span><span class="vc b3 due" aria-hidden="true">3</span>Due now</span></div>`;
+function vmResultsHtml(L) { // the summary line, the key and the grid's first rows; the rest are drawn as it scrolls (vmMore)
+  const t = now(), s = vmState();
+  VM_LIST = { list: L.list, drawn: Math.min(VM_CHUNK, L.list.length) };
+  const head = `<div class="vmhead" aria-hidden="true"><span class="vm-n"></span><span class="vm-c">${VG_TENSES.map(x => `<span class="vmh${x === s.tense ? " on" : ""}">${VM_CODE[x]}</span>`).join("")}</span></div>`;
+  return `<p class="small muted vmsum" id="vmSum" role="status">${esc(vmSumText(L.list.length))}</p>` + VM_KEY
+    + (L.list.length ? head + `<div class="card vmlist" id="vmRows">${L.list.slice(0, VM_CHUNK).map(v => vmRowHtml(v, t)).join("")}</div>` + (L.list.length > VM_CHUNK ? `<div class="vmmore" id="vmMore"></div>` : "") : `<p class="muted">No verbs match.</p>`);
+}
+function renderVerbMap() {
+  const st = counts().verbs, s = vmState(), from = S.vmapFrom === "units" ? "units" : "reference", L = vmList();
+  const fams = Object.entries(VERB_FAMILIES).map(([k, f]) => `<option value="${esc(k)}"${s.fam === k ? " selected" : ""}>${esc(f[0])}</option>`).join("");
+  return `<div class="hgroup">${screenHead("Verb map", { back: from, backLabel: from === "units" ? "Units" : "Verbs", eyebrow: "Verbs" })}</div>
+  <p class="small muted">${fmtN(st.totalVerbs)} verbs · ${fmtN(st.verbs)} started · ${fmtN(st.learned)} of ${fmtN(st.total)} verb tenses learned</p>`
+    + groupHtml("Tenses", vmTensesHtml(st) + `<p class="small muted">Tap a tense to filter the verbs below by it; tap it again for every tense.</p>`)
+    + `<section class="group"><h2 class="eyebrow">Find a verb</h2><div class="fchips" role="group" aria-label="Show">${vmChipsHtml(L.n)}</div>
+    <div class="vmsel"><label><span class="eyebrow">Family</span><select id="vmFam"><option value="">All families</option>${fams}</select></label><label><span class="eyebrow">Sort</span><select id="vmSort">${VM_SORT.map(([k, l]) => `<option value="${k}"${s.sort === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label></div>
+    <label class="vh" for="vmFilter">Find a verb by name, meaning or form</label><input type="text" id="vmFilter" placeholder="Verb, meaning or form…" value="${esc(s.q)}" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search"></section>`
+    + `<div class="results" id="vmResults">${vmResultsHtml(L)}</div>`;
+}
+function vmRedraw() { // after a filter changes: the chips' counts and states, the tense rows' states and the results, the field left alone
+  const res = document.getElementById("vmResults"); if (!res) return;
+  const L = vmList(), s = vmState();
+  for (const b of app.querySelectorAll("[data-vmtense]")) b.setAttribute("aria-pressed", String(b.dataset.vmtense === s.tense));
+  for (const b of app.querySelectorAll("[data-vmstatus]")) { b.setAttribute("aria-pressed", String(b.dataset.vmstatus === s.status)); const n = b.querySelector(".fchip-n"); if (n) n.textContent = fmtN(L.n[b.dataset.vmstatus]); }
+  res.innerHTML = vmResultsHtml(L); nbHyphens(res); vmWire();
+}
+function vmWire() { // the rows' taps (one listener for the grid), and more rows drawn as it scrolls near its end
+  if (VM_OBS) { VM_OBS.disconnect(); VM_OBS = null; }
+  const rows = document.getElementById("vmRows"), more = document.getElementById("vmMore");
+  if (!rows) return;
+  rows.onclick = (e) => { const b = e.target.closest("[data-vmverb]"); if (b) openVmSheet(b.dataset.vmverb); };
+  if (!more) return;
+  if (typeof IntersectionObserver !== "function") { while (document.getElementById("vmMore")) vmMore(); return; }
+  VM_OBS = new IntersectionObserver((es) => { if (es.some(e => e.isIntersecting)) vmMore(); }, { rootMargin: "0px 0px 1200px 0px" });
+  VM_OBS.observe(more);
+}
+function vmMore() { // the next VM_CHUNK rows
+  const rows = document.getElementById("vmRows"), more = document.getElementById("vmMore"), L = VM_LIST;
+  if (!rows || !L) return;
+  const t = now(), next = L.list.slice(L.drawn, L.drawn + VM_CHUNK), tpl = document.createElement("template");
+  tpl.innerHTML = next.map(v => vmRowHtml(v, t)).join(""); nbHyphens(tpl.content);
+  rows.appendChild(tpl.content);
+  L.drawn += next.length;
+  if (L.drawn >= L.list.length) { if (VM_OBS) VM_OBS.disconnect(); VM_OBS = null; if (more) more.remove(); return; }
+  if (VM_OBS && more) { VM_OBS.unobserve(more); VM_OBS.observe(more); } // observed afresh, it answers again while it is still near
+}
+// The sheet a row opens: the verb's tenses, each with its status, its table, its example sentences and Practise this tense
+function vmSheetHtml() {
+  const v = VERB_GYM.find(x => x.it === S.vsheet); if (!v) return "";
+  const t = now(), fam = VERB_FAMILIES[v.fam] || [""], byTense = counts().verbs.byTense;
+  let key = "";
+  const tenses = verbTenses(v).map(i => `<section class="vms-t"><h3 class="label">${esc(TENSE_LABEL[i.tense])} <span class="muted">· ${esc(vmCell(i, t).say)}</span></h3>`
+    + vgTableHtml(i, i.tense) + (key ? "" : (key = vgKeyHtml(v.it, i.tense))) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")
+    + vgFocusBtn("vtense", i.tense, "Practise this tense", byTense[i.tense] || { started: 0, open: 0 }, "vms-none-" + i.tense, `Practise this tense: the ${TENSE_LABEL[i.tense]}, with all your verbs`) + `</section>`).join("");
+  return `<div class="sheet-bg" id="vmBg"><div class="card sheet rulesheet vmsheet" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="vm-t">
+  <div class="rs-head"><div class="eyebrow">${esc(fam[0])}</div><h2 class="title-s" id="vm-t">${esc(v.it)}</h2><p class="small muted">${esc(arr(v.en).join(", "))}</p></div>
+  <div class="rs-body">${vgFocusBtn("vverb", v.it, "Practise this verb", vgVerbFocus(v), "vms-none-verb")}${tenses}${v.note ? `<p class="small muted">${esc(v.note)}</p>` : ""}</div>
+  <div class="rs-foot"><button type="button" class="primary" data-act="vmClose">Close</button></div></div></div>`;
+}
+function openVmSheet(verb) {
+  S.vsheet = verb;
+  const box = document.createElement("div"); box.innerHTML = vmSheetHtml();
+  const bg = box.firstElementChild; if (!bg) { S.vsheet = null; return; }
+  const old = document.getElementById("vmBg"); if (old) old.replaceWith(bg); else app.appendChild(bg);
+  nbHyphens(bg); wireVmSheet(bg); markSaying();
+}
+function wireVmSheet(bg) {
+  wire(bg); // its Close, its focus buttons and its speakers
+  bg.onclick = (e) => { if (e.target === bg) closeVmSheet(); };
+  for (const c of app.children) c.inert = c !== bg; // the map behind can't be reached until the sheet closes
+  const k = bg.querySelector(".sheet"); if (k) k.focus({ preventScroll: true });
+}
+function closeVmSheet() { // Close, a tap beside it, Escape and the back button: the focus goes back to the row that opened it
+  const v = S.vsheet; S.vsheet = null; stopSaying();
+  const bg = document.getElementById("vmBg"); if (bg) bg.remove();
+  for (const c of app.children) c.inert = false;
+  const b = v && app.querySelector(`[data-vmverb="${CSS.escape(v)}"]`); if (b) b.focus({ preventScroll: true });
+  syncHistory(); // back closed it: the history entry that keeps the screen is put back
+}
 /* ---------- sessions ---------- */
 let S = { screen: "home" }; // ui state
 let session = null;
@@ -21975,16 +22207,18 @@ function continueSession() {
 /* ---------- rendering ---------- */
 const app = document.getElementById("app");
 function render() {
-  const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou }[S.screen] || renderHome;
+  const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou, vmap: renderVerbMap }[S.screen] || renderHome;
   const key = S.screen === "reference" ? "reference:" + S.refUnit + ":" + (S.refTab || "lesson") : S.screen;
   const prev = S.viewKey, mem = S.scrollMem || (S.scrollMem = {});
   clearTimeout(typingTimer); typingDraw = null; // the whole screen is drawn now, with what has been typed so far
-  if (S.screen !== "units" && S.screen !== "reference") S.unitPick = null; // the card opened on Units lasts while you stay there or in its units
+  if (S.screen !== "units" && S.screen !== "reference" && S.screen !== "vmap") S.unitPick = null; // the card opened on Units lasts while you stay there or in its units (and the Verb map)
+  if (S.screen !== "vmap") S.vsheet = null; // the Verb map's sheet belongs to it
+  if (VM_OBS) { VM_OBS.disconnect(); VM_OBS = null; } // the map's rows are drawn afresh, or it is left
   if (prev && prev !== key) { mem[prev] = window.scrollY; stopSaying(); } // speech belongs to the screen it started on
   const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
   app.className = S.screen === "session" ? "session" : bare ? "notabs" : "";
   const flash = S.flash && S.screen !== "home" && !bare ? `<div class="card flash" id="flash" role="status">${esc(S.flash)}</div>` : "";
-  app.innerHTML = flash + fn() + (bare ? "" : tabBar()) + (S.screen === "session" && S.leaveAsk ? leaveSheetHtml() : "") + (S.screen === "session" && S.rule ? ruleSheetHtml() : "") + (S.rsheet ? reportSheetHtml() : "");
+  app.innerHTML = flash + fn() + (bare ? "" : tabBar()) + (S.screen === "session" && S.leaveAsk ? leaveSheetHtml() : "") + (S.screen === "session" && S.rule ? ruleSheetHtml() : "") + (S.vsheet ? vmSheetHtml() : "") + (S.rsheet ? reportSheetHtml() : "");
   if (S.screen !== "you" && S.screen !== "data") S.lastScreen = key + (S.screen === "session" && session ? ":" + session.kind + (session.unitId ? ":" + session.unitId : "") : ""); // an app problem's report names it
   nbHyphens(app);
   if (prev !== key) { S.viewKey = key; window.scrollTo(0, (/^(units|rules|lookup|reference)/.test(key) && mem[key]) || 0); }
@@ -22034,6 +22268,7 @@ const ICON = { // 24-unit stroke icons, as drawn in docs/design/mockups
   sparkle: '<path d="M12 3l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/>', // What's new (v9.1), in the same style
   send: '<path d="M20 4L3 11l7 3 3 7z"/><path d="M10 14l10-10"/>', // Report a problem (v9.19)
   doc: '<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>', // the learning summary (v9.19)
+  grid: '<rect x="3.5" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="9.75" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="16" y="3.5" width="4.5" height="4.5" rx="1"/><rect x="3.5" y="9.75" width="4.5" height="4.5" rx="1"/><rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1"/><rect x="16" y="9.75" width="4.5" height="4.5" rx="1"/><rect x="3.5" y="16" width="4.5" height="4.5" rx="1"/><rect x="9.75" y="16" width="4.5" height="4.5" rx="1"/><rect x="16" y="16" width="4.5" height="4.5" rx="1"/>', // the Verb map (v9.32)
 };
 function icon(name, size = 22, stroke = 1.8) { return `<svg class="ico" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="${stroke}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${ICON[name]}</svg>`; }
 function logo(size) { return `<svg class="ico logo" width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true" focusable="false"><rect width="100" height="100" rx="23" fill="#0F6B4B"/><path d="M31 32 L45 68" stroke="#FFFFFF" stroke-width="13" stroke-linecap="round" fill="none"/><path d="M55 32 L69 68" stroke="#EF4B55" stroke-width="13" stroke-linecap="round" fill="none"/></svg>`; }
@@ -22133,7 +22368,7 @@ if (TTS) {
 }
 applySay();
 const TABS = [["home", "today", "Today"], ["units", "units", "Units"], ["rules", "book", "Rules"], ["lookup", "search", "Look up"], ["you", "you", "You"]];
-const TAB_OF = { reference: "units", stats: "you", settings: "you", data: "you" };
+const TAB_OF = { reference: "units", vmap: "units", stats: "you", settings: "you", data: "you" };
 function tabBar() {
   const cur = TAB_OF[S.screen] || S.screen;
   return `<nav class="tabbar" aria-label="Sections"><div class="tabbar-in">` + TABS.map(([go, ic, label]) => `<button type="button" class="tab" data-go="${go}"${cur === go ? ' aria-current="page"' : ""}>${icon(ic, 22)}<span>${label}</span></button>`).join("") + `</div></nav>`;
@@ -22277,7 +22512,7 @@ function unitRow(u, isOpen, isCur) {
   const todo = u.mode === "verbs" ? ((vs) => `${vs.fresh} new · ${vs.due} to review`)(counts().verbs) : `${st.fresh} new · ${st.due} to review`;
   if (isOpen) return `<div class="card ucard"><div class="urow">${badge}<div class="urow-t"><div class="urow-h"><span class="label">${name}</span><span class="ustat cur">${st.pct}%</span></div>
     <span class="small muted">${isCur ? "Current unit · " : ""}${todo}</span>${pack}${bar(st.pct)}</div></div>
-    <div class="ucard-btns"><button type="button" class="primary" data-unit="${esc(u.id)}">Practise</button>${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">${icon("book", 18)}Read lesson</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}</div></div>`;
+    <div class="ucard-btns"><button type="button" class="primary" data-unit="${esc(u.id)}">Practise</button>${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">${icon("book", 18)}Read lesson</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}${u.mode === "verbs" ? `<button type="button" data-go="vmap">${icon("grid", 18)}Verb map</button>` : ""}</div></div>`;
   const status = state === "done" ? `<span class="ustat done">${icon("tick", 14, 2.6)}Learned</span>` : state === "new" ? `<span class="ustat none">Not started</span>` : `<span class="ustat">${st.pct}%</span>`;
   const line = [isCur ? "Current unit" : "", u.description ? esc(u.description) : ""].filter(Boolean).join(" · ");
   return `<button type="button" class="card urow" data-upick="${esc(u.id)}">${badge}<span class="urow-t"><span class="urow-h"><span class="label">${name}</span>${status}</span>${line ? `<span class="small muted clamp1">${line}</span>` : ""}${pack}${state === "going" ? bar(st.pct) : ""}</span></button>`;
@@ -23174,7 +23409,7 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
     const g = b.dataset.go;
     S.flash = null; S.report = null; S.exportText = null; S.dataNote = null; S.summaryBox = null;
     if (g === "quit") { session = null; S.feedback = null; S.leaveAsk = false; S.rule = null; S.screen = "home"; }
-    else S.screen = g;
+    else { if (g === "vmap" && S.screen !== "vmap") S.vmapFrom = S.screen === "units" ? "units" : "reference"; S.screen = g; } // the Verb map's back arrow returns where it was opened
     S.scrollTo = b.dataset.to || null; // a You row can open a screen at one of its sections
     render();
   });
@@ -23192,7 +23427,9 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   root.querySelectorAll("[data-lsec]").forEach(b => b.onclick = (e) => { e.preventDefault(); const t = document.getElementById(b.dataset.lsec === "toc" ? "toclabel" : "lsec-" + b.dataset.lsec); if (t) t.scrollIntoView({ block: "start" }); });
   root.querySelectorAll("[data-unit]").forEach(b => b.onclick = () => { S.flash = null; startSession(isFlashUnit(b.dataset.unit) ? "flashcards" : isVerbUnit(b.dataset.unit) ? "verbs" : "unit", b.dataset.unit); });
   root.querySelectorAll("[data-practise]").forEach(b => b.onclick = () => { S.flash = null; startSession("section", b.dataset.practise); });
-  root.querySelectorAll("[data-vfocus]").forEach(b => b.onclick = () => { const [k, ...key] = b.dataset.vfocus.split(":"); S.flash = null; startSession(k, key.join(":")); }); // Practise this verb, a tense or a family
+  root.querySelectorAll("[data-vfocus]").forEach(b => b.onclick = () => { const [k, ...key] = b.dataset.vfocus.split(":"); S.flash = null; S.vsheet = null; startSession(k, key.join(":")); }); // Practise this verb, a tense or a family (the Verb map's sheet closes)
+  root.querySelectorAll("[data-vmtense]").forEach(b => b.onclick = () => { const s = vmState(); s.tense = s.tense === b.dataset.vmtense ? "" : b.dataset.vmtense; vmRedraw(); }); // the Verb map's tense rows: a second tap goes back to any tense
+  root.querySelectorAll("[data-vmstatus]").forEach(b => b.onclick = () => { vmState().status = b.dataset.vmstatus; vmRedraw(); });
   root.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => answerOption(b.dataset.opt));
   root.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { S.bankPicked = (S.bankPicked || []).concat(Number(b.dataset.pick)); render(); });
   root.querySelectorAll("[data-unpick]").forEach(b => b.onclick = () => { const i = Number(b.dataset.unpick); S.bankPicked = (S.bankPicked || []).filter(x => x !== i); render(); });
@@ -23228,6 +23465,14 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   const sb = document.getElementById("sheetBg");
   if (sb) { sb.onclick = (e) => { if (e.target === sb) action("stay"); }; const k = sb.querySelector(".sheet"); if (k) k.focus({ preventScroll: true }); } // focus moves into the sheet (and the keyboard closes)
   const rb = document.getElementById("ruleBg"); if (rb) wireRule(rb);
+  if (S.screen === "vmap") { // the Verb map's filters and grid
+    const fam = document.getElementById("vmFam"), so = document.getElementById("vmSort"), vf = document.getElementById("vmFilter");
+    if (fam) fam.onchange = () => { vmState().fam = fam.value; vmRedraw(); };
+    if (so) so.onchange = () => { vmState().sort = so.value; vmRedraw(); };
+    if (vf) vf.oninput = () => { vmState().q = vf.value; afterTyping(vmRedraw); };
+    vmWire();
+    const vb = document.getElementById("vmBg"); if (vb) wireVmSheet(vb);
+  }
   const inp = document.getElementById("answer");
   if (inp && !S.feedback && !S.leaveAsk && !S.rsheet) { inp.focus(); }
   const cellInputs = app.querySelectorAll("[data-cell]");
@@ -23338,6 +23583,7 @@ function action(a) {
     case "stay": S.leaveAsk = false; render(); break;
     case "rule": { const q = current(), at = q && itemSection(q.ex.item.id); if (at) showRule(at.unit, at.index); break; }
     case "ruleClose": closeRule(); break;
+    case "vmClose": closeVmSheet(); break;
     case "applyUpdate": applyUpdate(); break;
     case "updateLater": S.updateLater = true; render(); break;
     case "checkUpdate": checkForUpdate(true); break;
@@ -23360,6 +23606,7 @@ function action(a) {
 }
 document.addEventListener("keydown", (e) => {
   if (S.rsheet) { if (e.key === "Escape") closeReport(); return; } // the report sheet, on any screen
+  if (S.vsheet) { if (e.key === "Escape") closeVmSheet(); return; } // the Verb map's sheet
   if (S.screen !== "session" || !session) return;
   if (S.rule) { if (e.key === "Escape") closeRule(); return; } // Enter belongs to the sheet's own buttons, not to Continue
   if (S.leaveAsk) { if (e.key === "Escape") action("stay"); return; }
@@ -23767,6 +24014,7 @@ window.addEventListener("popstate", () => {
 });
 function goBack() {
   if (S.rsheet) { closeReport(); return; }
+  if (S.vsheet) { closeVmSheet(); return; } // the Verb map's sheet closes first
   S.flash = null; S.report = null; S.exportText = null;
   if (S.screen === "session" && session) { if (S.rule) { closeRule(); return; } S.leaveAsk = !S.leaveAsk; render(); return; }
   if (S.screen === "home") { render(); return; }
@@ -23804,8 +24052,8 @@ Store.onError = (ok) => setSaveFailed(!ok);
 Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "data")) render(); };
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.31";
-const CHANGES = "Verbs practice is now balanced, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, tables underline irregular forms, Settings can stop new tenses opening, and the summary says which tenses opened."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.32";
+const CHANGES = "A new Verb map shows every verb's eight tenses at a glance, with filters to find any verb fast; open it from the Verbs page or the Verbs card on Units."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());
