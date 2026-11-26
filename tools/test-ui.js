@@ -396,6 +396,74 @@ async function verbMap(browser, origin) {
   }
 }
 
+/* The Verbs reference's upgrade (from 9.32): the Verb map's squares in each closed row, the sort menu, and Compare in an
+   opened row, in each layout, within the layout rules. */
+async function referenceUpgrade(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verbs reference, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await page.evaluate(() => {
+      const T = Date.now(), put = (t, box, due) => { progress.items[pid(vgId("andare", t))] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 5, lastRight: T - 864e5 }; };
+      put("presente", 6, T + 9 * 864e5); put("passato_prossimo", 5, T - 3600e3); saveProgress(); render();
+    });
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-ref="vb"]'))) await tap(page, '.ulist [data-upick="vb"]'); await tap(page, '.ucard [data-ref="vb"]');
+    const row = await page.evaluate(() => { const d = document.querySelector('details.vref[data-verb="andare"]'), s = d.querySelector("summary"); return { cells: [...s.querySelectorAll(".vref-c .vc")].map(c => c.className.replace(/^vc /, "") + (c.textContent ? ":" + c.textContent : "")), hidden: s.querySelector(".vref-c").getAttribute("aria-hidden"), say: (s.querySelector(".vh") || {}).textContent, lines: s.querySelectorAll("div.small").length, all: document.querySelectorAll("details.vref summary .vref-c").length === VERB_GYM.length }; });
+    check(L("each closed row shows the Verb map's squares in place of the line of statuses"), row.all && row.cells.join() === "b5:✓,b5 due:✓,open,lock,lock,lock,lock,lock" && row.hidden === "true" && !row.lines, JSON.stringify(row));
+    check(L("…while a screen reader still hears that line, with what is due"), /^presente box 6 ✓ · passato prossimo box 5 ✓, due · imperfetto new · futuro locked/.test(row.say || ""), row.say);
+    await layout(page, L("the reference with its squares"), opts);
+    // the sort menu
+    const order = async (how) => { await page.selectOption("#refSort", how); await settle(page); return page.evaluate(() => ({ rows: [...document.querySelectorAll("details.vref")].map(d => d.dataset.verb), heads: [...document.querySelectorAll("#refResults h2")].map(h => h.textContent), fam: document.querySelectorAll('#refResults [data-vfocus^="vfam:"]').length })); };
+    let o = await order("az");
+    check(L("sorting A–Z: one list, in alphabetical order, without the family headings"), o.heads.join() === "Verbs, A–Z" && !o.fam && o.rows.join() === await page.evaluate(() => VERB_GYM.map(v => v.it).sort((a, b) => a.localeCompare(b, "it")).join()), JSON.stringify(o.heads));
+    o = await order("course");
+    check(L("…in course order"), o.heads.join() === "Verbs, in course order" && o.rows.join() === await page.evaluate(() => VERB_GYM.map(v => v.it).join()));
+    o = await order("weak");
+    check(L("…weakest first: andare (two tenses learned) after the verbs started lower, before those not started"), o.heads.join() === "Verbs, weakest first" && await page.evaluate((rows) => { const avg = (v) => { const b = verbTenses(v).map(i => rec(i.id).box).filter(x => x >= 1); return b.length ? b.reduce((a, x) => a + x, 0) / b.length : Infinity; }; const a = rows.map(x => avg(VERB_GYM.find(v => v.it === x))); return a.every((x, k) => !k || x >= a[k - 1]) && Number.isFinite(a[0]) && a[a.length - 1] === Infinity; }, o.rows));
+    await page.fill("#refFilter", "andrò"); await until(() => page.evaluate(() => document.querySelectorAll("#refResults details.vref[open]").length > 0)); await settle(page);
+    check(L("…and a filter keeps the order chosen, redrawing only the results"), await page.evaluate(() => document.activeElement.id === "refFilter" && [...document.querySelectorAll("#refResults h2")].map(h => h.textContent).join() === "Verbs, weakest first" && !!document.querySelector('#refResults details.vref[data-verb="andare"][open] .conjtable')));
+    await page.fill("#refFilter", ""); await until(() => page.evaluate(() => !document.querySelector("#refResults details.vref[open]")));
+    o = await order("family");
+    check(L("…and by family again, with Practise this family under each heading"), o.fam === await page.evaluate("Object.keys(VERB_FAMILIES).length") && o.heads.length === o.fam);
+    // Compare
+    await page.evaluate(() => document.querySelector('details.vref[data-verb="sapere"]').scrollIntoView({ block: "start" }));
+    await tap(page, 'details.vref[data-verb="sapere"] summary');
+    check(L("an opened row has Compare with another verb, under Practise this verb, closed"), await page.evaluate(() => { const d = document.querySelector('details.vref[data-verb="sapere"] details.vcmp'); return !!d && !d.open && d.previousElementSibling.matches(".vgo") && d.children.length === 1; }));
+    await tap(page, 'details.vref[data-verb="sapere"] details.vcmp summary');
+    const sugg = await page.evaluate(() => [...document.querySelectorAll('details.vref[data-verb="sapere"] .vcmp-b > .fchips:not(.vcmp-hits) [data-vcmp]')].map(b => b.dataset.vcmp));
+    check(L("…offering the verb it is mixed up with first (sapere: conoscere), then those sharing a meaning"), sugg[0] === "conoscere" && await page.evaluate((s) => s.slice(1).every(x => arr(VERB_GYM.find(v => v.it === "sapere").en).some(e => (vgIndex().byGloss[normEn(e)] || []).includes(x))), sugg), JSON.stringify(sugg));
+    await tap(page, 'details.vref[data-verb="sapere"] [data-vcmp="conoscere"]');
+    const cmp = await page.evaluate(() => {
+      const out = document.querySelector('details.vref[data-verb="sapere"] .vcmp-out'), secs = [...out.querySelectorAll(".vcmp-t")];
+      const pres = secs[0], tables = pres ? [...pres.querySelectorAll(".conjtable")] : [];
+      const said = (el) => [...el.childNodes].map(n => n.nodeType === 3 ? n.nodeValue : n.classList.contains("vh") ? "" : said(n)).join(""); // without what only a screen reader hears
+      const bold = (t) => [...t.querySelectorAll("b")].map(said);
+      return { secs: secs.length, want: VG_TENSES.filter(t => vgItem("sapere", t) || vgItem("conoscere", t)).length, names: pres && [...pres.querySelectorAll(".vcmp-v")].map(x => x.textContent).join(), boldA: tables[0] && bold(tables[0]), boldB: tables[1] && bold(tables[1]), said: [...out.querySelectorAll(".conjtable b")].every(b => b.querySelector(":scope > .vh") && b.querySelector(":scope > .vh").textContent === " (differs)"),
+        stacked: tables.length === 2 && tables[1].getBoundingClientRect().top >= tables[0].getBoundingClientRect().bottom, pressed: document.querySelector('details.vref[data-verb="sapere"] [data-vcmp="conoscere"]').getAttribute("aria-pressed") };
+    });
+    check(L("…which shows both verbs' tables tense by tense, the chip pressed"), cmp.secs === cmp.want && cmp.names === "sapere,conoscere" && cmp.pressed === "true", JSON.stringify(cmp));
+    check(L("…the forms built differently in bold, on both sides, each with “(differs)” for a screen reader (sapete and conoscete, one ending on each stem, not)"), cmp.boldA.join() === "so,sai,sa,sappiamo,sanno" && cmp.boldB.join() === "conosco,conosci,conosce,conosciamo,conoscono" && cmp.said, JSON.stringify(cmp));
+    check(L("…one table under the other on a phone"), cmp.stacked);
+    await page.fill('details.vref[data-verb="sapere"] .vcmp-in', "potere"); await until(() => page.evaluate(() => !!document.querySelector('details.vref[data-verb="sapere"] .vcmp-hits [data-vcmp="potere"]')));
+    check(L("…another verb found by its name, the field keeping the focus"), await page.evaluate(() => document.activeElement.classList.contains("vcmp-in")));
+    await page.fill('details.vref[data-verb="sapere"] .vcmp-in', "to work"); await until(() => page.evaluate(() => !!document.querySelector('details.vref[data-verb="sapere"] .vcmp-hits [data-vcmp="lavorare"]')));
+    await page.evaluate(() => { document.querySelector('details.vref[data-verb="sapere"]').open = false; });
+    await page.evaluate(() => document.querySelector('details.vref[data-verb="parlare"]').scrollIntoView({ block: "start" }));
+    await tap(page, 'details.vref[data-verb="parlare"] summary'); await tap(page, 'details.vref[data-verb="parlare"] details.vcmp summary');
+    await page.fill('details.vref[data-verb="parlare"] .vcmp-in', "to work"); await until(() => page.evaluate(() => !!document.querySelector('details.vref[data-verb="parlare"] .vcmp-hits [data-vcmp="lavorare"]')));
+    await tap(page, 'details.vref[data-verb="parlare"] .vcmp-hits [data-vcmp="lavorare"]');
+    check(L("…and two verbs of one pattern (parlare, lavorare) show nothing in bold"), await page.evaluate(() => { const out = document.querySelector('details.vref[data-verb="parlare"] .vcmp-out'); return out.querySelectorAll(".vcmp-t").length === 8 && !out.querySelector(".conjtable b"); }));
+    await layout(page, L("the reference with a comparison open"), opts);
+    if (label === "390×844 light") {
+      await page.setViewportSize({ width: 700, height: 900 }); await settle(page);
+      check("Verbs reference, 700 px wide: Compare puts the two tables side by side", await page.evaluate(() => { const t = [...document.querySelector('details.vref[data-verb="parlare"] .vcmp-t').querySelectorAll(".conjtable")]; return t.length === 2 && Math.abs(t[0].getBoundingClientRect().top - t[1].getBoundingClientRect().top) < 2 && t[1].getBoundingClientRect().left > t[0].getBoundingClientRect().right; }));
+      await page.setViewportSize({ width, height }); await settle(page);
+    }
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verbs reference upgrade checked, ${label}`);
+  }
+}
+
 /* Storage (from 9.26): Your data's Storage card and Today's notices about where progress is kept, in each layout.
    What the storage does is tools/test-storage.js's; this is how it is shown. Each case is set up by a script run before
    the page's own: a device that had progress before 9.26 (so the first opening moves it), one with no IndexedDB, and
@@ -1562,6 +1630,9 @@ async function readAloud(browser, origin) {
 
     /* The Verb map (from 9.32) */
     await verbMap(browser, origin);
+
+    /* The Verbs reference's squares, sort menu and Compare (from 9.32) */
+    await referenceUpgrade(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

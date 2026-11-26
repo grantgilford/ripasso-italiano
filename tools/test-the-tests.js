@@ -130,6 +130,9 @@ const FAULTS = [
   { id: "vmap-sheet-ignores-escape", what: "Escape no longer closes the Verb map's sheet (9.32)",
     find: `if (S.vsheet) { if (e.key === "Escape") closeVmSheet(); return; }`, put: `if (S.vsheet) { return; }`,
     suite: "test-ui.js", expect: "Escape closes it" },
+  { id: "compare-bolds-nothing", what: "Compare on the Verbs reference never shows where two verbs differ (9.32)",
+    find: `if (f && g && f !== "—" && g !== "—" && vgBuiltAs(a, f) !== vgBuiltAs(b, g)) marks[p] = true;`, put: `if (f && g && f !== "—" && g !== "—" && false) marks[p] = true;`,
+    suite: "test-ui.js", expect: "the forms built differently in bold" },
   // ---- what the app keeps ready (test-speedups.js)
   { id: "counts-gone-stale", what: "the counts on Today, Units, Stats and You are not worked out again after an answer",
     find: `COUNTS = null; // whatever changed, the counts on Today, Units, Stats and You are worked out again`, put: `// whatever changed, the counts on Today, Units, Stats and You are worked out again`,
@@ -137,6 +140,9 @@ const FAULTS = [
   { id: "vmap-box4-learned", what: "the Verb map's tense rows count a tense in box 4 as learned (9.32)",
     find: `if (b >= 5) c.learned++;`, put: `if (b >= 4) c.learned++;`,
     suite: "test-speedups.js", expect: "the same counts" },
+  { id: "ref-az-unsorted", what: "the Verbs reference's A–Z leaves the verbs in course order (9.32)",
+    find: `if (how === "az") return list.slice().sort((a, b) => a.it.localeCompare(b.it, "it"));`, put: `if (how === "az") return list.slice();`,
+    suite: "test-speedups.js", expect: "four orders" },
   // ---- sessions (test-sessions.js)
   { id: "same-kind-three-in-a-row", what: "a session lets the same kind of exercise come three times running", // in noTriples, which has the last word: planSession's own hint against a run is a refinement the rule doesn't depend on
     find: `const r = k === a ? run + 1 : 1; if (r > 2) return false;`, put: `const r = k === a ? run + 1 : 1; if (r > 3) return false;`,

@@ -773,7 +773,7 @@ th { color: var(--muted); font-size: 13px; font-weight: 600; vertical-align: bot
 .conjtable b { font-weight: 700; }
 u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; } /* a form that breaks the regular pattern (from 9.31) */
 .vkey { margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
-.vref { padding: 10px 16px; }
+.vref { padding: 10px 16px; content-visibility: auto; contain-intrinsic-size: auto 92px; } /* from 9.32: a row out of sight is laid out only when it comes near, so its squares cost nothing until then */
 .vref summary { min-height: 44px; padding: 4px 0; cursor: pointer; color: var(--fg); }
 .vref summary::marker { color: var(--muted); }
 .vref summary .it { font-size: 16.5px; font-weight: 600; }
@@ -837,6 +837,18 @@ u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-dec
 .vc.due::after { content: ""; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--fg); border: 2px solid var(--card); } /* due now: a dot on the corner, ringed in the card colour so it shows on every fill */
 .vmkey .vc.due::after { border-color: var(--bg); }
 .vmmore { height: 1px; }
+.vref-c { margin: 6px 0 2px; } /* the Verbs reference's closed rows: the map's squares (9.32) */
+.vcmp { margin: 2px 0 6px; } /* Compare, in an opened row (9.32) */
+.vcmp > summary { display: flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; cursor: pointer; }
+.vcmp > summary::marker { color: var(--accent); }
+.vcmp-b { display: flex; flex-direction: column; gap: 8px; padding: 2px 0 6px; }
+.vcmp-b > p, .vcmp-b > label { margin: 0; }
+.vcmp-h { margin: 6px 0 0; }
+.vcmp-t { padding: 10px 0 4px; border-top: 1px solid var(--line); }
+.vcmp-t > h4 { margin: 0 0 6px; }
+.vcmp-g { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px 16px; }
+.vcmp-v { font-size: 13px; font-weight: 600; color: var(--accent); }
+@media (min-width: 480px) { .vcmp-g { grid-template-columns: repeat(2, minmax(0, 1fr)); } } /* side by side where there is room; one under the other on a phone */
 .vmsheet .rs-head p { margin: 4px 0 0; }
 .vms-t { padding: 12px 0 14px; }
 .vms-t + .vms-t { border-top: 1px solid var(--line); }
@@ -21045,11 +21057,11 @@ function vgAccepted(form, p, tense) { // the form, with its subject pronoun, and
   const all = vars.concat(PRON_PREFIX[p].flatMap(pr => vars.map(v => pr + " " + v)));
   return /^congiuntivo/.test(tense || "") ? all.concat(all.map(v => "che " + v)) : all;
 }
-function vgTableHtml(item, tense, marks) { // marks: {p: true} bolded; a form the regular pattern doesn't give is underlined (from 9.31)
+function vgTableHtml(item, tense, marks, markSay) { // marks: {p: true} bolded (markSay: what a screen reader hears after one, as "differs" in Compare); a form the regular pattern doesn't give is underlined (from 9.31)
   const forms = item.allForms[tense], irr = vgIrregular(item.it), odd = irr && irr.marks[tense];
   const u = (t) => `<u class="irr">${esc(t)}<span class="vh"> (irregular)</span></u>`;
   const cell = (f, i) => !odd || !odd.has(i) ? esc(f) : tense === "passato_prossimo" ? f.replace(/^(.*\s)?(\S+)$/, (m, a, b) => esc(a || "") + u(b)) : u(f); // the passato prossimo: only its participle
-  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + cell(f, i) + "</b>" : cell(f, i)}</div>`).join("") + `</div>`, forms, tense);
+  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + cell(f, i) + (markSay ? `<span class="vh"> (${esc(markSay)})</span>` : "") + "</b>" : cell(f, i)}</div>`).join("") + `</div>`, forms, tense);
 }
 const VG_FORMS = new WeakMap(); // per verb (its allForms): each form's variants, normalised, in ladder order: [[tense, person, [variants]], …]
 function vgFormsElsewhere(item, form, exceptTense, exceptP) { // does this form also occur in another ladder tense / person?
@@ -21557,22 +21569,36 @@ function renderVerbReference(u) {
     + tenseChipsHtml(st)
     + groupHtml("Rules", `<div class="card notes">` + (u.notes || []).map(n => `<p>${esc(n)}</p>`).join("") + `</div>`)
     + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`
+    + `<div class="vmsel"><label><span class="eyebrow">Sort</span><select id="refSort">${REF_SORT.map(([k, l]) => `<option value="${k}"${(S.refSort || "family") === k ? " selected" : ""}>${esc(l)}</option>`).join("")}</select></label></div>`
     + `<div class="results" id="refResults">${verbListHtml()}</div><button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`;
 }
 const vgTableWithKey = (item, tense, marks) => vgTableHtml(item, tense, marks) + vgKeyHtml(item.it, tense);
 // Every verb is a row that opens to show its tables. The tables are drawn when a row is opened (the listener below),
 // since all of them together would take several seconds on a phone; a filter opens the rows it leaves, so they come drawn.
 const filterVerbs = (f) => VERB_GYM.filter(v => !f || verbText(v).includes(f)); // f normalised
-/* Sorting the verbs (from 9.32), for the Verb map: course order (VERB_GYM's own, the order verbs open in), A–Z, or weakest
-   first (the lowest average box among the tenses started; a verb with none started comes last, and ties keep course order). */
+/* Sorting the verbs (from 9.32), for the Verbs reference and the Verb map: course order (VERB_GYM's own, the order verbs
+   open in), A–Z, or weakest first (the lowest average box among the tenses started; a verb with none started comes last,
+   and ties keep course order). The reference also keeps its grouping by family, the first choice. */
+const REF_SORT = [["family", "By family"], ["course", "Course order"], ["az", "A–Z"], ["weak", "Weakest first"]];
 function vgAvgBox(v) { let s = 0, k = 0; for (const i of verbTenses(v)) { const b = rec(i.id).box; if (b >= 1) { s += b; k++; } } return k ? s / k : Infinity; }
 function sortVerbs(list, how) { // list in VERB_GYM order
   if (how === "az") return list.slice().sort((a, b) => a.it.localeCompare(b.it, "it"));
   if (how === "weak") { const w = new Map(list.map(v => [v, vgAvgBox(v)])); return list.slice().sort((a, b) => w.get(a) - w.get(b)); }
   return list.slice();
 }
+// A closed row of the reference: the verb, its meanings and, from 9.32, a square per tense as the Verb map draws them, in
+// place of the line "presente box 3 · passato prossimo locked · …", which a screen reader still hears (with ", due" where due)
+function vrefSummary(v, t) {
+  const say = verbTenses(v).map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}${isDue(i.id, t) ? ", due" : ""}`).join(" · ");
+  return `<span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><span class="vm-c vref-c" aria-hidden="true">${vmCells(v, t).html}</span><span class="vh">${esc(say)}</span>`;
+}
 function verbListHtml() {
-  const f = normalize(S.refFilter || ""), byVerb = filterVerbs(f);
+  const f = normalize(S.refFilter || ""), byVerb = filterVerbs(f), how = S.refSort || "family", t = now();
+  const row = (v) => `<details class="vref" data-verb="${esc(v.it)}"${f ? " open" : ""}><summary>${vrefSummary(v, t)}</summary>${f ? verbTablesHtml(v) : ""}</details>`;
+  if (how !== "family") { // one list, in the order chosen
+    const list = sortVerbs(byVerb, how);
+    return list.length ? groupHtml(esc("Verbs, " + { course: "in course order", az: "A–Z", weak: "weakest first" }[how]), `<div class="card rows">${list.map(row).join("")}</div>`) : `<p class="muted">No verbs match.</p>`;
+  }
   const famOrder = Object.keys(VERB_FAMILIES);
   const sorted = byVerb.slice().sort((a, b) => famOrder.indexOf(a.fam) - famOrder.indexOf(b.fam) || a.it.localeCompare(b.it));
   let h = "", fam = null, rows = "";
@@ -21580,8 +21606,7 @@ function verbListHtml() {
   const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p>` + vgFocusBtn("vfam", fam, "Practise this family", byFam[fam] || { started: 0, open: 0 }, "vfam-none-" + fam) + `<div class="card rows">${rows}</div>`); rows = ""; };
   for (const v of sorted) {
     if (v.fam !== fam) { flush(); fam = v.fam; }
-    const summ = verbTenses(v).map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
-    rows += `<details class="vref" data-verb="${esc(v.it)}"${f ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>${f ? verbTablesHtml(v) : ""}</details>`;
+    rows += row(v);
   }
   flush();
   if (!sorted.length) h += `<p class="muted">No verbs match.</p>`;
@@ -21590,15 +21615,71 @@ function verbListHtml() {
 const verbTenses = (v) => VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
 function verbTablesHtml(v) {
   let key = ""; // the legend of its underlining, or the caption of a verb irregular throughout: once, under the first table it belongs to (from 9.31)
-  return vgFocusBtn("vverb", v.it, "Practise this verb", vgVerbFocus(v), "vverb-none-" + v.it) + verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + (key ? "" : (key = vgKeyHtml(v.it, i.tense))) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
+  return vgFocusBtn("vverb", v.it, "Practise this verb", vgVerbFocus(v), "vverb-none-" + v.it)
+    + `<details class="vcmp" data-cmp="${esc(v.it)}"><summary>Compare with another verb</summary></details>` // drawn when opened (from 9.32)
+    + verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + (key ? "" : (key = vgKeyHtml(v.it, i.tense))) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
     + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "");
 }
 document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this listens on the way down
   const d = e.target;
+  if (d.open && d.matches("details.vcmp") && d.children.length === 1) { drawCompare(d); return; } // Compare, in an opened row (from 9.32)
   if (!d.open || !d.matches("details.vref") || d.children.length > 1) return; // closed, another kind, or drawn already
   const v = VERB_GYM.find(x => x.it === d.dataset.verb); if (!v) return;
   d.insertAdjacentHTML("beforeend", verbTablesHtml(v)); nbHyphens(d); markSaying(); wire(d); // its Practise this verb
 }, true);
+/* Compare (from 9.32): in an opened row of the Verbs reference, another verb's tables beside this one's, tense by tense (one
+   under the other on a narrow screen), the forms the two verbs build differently in bold, with "(differs)" for a screen
+   reader: a different auxiliary or pronoun, a different ending after each verb's own stem (rest-o, riman-go), or a form
+   that leaves its stem (esco, from uscire), so two verbs of one pattern show none and the bold shows where they part.
+   Offered first: the pairs learners mix up most and the verbs that share an English meaning; any other is a search away
+   (the search index's verbText). Drawn when opened, and only the chosen comparison: nothing is kept. */
+const VG_PAIRS = [["sapere", "conoscere"], ["uscire", "partire"], ["portare", "prendere"], ["vedere", "guardare"], ["sentire", "ascoltare"], ["restare", "rimanere"], ["cominciare", "iniziare"]];
+let VG_BY_NAME = null;
+const vgVerbNamed = (it) => (VG_BY_NAME || (VG_BY_NAME = new Map(VERB_GYM.map(v => [v.it, v])))).get(it);
+function vgPartners(v) { // the verbs Compare offers first: its pairs, then those sharing a meaning
+  const out = [], add = (x) => { if (x !== v.it && !out.includes(x) && vgVerbNamed(x)) out.push(x); };
+  for (const [a, b] of VG_PAIRS) { if (a === v.it) add(b); if (b === v.it) add(a); }
+  const ix = vgIndex().byGloss;
+  for (const e of arr(v.en)) for (const x of ix[normEn(e)] || []) add(x);
+  return out.slice(0, 6);
+}
+const vgStem = (v) => v.it.replace(/(ar|er|ir|r)(si|sene|sela|cela|ci|ne|la)$/, "$1e").slice(0, -3); // the stem a verb's regular forms start from (alzarsi, andarsene: alz-, and-)
+function vgBuiltAs(v, form) { // a form as the verb builds it: the words before its last as they are, the last without the verb's stem (or whole, if it leaves it)
+  const st = vgStem(v), w = String(form).trim().split(/\s+/), last = w.pop();
+  return w.concat(st && last.startsWith(st) ? "-" + last.slice(st.length) : "=" + last).join(" ");
+}
+function vgCompareHtml(a, b) {
+  const secs = [];
+  for (const t of VG_TENSES) {
+    const ia = vgItem(a.it, t), ib = vgItem(b.it, t);
+    if (!ia && !ib) continue;
+    const marks = {};
+    if (ia && ib) ia.forms.forEach((f, p) => { const g = ib.forms[p]; if (f && g && f !== "—" && g !== "—" && vgBuiltAs(a, f) !== vgBuiltAs(b, g)) marks[p] = true; });
+    const side = (v, i) => `<div class="vcmp-s"><div class="vcmp-v it">${esc(v.it)}</div>${i ? vgTableHtml(i, t, marks, "differs") : `<p class="small muted">No ${esc(TENSE_LABEL[t])}.</p>`}</div>`;
+    secs.push(`<section class="vcmp-t"><h4 class="label">${esc(TENSE_LABEL[t])}</h4><div class="vcmp-g">${side(a, ia)}${side(b, ib)}</div></section>`);
+  }
+  return `<p class="small vcmp-h"><b>${esc(a.it)}</b> and <b>${esc(b.it)}</b>, tense by tense. <b>Bold</b>: where the two differ (an ending, the stem or the auxiliary).</p>` + secs.join("");
+}
+const vcmpChips = (v, list, on) => list.map(x => `<button type="button" class="fchip" data-vcmp="${esc(x)}" aria-pressed="${x === on}">${esc(x)}</button>`).join("");
+function drawCompare(d) {
+  const v = vgVerbNamed(d.dataset.cmp); if (!v) return;
+  const id = "vcmp-" + v.it, sugg = vgPartners(v);
+  d.insertAdjacentHTML("beforeend", `<div class="vcmp-b">` + (sugg.length ? `<p class="small muted">Often mixed up with ${esc(v.it)}, or sharing a meaning:</p><div class="fchips" role="group" aria-label="Suggested verbs">${vcmpChips(v, sugg)}</div>` : "")
+    + `<label class="small muted" for="${esc(id)}">${sugg.length ? "Or find another verb:" : "Find a verb to compare it with:"}</label><input type="text" id="${esc(id)}" class="vcmp-in" placeholder="Verb or meaning…" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="search">`
+    + `<div class="fchips vcmp-hits" role="group" aria-label="Verbs found"></div><div class="vcmp-out" aria-live="polite"></div></div>`);
+  const body = d.lastElementChild, inp = body.querySelector(".vcmp-in"), hits = body.querySelector(".vcmp-hits"), out = body.querySelector(".vcmp-out");
+  let on = null;
+  const show = (x) => { // the comparison with x, and its chip pressed wherever it is
+    const b = vgVerbNamed(x); if (!b) return;
+    on = x; out.innerHTML = vgCompareHtml(v, b); nbHyphens(out); markSaying();
+    body.querySelectorAll("[data-vcmp]").forEach(c => c.setAttribute("aria-pressed", String(c.dataset.vcmp === x)));
+  };
+  body.onclick = (e) => { const c = e.target.closest("[data-vcmp]"); if (c) show(c.dataset.vcmp); };
+  inp.oninput = () => afterTyping(() => { // up to 6 verbs found, by name, meaning or form
+    const f = normalize(inp.value);
+    hits.innerHTML = f.length < 2 ? "" : (() => { const found = VERB_GYM.filter(x => x !== v && verbText(x).includes(f)).slice(0, 6).map(x => x.it); return found.length ? vcmpChips(v, found, on) : `<p class="small muted">No verb matches.</p>`; })();
+  });
+}
 
 /* ---------- the Verb map (from 9.32) ----------
    Every verb's progress on one screen (S.screen "vmap"), opened from the Verbs reference's header and the Verbs card on
@@ -23484,6 +23565,7 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   if (S.feedback && !S.leaveAsk && !S.rule && !S.rsheet) { const c = app.querySelector('[data-act="continue"]'); if (c) c.focus({ preventScroll: true }); }
   const lb = document.getElementById("lookupBox");
   if (lb) { lb.oninput = () => { S.lookup = lb.value; afterTyping(() => redrawResults("lookupResults", lookupResultsHtml)); }; if (!S.lookup) lb.focus(); }
+  const rs = document.getElementById("refSort"); if (rs) rs.onchange = () => { S.refSort = rs.value; redrawResults("refResults", verbListHtml); }; // the Verbs reference's order (from 9.32), for the visit
   const rf = document.getElementById("refFilter");
   if (rf) rf.oninput = () => { S.refFilter = rf.value; afterTyping(() => { const u = content.unitById[S.refUnit]; if (u) redrawResults("refResults", () => u.mode === "verbs" ? verbListHtml() : glossaryHtml(u)); }); };
   const pf = document.getElementById("packFile"); if (pf) pf.onchange = () => readFile(pf, txt => { document.getElementById("packText").value = txt; action("importPack"); });
@@ -24053,7 +24135,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.32";
-const CHANGES = "A new Verb map shows every verb's eight tenses at a glance, with filters to find any verb fast; open it from the Verbs page or the Verbs card on Units."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "A new Verb map shows every verb's eight tenses at a glance, with filters to find any verb fast. The Verbs page shows each verb's tenses as small squares, sorts four ways and can compare two verbs side by side."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());
