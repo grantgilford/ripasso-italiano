@@ -245,6 +245,8 @@ The open unit card (the current unit's, or the one just tapped) has a 2 px `--ac
 
 **Tables** (lessons, glossary, conjugations). No outer border; 1 px `--line` rules between rows; header row in `--muted` 13 px 600 (or `--accent` for column heads naming a verb, as in the lesson mockup); 8 px cell padding. Wide tables keep their `overflow-x: auto` wrapper.
 
+**Irregular forms** (from 9.31), in every Verbs section table (the New verb and New tense card, the answer panel, the Verbs reference and Look up): each form the regular pattern doesn't give has a dotted 2 px underline in `--accent`, 3 px below the text (`u.irr`), and a visually hidden "(irregular)" for a screen reader, which the table's speaker never reads; in the *passato prossimo* only the participle is underlined, never the auxiliary. Under the first table with marks (in the reference, the first in each opened row) a one-line legend in Small `--muted` (`.vkey`, 13 px): "Underlined: breaks the pattern.", the word "Underlined" itself underlined as the key. A verb irregular throughout (essere, avere, the verbs with built-in pronouns, and any verb nine of whose forms in ten would be underlined: fare, rifare, bere) has no underlining; the same line says "essere is irregular throughout, so its forms aren't underlined one by one." The colour is never the only signal: the underline is a shape, and the legend names it.
+
 ---
 
 ## 8. Screens
@@ -327,6 +329,11 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 - **Practise this unit:** a primary button at the end of both tabs (`data-unit`).
 - **Practise this section (N items)** (from 9.6): a full-width secondary button at the end of each lesson section with items linked to it (`.secgo`, `data-practise="u05#6"`, the unit and the section's index from 0), starting a session of those items. When they are all new and today's new items are used up it is disabled, with a muted line under it saying so.
 - **Verbs reference:** the same frame. Each verb is a row (`details.vref`) that opens to its tables; the tables are drawn when the row is opened (from 9.3), and a filter opens, and draws, the rows it leaves. From 9.20 each tense's example sentence sits under its table as a verb sentence card (section 7) on the page colour (`.fb-ctx.vs-in`, `--bg` inside the row's `--card`).
+- **Focus sessions on the Verbs reference** (from 9.31), each starting a Verbs session aimed at one thing (`data-vfocus="kind:key"`):
+  - **Practise a tense:** a group (Eyebrow heading "Practise a tense") under Practise verbs, before Rules: eight tense chips in a two-column grid (`.tchips`, 8 px gaps), one per tense of the ladder in order. Each chip (`.tchip`) is a `--card` button with a 14 px radius, at least 52 px tall, the tense in Label weight at 15 px and "N started" (the verbs with that tense started) in Small `--muted` beneath; a long name wraps to two lines rather than being cut. Not pills: two lines and a grid keep all eight in view at 360 px, where a scrolling row would hide most of them. A tense with nothing started and nothing able to open is disabled (55%), with one muted line under the grid saying why.
+  - **Practise this family:** under each family's heading and description, before its card of verbs, a full-width secondary button (`.secgo.vgo`).
+  - **Practise this verb:** the first thing in an opened row, above the presente table: the same full-width secondary button.
+  - A focus that has nothing to practise is disabled, with a muted line under it saying why (`aria-describedby`), as Practise this section is.
 
 ### 8.5 Practice session (`renderSession`), see `mockups/exercise-wrong-*.html`
 
@@ -351,9 +358,10 @@ The current screens are `S.screen` values drawn by the `render*` functions. Here
 
 ### 8.6 Session summary (`renderSummary`)
 
-- A title, "Session complete".
+- A title, "Session complete"; after a focus session (from 9.31), an Eyebrow line above it naming the focus (`.sumfocus`): "Focus: imperfetto", "Focus: andare", "Focus: -ire with -isc-".
 - A card with three big numbers: accuracy, XP earned, items promoted. Below them, today's XP against the goal as a bar.
 - The missed items as a card list (Italian in DM Sans 500, English muted).
+- After a session with verb tenses in it (from 9.31), before the buttons: a group **Verbs** (Eyebrow heading) with a card of rows (`.vnews`, 15 px, 12 × 16 px padding, `--line` between them): "New tense open: **andare · imperfetto**" for each tense that opened during the session, and "Every tense learned: **andare**" for each verb that has now learned all its tenses; then a group **Verbs you missed**, a card with a row per verb missed (`.vmiss`): the infinitive in the Italian face and its first gloss in Small `--muted`, with a secondary **Practise this verb** button at the right (wrapping under it when there's no room), which starts that verb's focus session. Only here, once the session is over: never in the answer panel, where it would end the session.
 - A primary "Back to Today" button (`data-go="home"`), and beside it, as wide, a secondary **Another round** (`data-act="again"`, from 9.5) that starts another session of the same kind and unit. When nothing is left to practise it is disabled, with a muted line under the row saying so.
 
 ### 8.7 Rules (`renderRules`) and Look up (`renderLookup`)
@@ -379,7 +387,7 @@ A new `S.screen = "you"` with its own render function and a `data-go="you"` tab.
    - **New items per day:** current value, e.g. "No limit".
    - **Vocab direction:** current value, e.g. "Italian → English".
    - **More settings:** opens the full `settings` screen.
-   - *Each row opens* the full Settings screen, which keeps every existing option, restyled as grouped rows with their hints beneath.
+   - *Each row opens* the full Settings screen, which keeps every existing option, restyled as grouped rows with their hints beneath. From 9.31 its Verbs group ends with **Open new tenses up to** (All, then the tenses from the *congiuntivo presente* back to the *passato prossimo*), a select like the others; a tense after it shows as "held back" in the Verbs reference.
 4. **Your data** (card of rows):
    - **Sync:** a status dot plus words; the dot is never the only signal. It opens `data`.
    - **Flagged items:** the count; opens `data`, scrolled to that section.
@@ -394,6 +402,7 @@ The Stats screen keeps all its current tables and the "Practise the most-missed 
 
 - **Due in the next 7 days**, after the figures: one card with a column per day, tomorrow first, as tall as the number of items falling due that day (grammar, cards and verbs together), the number on top in `--fg`, columns at most 24 px wide in `--accent` with 4 px rounded tops on a hairline `--line` baseline, and the weekday and date beneath in Small; one series, so no legend. Under it, a table of the same days by kind (Grammar, Cards, Verbs), numbers right-aligned in tabular figures, which also gives screen readers the figures (the chart itself is one `role="img"` with a spoken summary).
 - **Tricky items**, between Most missed and the button: up to 15 items with 4 or more lapses at box 3 or below, as a table like Most missed, with a muted line saying they start again with their introduction.
+- **Verbs: weak spots** (from 9.31), after Practise the most-missed items: a group with that Eyebrow heading and one card (`.weak`). In it, under small `--muted` 600 headings (13 px), **By person** (io … loro) and **By tense** (the eight, in ladder order): one row per label in a three-column grid, the label (14 px), a 6 px bar (`--track`, `--accent` fill, scaled to the largest in its group) and the number (14 px 600, tabular figures, right-aligned), so the bar is never the only signal; then **Missed most**, a numbered list of up to 8 cells, most first: "**voi · andare · futuro:** andrete, missed 4 times" (the person as the tables label it, *che voi*, *Lei*). Under the card, a full-width secondary **Practise my weak spots** (`button.wide`, `data-start="vweak"`) with a small line saying what it does. With nothing missed yet, the card says so in one muted line and the button is disabled, with a muted line under it saying why.
 
 ---
 

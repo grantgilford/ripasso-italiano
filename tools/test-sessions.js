@@ -9,22 +9,27 @@
   type is among the choices, as on a phone), and checks:
 
     1. Balanced sessions: 12-exercise sessions of every grammar kind (Continue and a unit for each grammar unit,
-       Review, Wild card, Mistakes, most-missed), built many times: never the same kind of exercise (typeKey)
-       three times in a row; at least four kinds whenever the items can give four (as many as they can give
-       otherwise: worked out by asking each item for every kind and matching kinds to items); and about the
-       same share of typed exercises as the same items get without the session's hint (within 3 points).
-       makeExercise's hint keeps the kind: with the same random numbers, a hinted choice is typed exactly
-       when the plain one is. Flashcard and Verbs sessions are built as before (no hint, no new order).
-    2. Rotation: each answered grammar exercise is remembered per device in itapp.lasttype.v1 (record id and
-       typeKey, newest last, at most 2,000, never in progress); a vocab pack's cards are not; the next session
-       gives an item another kind of exercise wherever it has one of the same kind (typed or not); a damaged
-       value or a device that refuses to store it costs nothing.
+       Review, Wild card, Mistakes, most-missed) and, from 9.31, Verbs sessions (from Today and from Units),
+       built many times: never the same kind of exercise (typeKey) three times in a row; at least four kinds
+       whenever the items can give four (as many as they can give otherwise: worked out by asking each item
+       for every kind and matching kinds to items); and about the same share of typed exercises as the same
+       items get without the session's hint (within 3 points), for the grammar sessions and the Verbs sessions
+       each. makeExercise's hint keeps the kind: with the same random numbers, a hinted choice is typed exactly
+       when the plain one is, for words, sentences and verb tenses. Flashcard sessions are built as before (no
+       hint, no new order).
+    2. Rotation: each answered grammar exercise, and from 9.31 each answered verb tense, is remembered per
+       device in itapp.lasttype.v1 (record id and typeKey, newest last, at most 4,000 from 9.31, never in
+       progress; its size at the cap, with the longest ids, is printed and must stay under 200 KB); a vocab
+       pack's cards are not; the next session gives an item, or a verb tense, another kind of exercise
+       wherever it has one of the same kind (typed or not); a damaged value or a device that refuses to store
+       it costs nothing.
     3. Spread: a correct answer that sets the next review at box 3 or above lands within 10% of the interval
        either way, and the dates do spread; boxes 1 and 2, and a wrong answer, keep their exact intervals.
     4. Tricky items (4 or more lapses, box 3 or below): the next session introduces each again (the flip card
-       or first exercise, with its explanation); the introduction leaves the record as it was, and the typed
-       follow-up comes later in the session and moves the item as usual; an item with 3 lapses, or at box 4,
-       is not tricky; Stats lists up to 15, above the "Practise the most-missed items" button.
+       or first exercise, with its explanation; from 9.31 a verb tense's New tense card, called Look again,
+       then its whole table); the introduction leaves the record as it was, and the typed follow-up comes
+       later in the session and moves the item as usual; an item with 3 lapses, or at box 4, is not tricky;
+       Stats lists up to 15, above the "Practise the most-missed items" button.
     5. The forecast on Stats: for each of the next 7 days, the items that fall due that day, grammar, cards
        and verbs, are exactly what dueIds(), flashDueIds() and dueIds("vb") gain from the end of the day
        before to the end of that day; the numbers drawn on Stats are those.
@@ -39,6 +44,25 @@
        with linked items, its session takes only those items, up to the lesson length: the due ones first
        (soonest due first), then new ones, no more than today's new items allow, then the rest, least known
        first; with today's new items used up it takes no new ones.
+    8. Focus sessions (from 9.31): Practise this verb, a tense and a family, from the Verbs reference. For
+       every tense, every family and 60 verbs, on a new device and with the seeded progress, each session
+       takes only matching verb tenses, up to a Verbs session's length: the due ones first (soonest due
+       first), then the others started (least known first), then new ones that can open now, in the order of
+       VERB_GYM and no more than a Verbs session's new ones; never a tense that hasn't opened; its exercises
+       are its items. The chips show each tense's number of verbs started; a focus with nothing started and
+       nothing able to open is disabled, with its reason. Another round (section 6) works after each, and the
+       summary names the focus ("Focus: imperfetto").
+    9. The ladder cap (from 9.31): Settings › Verbs › Open new tenses up to, chosen by tapping, is stored
+       with the settings (so it syncs, in the cloud's documents) and drawn as chosen; with it set to the
+       imperfetto, on a device with every verb's presente and passato prossimo learned, no session, Verbs or
+       focus, ever takes a newer tense as new, while the started ones beyond it still come up for review;
+       Today's Verbs tile, the Units card and the reference's rows count new tenses accordingly (worked out
+       here the plain way); and set back to All, the next tense opens again.
+   10. The Verbs part of the summary (from 9.31): after a Verbs session in which one verb's presente
+       reaches box 5, another verb's last tense is learned and a third verb is missed, the summary lists
+       "New tense open: parlare · passato prossimo", "Every tense learned: guardare" and, under Verbs you
+       missed, andare with Practise this verb, which starts a session of that verb; no answer panel in the
+       session offers it.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -54,6 +78,7 @@ const { chromium } = loadPlaywright();
 const results = checks(), { check, section } = results;
 const ready = "typeof content !== 'undefined' && content && typeof S !== 'undefined' && S.screen === 'home'";
 const DAY = 864e5;
+const vgIdOf = (verb, tense) => "vg-" + verb + "-" + tense; // a verb tense's id, as the app makes it
 
 // Run in the page before the app: a seeded Math.random (mulberry32) and a stand-in Italian voice, so canListen() is true.
 const INIT = `(() => {
@@ -95,9 +120,11 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         const kinds = [];
         for (const u of units) kinds.push(["continue", u], ["unit", u]);
         for (let k = 0; k < 6; k++) kinds.push(["review"], ["wild"], ["mistakes"], ["hard"]);
-        const out = { sessions: 0, exercises: 0, triples: [], unavoidable: 0, fewKinds: [], kindsHist: {}, typed: 0, typedPlain: 0, plainN: 0, flash: "", tooShort: 0 };
+        for (let k = 0; k < 20; k++) kinds.push(["verbs"], ["verbs", "vb"]); // from 9.31: Verbs from Today and from Units
+        const out = { sessions: 0, exercises: 0, triples: [], unavoidable: 0, fewKinds: [], kindsHist: {}, typed: 0, typedPlain: 0, plainN: 0, flash: "", tooShort: 0,
+          verbs: { sessions: 0, kindsHist: {}, typed: 0, typedPlain: 0, plainN: 0 } };
         // the kinds each item can give at its box: makeExercise asked for each kind in turn (anyKind), as the session's last pass asks
-        const can = (q) => q.reintro || isSideUnit(q.ex.item.unit) ? new Set([q.ex.typeKey]) : new Set(HINT_KEYS.concat([q.ex.typeKey]).map(k => (makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: [k], anyKind: true }) || {}).typeKey).filter(Boolean));
+        const can = (q) => q.reintro || !isBalancedUnit(q.ex.item.unit) ? new Set([q.ex.typeKey]) : new Set(HINT_KEYS.concat([q.ex.typeKey]).map(k => (makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: [k], anyKind: true }) || {}).typeKey).filter(Boolean));
         const matching = (sets) => { // the most kinds that distinct items can give (Kuhn's augmenting paths)
           const owner = {}, ks = [...new Set(sets.flatMap(s => [...s]))];
           const tryKind = (k, seen) => { for (let i = 0; i < sets.length; i++) if (sets[i].has(k) && !seen.has(i)) { seen.add(i); if (owner[i] == null || tryKind(owner[i], seen)) { owner[i] = k; return true; } } return false; };
@@ -108,22 +135,24 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
           const s = buildSession(kind, unit), keys = s.queue.map(q => q.ex.typeKey), n = keys.length;
           if (!n) continue;
           out.sessions++; out.exercises += n;
+          const v = kind === "verbs" ? out.verbs : null; if (v) v.sessions++;
           const tally = {}; keys.forEach(k => tally[k] = (tally[k] || 0) + 1);
           const avoidable = Object.values(tally).every(c => c <= 2 * (n - c) + 2);
           const at = keys.findIndex((k, i) => i >= 2 && keys[i - 1] === k && keys[i - 2] === k);
           if (at >= 0) { if (avoidable) out.triples.push(`${kind} ${unit || ""}: ${keys.join(" ")}`); else out.unavoidable++; }
           const distinct = Object.keys(tally).length, want = Math.min(4, Math.ceil(n / 3)), best = Math.min(want, matching(s.queue.map(can)));
           if (n === 12) out.kindsHist[distinct] = (out.kindsHist[distinct] || 0) + 1; else out.tooShort++;
+          if (v && n === 12) v.kindsHist[distinct] = (v.kindsHist[distinct] || 0) + 1;
           if (distinct < best) out.fewKinds.push(`${kind} ${unit || ""}: ${distinct} kinds, the items could give ${best}: ${keys.join(" ")}`);
           // the same items without the session's hint, as 9.4 built them (tricky items' introductions left out of both)
           for (const q of s.queue) if (!q.reintro) {
-            if (q.ex.kind === "production") out.typed++;
+            if (q.ex.kind === "production") { out.typed++; if (v) v.typed++; }
             const plain = makeExercise(q.ex.item, rec(q.ex.item.id));
-            if (plain) { out.plainN++; if (plain.kind === "production") out.typedPlain++; }
+            if (plain) { out.plainN++; if (plain.kind === "production") out.typedPlain++; if (v) { v.plainN++; if (plain.kind === "production") v.typedPlain++; } }
           }
         }
-        // Flashcard and Verbs sessions: with the same random numbers, the same items and exercises as plain makeExercise in shuffled order
-        for (const [kind, unit] of [["flashcards"], ["flashcards", "fc01"], ["verbs"], ["verbs", "vb"]]) {
+        // Flashcard sessions: with the same random numbers, the same items and exercises as plain makeExercise in shuffled order
+        for (const [kind, unit] of [["flashcards"], ["flashcards", "fc01"]]) {
           window.__reseed(4242); const s = buildSession(kind, unit);
           window.__reseed(4242); const plain = shuffle(uniqueByPid(sessionIds(kind, unit))).map(id => makeExercise(content.items[id], rec(id))).filter(Boolean);
           const a = s.queue.map(q => q.ex.item.id + ":" + q.ex.typeKey).join(), b = plain.map(ex => ex.item.id + ":" + ex.typeKey).join();
@@ -136,21 +165,25 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check(`no session has the same kind three times in a row where its mix allows another order (${r.sessions} sessions${r.unavoidable ? `; ${r.unavoidable} whose items give one kind too often to avoid it` : ""})`, r.sessions > 150 && !r.triples.length, r.triples.slice(0, 5).join("\n"));
       check("every session has at least four kinds of exercise when its items can give four (or as many as they can)", !r.fewKinds.length, r.fewKinds.slice(0, 5).join("\n"));
       check(`about the same share of typed exercises as without the hint (${share(r.typed, r.plainN)} against ${share(r.typedPlain, r.plainN)}, within 3 points)`, Math.abs(r.typed - r.typedPlain) / r.plainN <= 0.03);
-      check("flashcard and Verbs sessions are built as before: the same items and exercises, in the shuffled order", !r.flash, r.flash);
+      const vb = r.verbs;
+      console.log(`         Verbs: ${vb.sessions} sessions; kinds in a 12-exercise session: ${Object.entries(vb.kindsHist).map(([k, v]) => `${k}: ${v}`).join(", ")}; typed ${share(vb.typed, vb.plainN)} (without the hint ${share(vb.typedPlain, vb.plainN)})`);
+      check(`Verbs sessions are balanced too (from 9.31): ${vb.sessions} built, counted in the checks above, each of 12 with at least four kinds`, vb.sessions === 160 && Object.keys(vb.kindsHist).length && Object.keys(vb.kindsHist).every(k => Number(k) >= 4), JSON.stringify(vb.kindsHist));
+      check(`…with about the same share of typed exercises as without the hint (${share(vb.typed, vb.plainN)} against ${share(vb.typedPlain, vb.plainN)}, within 3 points)`, vb.plainN > 300 && Math.abs(vb.typed - vb.typedPlain) / vb.plainN <= 0.03);
+      check("flashcard sessions are built as before: the same items and exercises, in the shuffled order", !r.flash, r.flash);
 
       const kept = await page.evaluate(() => { // the hint never changes the kind: the same random numbers, with and without a hint
-        const ids = Object.keys(content.items).filter(id => !isSideUnit(content.items[id].unit) && ["vocab", "sentence"].includes(content.items[id].type)).filter((_, k) => k % 9 === 0);
-        let n = 0; const bad = [];
+        const ids = Object.keys(content.items).filter(id => isBalancedUnit(content.items[id].unit) && ["vocab", "sentence", "vtense"].includes(content.items[id].type)).filter((_, k) => k % 9 === 0);
+        let n = 0, verbs = 0; const bad = [];
         for (const id of ids) for (const box of [0, 1, 2, 3, 5]) for (const force of [undefined, "production"]) {
           const item = content.items[id], r = Object.assign({}, rec(id), { box }), hint = { avoid: [HINT_KEYS[n % HINT_KEYS.length]], prefer: HINT_KEYS.filter((_, k) => (k + n) % 3 === 0) };
           window.__reseed(n * 7919 + 1); const a = makeExercise(item, r, force);
           window.__reseed(n * 7919 + 1); const b = makeExercise(item, r, force, hint);
-          n++;
+          n++; if (item.type === "vtense") verbs++;
           if (a && b && a.kind !== b.kind) bad.push(`${id} box ${box}${force ? " follow-up" : ""}: ${a.typeKey} (${a.kind}) became ${b.typeKey} (${b.kind})`);
         }
-        return { n, bad };
+        return { n, bad, verbs };
       });
-      check(`makeExercise's hint keeps the kind: of ${kept.n} exercises built with the same random numbers, a hinted one is typed exactly when the plain one is`, kept.n > 1000 && !kept.bad.length, kept.bad.slice(0, 5).join("\n"));
+      check(`makeExercise's hint keeps the kind: of ${kept.n} exercises built with the same random numbers (words, sentences and from 9.31 verb tenses), a hinted one is typed exactly when the plain one is`, kept.n > 1000 && kept.verbs > 2000 && !kept.bad.length, kept.bad.slice(0, 5).join("\n"));
 
       section("2. Rotation: another kind of exercise for an item, per device");
       const rot = await page.evaluate(() => {
@@ -163,6 +196,13 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         const last = new Map(); answered.forEach(([id, k]) => { last.delete(id); last.set(id, k); });
         out.saved = Array.isArray(saved) && saved.length === last.size && saved.every(([id, k]) => last.get(id) === k) && saved.map(p => p[0]).join() === [...last.keys()].join();
         out.notInProgress = !JSON.stringify(progress).includes("lasttype") && !JSON.stringify(Store.get("itapp.progress.v1")).includes("lasttype");
+        S.screen = "home"; session = null;
+        // a Verbs session's verb tenses are remembered too (from 9.31), each as its last kind
+        startSession("verbs");
+        const vAnswered = [];
+        for (let n = 0; S.screen === "session" && n < 60; n++) { const q = current(); if (!S.feedback) { vAnswered.push([pid(q.ex.item.id), q.ex.typeKey]); finishAnswer(true, "", ""); } continueSession(); }
+        const vSaved = new Map(Store.get("itapp.lasttype.v1")), vLast = new Map(); vAnswered.forEach(([id, k]) => vLast.set(id, k));
+        out.verbsSaved = vLast.size >= 8 && [...vLast].every(([id, k]) => id.startsWith("vg-") && vSaved.get(id) === k);
         S.screen = "home"; session = null;
         // a vocab pack's cards are not remembered
         const before = JSON.stringify(Store.get("itapp.lasttype.v1"));
@@ -177,26 +217,36 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         const plan = [];
         for (let rep = 0; rep < 40; rep++) plan.push(["review"]);
         for (let rep = 0; rep < 6; rep++) for (const u of content.units.filter(u => !isSideUnit(u.id) && !u.mode && u.id !== "vb")) plan.push(["unit", u.id]);
+        for (let rep = 0; rep < 40; rep++) plan.push(["verbs"]); // from 9.31
+        const v = { could: 0, same: 0, plainSame: 0 };
         for (const [kind, unit] of plan) {
           const s = buildSession(kind, unit);
           for (const q of s.queue) {
-            if (q.reintro || isSideUnit(q.ex.item.unit)) continue;
-            const id = pid(q.ex.item.id), was = lastTypes().get(id), r = rec(q.ex.item.id);
+            if (q.reintro || !isBalancedUnit(q.ex.item.unit)) continue;
+            const id = pid(q.ex.item.id), was = lastTypes().get(id), r = rec(q.ex.item.id), isV = q.ex.item.type === "vtense";
             if (was) {
               const m = kindsAt(q.ex.item, r), cls = m[q.ex.typeKey], alts = Object.keys(m).filter(k => m[k] === cls && k !== was);
-              if (cls && m[was] === cls && alts.length) { could++; if (q.ex.typeKey === was) same++; const p = makeExercise(q.ex.item, r); if (p && p.typeKey === was) plainSame++; }
+              if (cls && m[was] === cls && alts.length) {
+                const p = makeExercise(q.ex.item, r);
+                could++; if (q.ex.typeKey === was) same++; if (p && p.typeKey === was) plainSame++;
+                if (isV) { v.could++; if (q.ex.typeKey === was) v.same++; if (p && p.typeKey === was) v.plainSame++; }
+              }
             }
             noteType(q.ex);
           }
         }
-        Object.assign(out, { could, same, plainSame });
-        // capped at 2,000, newest last
-        const many = Array.from({ length: 2100 }, (_, k) => ["old-" + k, "recall"]);
+        Object.assign(out, { could, same, plainSame, v });
+        // capped at 4,000 (from 9.31; 2,000 before), newest last
+        const many = Array.from({ length: 4100 }, (_, k) => ["old-" + k, "recall"]);
         Store.set("itapp.lasttype.v1", many); LAST_TYPES = null;
         const g = Object.values(content.items).find(i => i.unit === "u02" && i.type === "grammar_mc");
         noteType({ item: g, typeKey: "grammar" });
         const capped = Store.get("itapp.lasttype.v1");
-        out.capped = capped.length === 2000 && capped[capped.length - 1][0] === pid(g.id) && capped[0][0] === "old-101";
+        out.capped = capped.length === 4000 && capped[capped.length - 1][0] === pid(g.id) && capped[0][0] === "old-101";
+        // its size at the cap: the longest record ids (half grammar items, half verb tenses) with the longest kinds
+        const longest = (f, n) => [...new Set(Object.keys(content.items).filter(id => f(content.items[id])).map(pid))].sort((a, b) => b.length - a.length).slice(0, n);
+        const fullList = longest(i => !isSideUnit(i.unit), 2000).map(id => [id, "translate"]).concat(longest(i => i.type === "vtense", 2000).map(id => [id, "vtenseid"]));
+        out.capSize = JSON.stringify(fullList).length;
         // damaged values are ignored (a row whose text can't be read at all is the storage test's: it reads as nothing saved)
         out.damaged = [];
         for (const v of ["\"not a list\"", "{\"a\":1}", "[1,2,[3]]", "null", "[[\"x\"]]"]) {
@@ -206,10 +256,13 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         return out;
       });
       check("each answered grammar exercise is remembered in itapp.lasttype.v1, as [record id, typeKey], newest last", rot.saved);
+      check("…and so is each answered verb tense in a Verbs session (from 9.31)", rot.verbsSaved);
       check("…never in progress, so it never syncs", rot.notInProgress);
       check("…and a vocab pack's cards are not", rot.cardsLeftOut);
       check(`the next time, an item that has another exercise of the same kind gets another one (${rot.same} of ${rot.could} the same as last time; ${rot.plainSame} without the memory)`, rot.could > 100 && rot.same <= rot.could * 0.03 && rot.plainSame > rot.could * 0.15);
-      check("the memory is capped at 2,000 items, the oldest dropped first", rot.capped);
+      check(`…and so does a verb tense in a Verbs session (${rot.v.same} of ${rot.v.could} the same as last time; ${rot.v.plainSame} without the memory)`, rot.v.could > 100 && rot.v.same <= rot.v.could * 0.03 && rot.v.plainSame > rot.v.could * 0.1);
+      check("the memory is capped at 4,000 items (from 9.31, as verb tenses share it), the oldest dropped first", rot.capped);
+      check(`at the cap, with the longest ids, it takes ${(rot.capSize / 1024).toFixed(0)} KB: under 200 KB`, rot.capSize > 0 && rot.capSize < 200 * 1024);
       check("a damaged memory is ignored, and sessions still build", !rot.damaged.length, rot.damaged.join("\n"));
       check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
@@ -257,9 +310,10 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       const { page, context } = await open(browser, origin, { seed: false });
       section("4. Tricky items are introduced again");
       const r = await page.evaluate(() => {
-        const T = Date.now(), pick = (f) => Object.values(content.items).find(i => !isSideUnit(i.unit) && pid(i.id) === i.id && f(i)).id;
+        const T = Date.now(), pick = (f) => Object.values(content.items).find(i => isBalancedUnit(i.unit) && pid(i.id) === i.id && f(i)).id;
         const cases = [["a word", pick(i => i.type === "vocab"), 2], ["a sentence", pick(i => i.type === "sentence" && i.cloze), 3], ["a verb", pick(i => i.type === "verb"), 1],
-          ["a transform", pick(i => i.type === "transform"), 2], ["a grammar question", pick(i => i.type === "grammar_mc"), 2], ["a number", pick(i => i.type === "number"), 3]];
+          ["a transform", pick(i => i.type === "transform"), 2], ["a grammar question", pick(i => i.type === "grammar_mc"), 2], ["a number", pick(i => i.type === "number"), 3],
+          ["a verb tense (from 9.31)", pick(i => i.type === "vtense" && i.tense === "imperfetto"), 2]];
         const ids0 = cases.map(c => c[1]), notTricky = [pick(i => i.type === "vocab" && !ids0.includes(i.id)), pick(i => i.type === "sentence" && i.cloze && !ids0.includes(i.id))];
         progress.items = {};
         for (const [, id, box] of cases) progress.items[id] = { box, due: T - 1000, lapses: 4 + box, lastSeen: T - 864e5, lastWrong: T - 3 * 864e5, seenCount: 12, lastRight: T - 864e5 };
@@ -272,6 +326,7 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
           const q = s.queue.find(x => x.ex.item.id === id);
           const want = content.items[id].type === "vocab" ? ["flip", "meaning"] : [makeExercise(content.items[id], Object.assign({}, rec(id), { box: 0 })).typeKey];
           if (!q || !q.reintro || !q.ex.showWhy || !want.includes(q.ex.typeKey)) out.intro.push(`${label} (${id}, box ${box}): ${q ? q.ex.typeKey + (q.reintro ? "" : ", not marked") : "missing"}`);
+          else if (q.ex.mode === "vintro" && !/^Look again · /.test(q.ex.type)) out.intro.push(`${label}: called “${q.ex.type}”, not Look again`);
         }
         for (const id of notTricky) { const q = s.queue.find(x => x.ex.item.id === id); if (!q || q.reintro) out.notTricky.push(id); }
         // answer every introduction right: a recognition one on an item with a typed exercise leaves the record alone and brings a typed follow-up
@@ -280,15 +335,18 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         for (let n = 0; S.screen === "session" && n < 80; n++) {
           const q = current(), id = q.ex.item.id, before = JSON.stringify(progress.items[pid(id)]);
           if (!S.feedback) {
+            const card = q.ex.mode === "vintro" && document.querySelector(".card.vintro"); // a verb tense's card is its explanation: Got it moves straight on
+            const cardWhy = !!card && card.textContent.includes(TENSE_USE[q.ex.item.tense]) && !!card.querySelector(".conjtable");
             finishAnswer(true, "", "");
             const c = cases.find(x => x[1] === id);
             if (c && q.reintro) {
               const teach = q.ex.kind === "recognition" && itemHasProduction(q.ex.item);
               seen[id] = { teach, at: session.pos };
               if (teach && JSON.stringify(progress.items[pid(id)]).replace(/"(lastSeen|seenCount)":\d+/g, "") !== before.replace(/"(lastSeen|seenCount)":\d+/g, "")) out.moved.push(`${c[0]}: ${before} → ${JSON.stringify(progress.items[pid(id)])}`);
-              if (!document.querySelector(".fb .why, .fb .facts")) out.why.push(c[0]);
+              if (q.ex.mode === "vintro" ? !cardWhy : !document.querySelector(".fb .why, .fb .facts")) out.why.push(c[0]);
               const f = session.queue.findIndex((x, i) => i > session.pos && x.followup && x.ex.item.id === id);
               if (teach && !(f > session.pos && (f >= session.pos + 3 || f === session.queue.length - 1) && f <= session.pos + 6 && session.queue[f].ex.kind === "production")) out.follow.push(`${c[0]}: follow-up at ${f}, now ${session.pos}`);
+              else if (teach && q.ex.item.type === "vtense" && session.queue[f].ex.typeKey !== "vtable") out.follow.push(`${c[0]}: the follow-up is ${session.queue[f].ex.typeKey}, not the whole table`);
               if (!teach && f >= 0) out.follow.push(`${c[0]}: a follow-up after a typed or rule exercise`);
             } else if (c && q.followup) {
               const was = JSON.parse(before), now = progress.items[pid(id)];
@@ -315,7 +373,7 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check("an item with 3 lapses, or at box 4, is not tricky", !r.notTricky.length, r.notTricky.join(", "));
       check("the introduction shows the explanation", !r.why.length, r.why.join(", "));
       check("an introduction that isn't typed leaves the record as it was (only seen again)", !r.moved.length, r.moved.join("\n"));
-      check("…and the usual typed follow-up comes 3 to 6 exercises later (none after a typed or rule exercise)", !r.follow.length, r.follow.join("\n"));
+      check("…and the usual typed follow-up comes 3 to 6 exercises later (none after a typed or rule exercise; for a verb tense, its whole table)", !r.follow.length, r.follow.join("\n"));
       check("the follow-up, answered right, moves the item up a box as usual", !r.promoted.length, r.promoted.join("\n"));
       check("Stats lists the tricky items, above the Practise the most-missed items button", r.stats);
       check("…at most 15, most lapses first", r.fifteen);
@@ -359,14 +417,19 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
         ["Wild card", "home", '[data-start="wild"]'], ["Mistakes", "home", '[data-start="mistakes"]'], ["the most-missed items", "stats", '[data-start="hard"]'],
         ["Flashcards", "home", '[data-start="flashcards"]'], ["a vocab pack", "units:vocab:fc01", '.ucard [data-unit]'], ["Verbs", "home", '[data-start="verbs"]'], ["the Verbs section from Units", "units:verbs:vb", '.ucard [data-unit]'],
         ["a lesson section", "reference:lesson:u06", '[data-practise]:not([disabled])'],
+        ["a tense, from the Verbs reference", "reference:lesson:vb", '[data-vfocus="vtense:imperfetto"]', "Focus: imperfetto"],
+        ["a family, from the Verbs reference", "reference:lesson:vb", '[data-vfocus="vfam:isc"]', "Focus: -ire with -isc-"],
+        ["a verb, from its row in the Verbs reference", "reference:lesson:vb", 'details.vref[data-verb="andare"] [data-vfocus]', "Focus: andare"],
       ];
-      for (const [label, where, sel] of ways) {
-        await page.evaluate((w) => { session = null; S.feedback = null; const [scr, seg, pickU] = w.split(":"); S.screen = scr; if (scr === "reference") { S.refTab = seg; S.refUnit = pickU; render(); return; } if (seg) S.unitSeg = seg; render(); S.unitPick = pickU || null; render(); }, where);
+      for (const [label, where, sel, focus] of ways) {
+        await page.evaluate((w) => { session = null; S.feedback = null; S.refFilter = ""; const [scr, seg, pickU] = w.split(":"); S.screen = scr; if (scr === "reference") { S.refTab = seg; S.refUnit = pickU; render(); return; } if (seg) S.unitSeg = seg; render(); S.unitPick = pickU || null; render(); }, where);
+        if (/details\.vref/.test(sel)) await page.evaluate(() => { document.querySelector('details.vref[data-verb="andare"]').open = true; }); // its tables, and its button, are drawn as it opens
         await page.click(sel);
         const started = await page.evaluate(() => S.screen === "session" && { kind: session.kind, unit: session.unitId });
         const end = await page.evaluate(FINISH);
-        const sum = await page.evaluate(() => { const b = document.querySelector('[data-act="again"]'), home = document.querySelector('.sumbtns [data-go="home"]'); return { b: !!b, disabled: b && b.disabled, beside: !!(b && home && b.parentElement === home.parentElement), left: sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length }; });
+        const sum = await page.evaluate(() => { const b = document.querySelector('[data-act="again"]'), home = document.querySelector('.sumbtns [data-go="home"]'), f = document.querySelector(".sumfocus"); return { b: !!b, disabled: b && b.disabled, beside: !!(b && home && b.parentElement === home.parentElement), left: sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length, focus: f ? f.textContent.replace(/\u2011/g, "-") : null }; }); // nbHyphens keeps -ire in one piece
         check(`${label}: the summary has Another round beside Back to Today, enabled while something is left`, started && end === "summary" && sum.b && sum.beside && sum.disabled === !sum.left, JSON.stringify({ started, end, sum }));
+        check(`${label}: the summary ${focus ? `names the focus (“${focus}”)` : "names no focus"}`, sum.focus === (focus || null), JSON.stringify(sum.focus));
         if (!sum.b || sum.disabled) continue;
         await page.evaluate(() => { window.__prev = session; });
         await page.click('[data-act="again"]');
@@ -455,6 +518,134 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       check(`${who}: Practise this section takes only the section's items, due first, then new (within today's limit), then the rest, least known first, up to the lesson length (${sec.sections} sections: ${sec.due} due, ${sec.fresh} new, ${sec.rest} others)`, sec.sections > 250 && !sec.bad.length && (seeded ? sec.due > 0 && sec.rest > 0 : sec.fresh > 0), sec.bad.slice(0, 5).join("\n"));
       check(`${who}: with today's new items used up, Practise this section takes no new ones`, sec.none);
       check(`${who}: no script errors`, !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 8. Focus sessions */
+    for (const seeded of [false, true]) {
+      const { page, context } = await open(browser, origin, { seed: seeded });
+      if (!seeded) section("8. Focus sessions: a verb, a tense, a family (from 9.31)");
+      const who = seeded ? "with the seeded progress" : "on a new device";
+      const r = await page.evaluate(() => {
+        progress.settings.verbsPerSession = 12; progress.settings.verbNewPerSession = 3;
+        const out = { sessions: 0, bad: [], due: 0, rest: 0, fresh: 0, full: 0, empty: [] }, t = now(), vb = content.byUnit.vb, per = 12, nNew = 3;
+        const kindOf = (id) => isDue(id, t) ? 0 : rec(id).box >= 1 ? 1 : 2; // due, started, new
+        const keys = [...VG_TENSES.map(x => ["vtense", x]), ...Object.keys(VERB_FAMILIES).map(x => ["vfam", x]), ...VERB_GYM.filter((v, k) => k % 8 === 0).slice(0, 60).map(v => ["vverb", v.it])];
+        for (const [kind, key] of keys) {
+          const match = vb.filter(i => kind === "vtense" ? i.tense === key : kind === "vfam" ? i.fam === key : i.it === key);
+          const ids = sessionIds(kind, key), ks = ids.map(kindOf), tag = kind + " " + key;
+          out.sessions++;
+          if (ids.some(id => !match.some(i => i.id === id))) out.bad.push(`${tag}: an item that isn't one of its verb tenses`);
+          if (ks.some((k, i) => i && k < ks[i - 1])) out.bad.push(`${tag}: not due, then started, then new: ${ks.join("")}`);
+          const due = ids.filter(id => kindOf(id) === 0), rest = ids.filter(id => kindOf(id) === 1), fresh = ids.filter(id => kindOf(id) === 2);
+          if (due.some((id, i) => i && rec(id).due < rec(due[i - 1]).due)) out.bad.push(`${tag}: the due ones not soonest first`);
+          if (rest.some((id, i) => i && rec(id).box < rec(rest[i - 1]).box)) out.bad.push(`${tag}: the started ones not least known first`);
+          const rank = (id) => content.items[id].rank * 10 + content.items[id].step;
+          if (fresh.some((id, i) => i && rank(id) < rank(fresh[i - 1]))) out.bad.push(`${tag}: the new ones not in the order of VERB_GYM`);
+          if (fresh.length > nNew) out.bad.push(`${tag}: ${fresh.length} new ones, more than a Verbs session's ${nNew}`);
+          const cap = progress.settings.verbTenseCap || 7;
+          if (fresh.some(id => !vgUnlocked(content.items[id]) || content.items[id].step > cap)) out.bad.push(`${tag}: a tense that hasn't opened`);
+          const opens = match.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap), started = match.filter(i => rec(i.id).box >= 1);
+          const want = Math.min(per, started.length + Math.min(nNew, opens.length));
+          if (ids.length !== want) out.bad.push(`${tag}: ${ids.length} items, expected ${want}`);
+          if (started.filter(i => isDue(i.id, t)).length > due.length && ids.length < per) out.bad.push(`${tag}: a due one left out`);
+          if (rest.length && due.length < Math.min(per, started.filter(i => isDue(i.id, t)).length)) out.bad.push(`${tag}: a started one before a due one`);
+          if (fresh.length && rest.length < Math.min(per - due.length, started.length - due.length)) out.bad.push(`${tag}: a new one before a started one`);
+          const q = buildSession(kind, key).queue;
+          if (q.length !== ids.length || q.some(x => !ids.includes(x.ex.item.id))) out.bad.push(`${tag}: its session's exercises aren't its items`);
+          if (!ids.length) out.empty.push(tag);
+          out.due += due.length; out.rest += rest.length; out.fresh += fresh.length; if (ids.length === per) out.full++;
+        }
+        // the screen: the chips' numbers, and disabled exactly where there is nothing to practise, with the reason
+        S.screen = "reference"; S.refUnit = "vb"; S.refFilter = ""; render();
+        const chips = [...document.querySelectorAll(".tchip")].map(b => ({ t: b.dataset.vfocus.split(":")[1], n: Number(b.querySelector(".tchip-n").textContent.replace(/\D/g, "")), off: b.disabled, why: b.getAttribute("aria-describedby") }));
+        out.chips = chips.length === 8 && chips.every(c => c.n === vb.filter(i => i.tense === c.t && rec(i.id).box >= 1).length && c.off === !sessionIds("vtense", c.t).length && (!c.off || (c.why && document.getElementById(c.why))));
+        out.offChips = chips.filter(c => c.off).length;
+        const fams = [...document.querySelectorAll('[data-vfocus^="vfam:"]')];
+        out.fams = fams.length === Object.keys(VERB_FAMILIES).length && fams.every(b => b.disabled === !sessionIds("vfam", b.dataset.vfocus.slice(5)).length);
+        return out;
+      });
+      check(`${who}: each focus session takes only its verb tenses, due first (soonest first), then the others started (least known first), then new ones that can open, in VERB_GYM order and within a Verbs session's new ones, up to a Verbs session's length (${r.sessions} focuses: ${r.due} due, ${r.rest} started, ${r.fresh} new)`, r.sessions > 70 && !r.bad.length && (seeded ? r.due > 0 && r.rest > 0 : r.fresh > 0), r.bad.slice(0, 6).join("\n"));
+      check(`${who}: no focus session opens a tense that hasn't opened, and its exercises are its items`, !r.bad.some(b => /hasn't opened|aren't its items/.test(b)));
+      check(`${who}: the tense chips show each tense's verbs started, and are disabled, with the reason, exactly where nothing can be practised (${r.offChips} of 8 disabled)`, r.chips && (seeded || r.offChips === 7), JSON.stringify(r.empty));
+      check(`${who}: Practise this family is under every family's heading, disabled exactly where nothing can be practised`, r.fams);
+      check(`${who}: no script errors`, !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 9. The ladder cap */
+    {
+      const { page, context } = await open(browser, origin, { seed: false });
+      section("9. The ladder cap: Open new tenses up to (from 9.31)");
+      // every verb's presente and passato prossimo learned, the first 30 verbs' imperfetto and futuro started and due
+      await page.evaluate(() => {
+        const T = Date.now(), put = (i, box, due) => { progress.items[pid(i.id)] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 6, lastRight: T - 864e5 }; };
+        for (const i of content.byUnit.vb) if (i.step <= 1) put(i, 5, T + 30 * 864e5);
+        VERB_GYM.slice(0, 30).forEach(v => { for (const t of ["imperfetto", "futuro"]) { const i = vgItem(v.it, t); if (i) put(i, 5, T - 1000); } });
+        saveProgress(); S.screen = "settings"; render();
+      });
+      await page.selectOption('select[data-set="verbTenseCap"]', "2");
+      const st = await page.evaluate(async () => { await Store.flush(); return { set: progress.settings.verbTenseCap, stored: (await Store.read("itapp.progress.v1")).settings.verbTenseCap, cloud: JSON.stringify(progressToDocs(progress)).includes('"verbTenseCap":2'), shown: document.querySelector('select[data-set="verbTenseCap"]').value }; });
+      check("Settings › Verbs › Open new tenses up to, chosen by tapping, is stored with the settings, in the cloud's documents too, and drawn as chosen", st.set === 2 && st.stored === 2 && st.cloud && st.shown === "2", JSON.stringify(st));
+      const r = await page.evaluate(() => {
+        const out = { bad: [], fresh: 0, reviews: 0 }, cap = 2, vb = content.byUnit.vb;
+        for (let k = 0; k < 30; k++) for (const [kind, key] of [["verbs"], ["vtense", "futuro"], ["vtense", "condizionale"], ["vfam", "irr"], ["vverb", VERB_GYM[k].it], ["vverb", VERB_GYM[100 + k].it]]) {
+          const s = buildSession(kind, key);
+          for (const q of s.queue) { const i = q.ex.item; if (rec(i.id).box === 0) { out.fresh++; if (i.step > cap) out.bad.push(`${kind} ${key || ""}: ${i.id}, a tense after the imperfetto, as new`); } else if (i.step > cap) out.reviews++; }
+        }
+        if (verbNewIds().some(id => content.items[id].step > cap)) out.bad.push("verbNewIds takes a tense after the imperfetto");
+        out.plainNew = vb.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap).length;
+        S.screen = "home"; render();
+        out.tile = (document.querySelector('.tile[data-start="verbs"]') || {}).textContent || "";
+        S.screen = "units"; S.unitSeg = "verbs"; render(); S.unitPick = "vb"; render();
+        out.card = (document.querySelector(".ucard") || {}).textContent || "";
+        S.screen = "reference"; S.refUnit = "vb"; S.refFilter = "andare"; render();
+        out.row = (document.querySelector('details.vref[data-verb="andare"] summary') || {}).textContent || "";
+        S.refFilter = ""; progress.settings.verbTenseCap = 7; progress.settingsUpdatedAt = now(); saveProgress();
+        out.after = verbNewIds().filter(id => content.items[id].tense === "imperfetto").length;
+        return out;
+      });
+      check(`with the cap at the imperfetto, no session (Verbs, a tense, a family, a verb) takes a newer tense as new (${r.fresh} new ones taken), while those already started still come up for review (${r.reviews})`, !r.bad.length && r.fresh > 0 && r.reviews > 0, r.bad.slice(0, 5).join("\n"));
+      check(`Today's Verbs tile, the Units card and the reference count new tenses within the cap (${r.plainNew} new)`, r.tile.includes(`${r.plainNew} new`) && r.card.includes(`${r.plainNew} new`) && /condizionale held back/.test(r.row) && !/ new/.test(r.row),JSON.stringify({ tile: r.tile, card: r.card, row: r.row }));
+      check("set back to All, the next tense opens again", r.after > 0);
+      check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 10. The Verbs part of the summary */
+    {
+      const { page, context } = await open(browser, origin, { seed: false });
+      section("10. The Verbs part of the summary (from 9.31)");
+      const r = await page.evaluate(() => {
+        const T = Date.now(), put = (id, box, due) => { progress.items[pid(id)] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 6, lastRight: T - 864e5 }; };
+        put(vgId("parlare", "presente"), 4, T - 1000);
+        for (const t of VG_TENSES) if (vgItem("guardare", t)) put(vgId("guardare", t), t === "congiuntivo_imperfetto" ? 4 : 5, t === "congiuntivo_imperfetto" ? T - 2000 : T + 30 * 864e5);
+        put(vgId("andare", "presente"), 2, T - 3000);
+        saveProgress();
+        startSession("verbs");
+        const want = [vgId("parlare", "presente"), vgId("guardare", "congiuntivo_imperfetto")];
+        for (const q of session.queue) if (want.includes(q.ex.item.id)) q.ex = makeExercise(q.ex.item, rec(q.ex.item.id), "production"); // a table: a typed answer, which moves a tense at box 4
+        render();
+        const out = { inSession: session.queue.filter(q => want.concat(vgId("andare", "presente")).includes(q.ex.item.id)).length, panelLink: false };
+        for (let n = 0; S.screen === "session" && n < 300; n++) {
+          const q = current();
+          if (!S.feedback) { finishAnswer(!(q.ex.item.it === "andare" && !q.repeat), "", ""); if (document.querySelector(".fb [data-vfocus], .fb [data-start]")) out.panelLink = true; }
+          continueSession();
+        }
+        render();
+        out.screen = S.screen;
+        out.news = (session.vgNews && { opened: session.vgNews.opened.map(i => i.id), learned: session.vgNews.learned, missed: session.vgNews.missed }) || null;
+        out.lines = [...document.querySelectorAll(".vnews")].map(e => e.textContent);
+        const b = document.querySelector('.vmiss [data-vfocus="vverb:andare"]');
+        out.missBtn = !!b && b.textContent === "Practise this verb" && /andare/.test(b.closest(".vmiss").textContent);
+        return out;
+      });
+      check("the session holds the three verb tenses set up", r.inSession === 3, JSON.stringify(r));
+      check("after it the summary says New tense open: parlare · passato prossimo", r.screen === "summary" && r.lines.includes("New tense open: parlare · passato prossimo") && r.news && r.news.opened.includes(vgIdOf("parlare", "passato_prossimo")), JSON.stringify(r.lines));
+      check("…and Every tense learned: guardare", r.lines.includes("Every tense learned: guardare") && r.news.learned.join() === "guardare", JSON.stringify(r.news));
+      check("…and lists andare under Verbs you missed, with Practise this verb", r.missBtn && r.news.missed.join() === "andare", JSON.stringify(r.news));
+      check("no answer panel in the session offers a way out to another session", !r.panelLink);
+      await page.click('.vmiss [data-vfocus="vverb:andare"]');
+      const s2 = await page.evaluate(() => ({ screen: S.screen, kind: session && session.kind, unit: session && session.unitId, only: session && session.queue.every(q => q.ex.item.it === "andare") }));
+      check("Practise this verb there starts a session of that verb", s2.screen === "session" && s2.kind === "vverb" && s2.unit === "andare" && s2.only, JSON.stringify(s2));
+      check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
     }
   } catch (e) {

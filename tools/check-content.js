@@ -61,7 +61,7 @@ const srcTags = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map(m => m[1]
 for (const s of srcTags) if (!/^https:\/\/cdnjs\.cloudflare\.com\//.test(s)) problem("Structure", `script loaded from outside cdnjs: ${s}`);
 
 /* ---------- 2. load the content (and a few of the app's own helpers) ---------- */
-const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, sectionTarget, getContent: () => content, ITEM_SECTIONS: typeof ITEM_SECTIONS === 'undefined' ? null : ITEM_SECTIONS, VERB_SENTENCES: typeof VERB_SENTENCES === 'undefined' ? null : VERB_SENTENCES, vsFind: typeof vsFind === 'undefined' ? null : vsFind";
+const exportsExpr = "BUILTIN_PACKS, LESSONS, VERB_GYM, VG_TENSES, ID_ALIASES, buildContent, normalize, parseCloze, translationsOf, sectionTarget, getContent: () => content, ITEM_SECTIONS: typeof ITEM_SECTIONS === 'undefined' ? null : ITEM_SECTIONS, VERB_SENTENCES: typeof VERB_SENTENCES === 'undefined' ? null : VERB_SENTENCES, vsFind: typeof vsFind === 'undefined' ? null : vsFind, regForms, regJoin";
 const appVersion = (code.match(/const APP_VERSION = "([^"]+)"/) || [])[1];
 let app;
 try { app = loadApp(exportsExpr, { html }); } // stops with a message if the boot section is missing
@@ -398,27 +398,14 @@ const strip = (f, pron) => pron ? String(f).replace(/^(?:(?:mi|ti|si|ci|vi|me|te
 // "andato/a" is one form with an agreement variant; "va'/vai" are two forms.
 const variants = f => String(f).split("/").filter((part, i) => i === 0 || !/^[aeio]$/.test(part));
 
-// Regular endings, by conjugation.
-const END = {
-  are: { presente: ["o", "i", "a", "iamo", "ate", "ano"], imperfetto: ["avo", "avi", "ava", "avamo", "avate", "avano"], futuro: ["erò", "erai", "erà", "eremo", "erete", "eranno"], condizionale: ["erei", "eresti", "erebbe", "eremmo", "ereste", "erebbero"] },
-  ere: { presente: ["o", "i", "e", "iamo", "ete", "ono"], imperfetto: ["evo", "evi", "eva", "evamo", "evate", "evano"], futuro: ["erò", "erai", "erà", "eremo", "erete", "eranno"], condizionale: ["erei", "eresti", "erebbe", "eremmo", "ereste", "erebbero"] },
-  ire: { presente: ["o", "i", "e", "iamo", "ite", "ono"], imperfetto: ["ivo", "ivi", "iva", "ivamo", "ivate", "ivano"], futuro: ["irò", "irai", "irà", "iremo", "irete", "iranno"], condizionale: ["irei", "iresti", "irebbe", "iremmo", "ireste", "irebbero"] },
-};
-END.isc = Object.assign({}, END.ire, { presente: ["isco", "isci", "isce", "iamo", "ite", "iscono"] });
-// Stem + ending with the -are spelling rules: -care/-gare keep the hard sound (cerchi),
-// -ciare/-giare drop the i before e or i (mangi, mangerò), and other -iare verbs drop it before
-// i unless it is stressed (studi, but invii), so both are accepted there.
-function join(stem, end, isAre) {
-  if (!isAre) return [stem + end];
-  if (/[cg]$/.test(stem) && /^[ei]/.test(end)) return [stem + "h" + end];
-  if (/[cg]i$/.test(stem) && /^[ei]/.test(end)) return [stem.slice(0, -1) + end];
-  if (/i$/.test(stem) && /^i/.test(end)) return end === "iamo" ? [stem.slice(0, -1) + end] : [stem.slice(0, -1) + end, stem + end];
-  return [stem + end];
-}
-function regular(inf, conj, tense) {
-  const e = END[conj] && END[conj][tense];
-  return e ? e.map(x => join(inf.slice(0, -3), x, conj === "are")) : null;
-}
+// The regular pattern: the app's own (from 9.31 one copy, regForms and regJoin in index.html, which also marks the forms that
+// break it in the Verbs tables): the -are, -ere and -ire endings on the infinitive's stem, with the -are spelling rules
+// (-care/-gare keep the hard sound, cerchi; -ciare/-giare drop the i before e or i, mangi, mangerò; other -iare verbs drop it
+// before i unless it is stressed, studi but invii, so both are accepted there) and -isc-. The checks below compare the four
+// tenses they always have; the subjunctives and the commands are checked by the rules further down, from the verb's forms.
+const join = app.regJoin;
+const REGULAR_CHECKED = new Set(["presente", "imperfetto", "futuro", "condizionale"]);
+const regular = (inf, conj, tense) => REGULAR_CHECKED.has(tense) ? app.regForms(inf, conj, tense) : null;
 const conjOfGroup = { "-are": "are", "-ere": "ere", "-ire": "ire", "-ire (-isc-)": "isc" };
 const conjOfFam = { are: "are", cg: "are", iare: "are", ere: "ere", erepp: "ere", ire: "ire", irepp: "ire", isc: "isc" };
 // Correct forms the regular pattern doesn't produce, checked by hand.

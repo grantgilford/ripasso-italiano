@@ -106,6 +106,20 @@
        progress couldn't be opened (IndexedDB unavailable after the move) and
        Progress saved by an older version (the old copy changed since the
        move). What the storage itself does is tools/test-storage.js's.
+   14. the Verbs section's new screens (from 9.31), in light and dark at 390 and
+       360 px and at 120% text, reached by tapping (Units › Verbs › Read lesson):
+       the reference's Practise a tense chips (eight, each with its number of
+       verbs started), Practise this family under each family's heading, and
+       Practise this verb in an opened row, each within the layout rules; a
+       chip starts a session of that tense, the back button then asks before
+       leaving, and the summary names the focus; the back arrow returns to
+       Units. An opened row's irregular forms are underlined, dotted, with the
+       legend under the first table that has them. The summary of a Verbs
+       session lists a verb missed under Verbs you missed, with Practise this
+       verb, which starts a session of it. Stats' Verbs: weak spots card (You › Stats), empty with its
+       button disabled and saying why, then with misses saved: the bars by
+       person and by tense, each with its label and number, the cells missed
+       most, and Practise my weak spots, which starts that session.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -224,6 +238,59 @@ async function layout(page, label, { zoomOnly } = {}) {
   check(`${label}: every control is at least 44 × 44 px`, !r.small.length, r.small.slice(0, 8).join("\n"));
 }
 
+/* The Verbs section's new screens (from 9.31): reached by tapping, in each layout, within the layout rules. */
+async function verbsScreens(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verbs, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-ref="vb"]'))) await tap(page, '.ulist [data-upick="vb"]'); await tap(page, '.ucard [data-ref="vb"]');
+    check(L("Units › Verbs › Read lesson opens the Verbs reference"), (await screen(page)) === "reference" && (await page.evaluate("S.refUnit")) === "vb");
+    const chips = await page.evaluate(() => [...document.querySelectorAll(".tchip")].map(b => ({ t: b.dataset.vfocus, text: b.textContent, off: b.disabled })));
+    check(L("Practise a tense has a chip for each of the eight tenses, each saying how many verbs have it started"), chips.length === 8 && chips.every(c => /^vtense:/.test(c.t) && /\d+ started$/.test(c.text)), JSON.stringify(chips));
+    check(L("Practise this family sits under every family's heading"), await page.evaluate(() => [...document.querySelectorAll('[data-vfocus^="vfam:"]')].length === Object.keys(VERB_FAMILIES).length && [...document.querySelectorAll('[data-vfocus^="vfam:"]')].every(b => b.closest("section.group").querySelector("h2"))));
+    await layout(page, L("the Verbs reference"), opts);
+    await tap(page, 'details.vref[data-verb="andare"] summary');
+    check(L("an opened row starts with Practise this verb"), await page.evaluate(() => { const b = document.querySelector('details.vref[data-verb="andare"] [data-vfocus="vverb:andare"]'); return !!b && b.offsetParent !== null && !b.disabled; }));
+    check(L("its irregular forms are underlined (dotted, in the accent colour), with the legend under the first table that has them"), await page.evaluate(() => {
+      const d = document.querySelector('details.vref[data-verb="andare"]'), u = d.querySelector("u.irr"), k = d.querySelector(".vkey"), accent = getComputedStyle(d.querySelector(".vgo button")).color; // a secondary button's text is the accent colour
+      return !!u && getComputedStyle(u).textDecorationStyle === "dotted" && getComputedStyle(u).textDecorationColor === accent && !!k && k.offsetParent !== null && /Underlined: breaks the pattern/.test(k.textContent) && !!k.previousElementSibling.querySelector("u.irr");
+    }));
+    await layout(page, L("the Verbs reference with a row open"), opts);
+    await tap(page, '[data-vfocus="vtense:presente"]');
+    check(L("a tense chip starts a session of that tense"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vtense" && session.unitId === "presente" && session.queue.every(q => q.ex.item.tense === "presente")));
+    await page.goBack(); await settle(page);
+    check(L("…in which the back button asks before leaving"), (await page.evaluate("S.leaveAsk")) && !!(await page.$("#sheetBg")));
+    await tap(page, '[data-act="stay"]');
+    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(n > 0 || current().repeat, "", ""); continueSession(); } render(); }); await settle(page); // the first one missed
+    check(L("its summary names the focus"), (await screen(page)) === "summary" && /^Focus: presente$/.test(await page.textContent(".sumfocus")));
+    check(L("…and lists the verb missed under Verbs you missed, with Practise this verb"), await page.evaluate(() => { const b = document.querySelector(".vmiss [data-vfocus]"); return !!b && b.offsetParent !== null && b.dataset.vfocus === "vverb:" + session.missed[0].item.it; }));
+    await layout(page, L("the summary of a focus session"), opts);
+    await tap(page, '.vmiss [data-vfocus]');
+    check(L("…which starts a session of that verb"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vverb"));
+    await page.evaluate(() => { session = null; S.screen = "home"; render(); }); await settle(page);
+    await page.evaluate(() => { S.screen = "reference"; S.refUnit = "vb"; render(); });
+    await tap(page, '.hdr .back[data-go="units"]');
+    check(L("the back arrow returns to Units"), (await screen(page)) === "units");
+    // Stats: Verbs: weak spots, empty and then with misses
+    await page.evaluate(() => { Store.remove("itapp.vgmiss.v1"); VG_MISS = null; });
+    await tap(page, '.tab[data-go="you"]'); await tap(page, '.statcard[data-go="stats"]');
+    check(L("Stats has Verbs: weak spots, saying none yet, with Practise my weak spots disabled and saying why"), await page.evaluate(() => { const c = document.querySelector(".weak"), b = document.querySelector('[data-start="vweak"]'); return !!c && /None yet/.test(c.textContent) && !!b && b.disabled && !!document.getElementById(b.getAttribute("aria-describedby")); }));
+    await page.evaluate(() => { const t = Date.now(); Store.set("itapp.vgmiss.v1", [["andare", 3, 4, 4, t], ["andare", 3, 1, 2, t], ["fare", 0, 0, 3, t], ["venire", 4, 5, 2, t], ["essere", 6, 2, 1, t], ["dire", 1, 3, 2, t], ["potere", 3, 0, 1, t], ["bere", 2, 4, 1, t], ["sapere", 0, 5, 2, t]]); VG_MISS = null; render(); });
+    await settle(page);
+    const wk = await page.evaluate(() => { const c = document.querySelector(".weak"), rows = [...c.querySelectorAll(".wkrow")]; return { rows: rows.length, labelled: rows.every(r => r.querySelector(".wk-l").textContent.trim() && /^\d+$/.test(r.querySelector(".wk-n").textContent)), top: c.querySelectorAll(".wk-top li").length, first: (c.querySelector(".wk-top li") || {}).textContent }; });
+    check(L("…and with misses: a bar for each person and each tense, each with its label and number, and the 8 cells missed most, most first"), wk.rows === 14 && wk.labelled && wk.top === 8 && /^voi · andare · futuro: andrete, missed 4 times$/.test(wk.first), JSON.stringify(wk));
+    await layout(page, L("Stats with Verbs: weak spots"), opts);
+    await tap(page, '[data-start="vweak"]');
+    check(L("Practise my weak spots starts that session"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vweak" && session.queue.every(q => vgWeakIds().includes(q.ex.item.id))));
+    await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 300; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } render(); }); await settle(page);
+    check(L("…and its summary names it"), /^Focus: your weak spots$/.test(await page.textContent(".sumfocus")));
+    await tap(page, '.sumbtns [data-go="home"]');
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verbs screens checked, ${label}`);
+  }
+}
+
 /* Storage (from 9.26): Your data's Storage card and Today's notices about where progress is kept, in each layout.
    What the storage does is tools/test-storage.js's; this is how it is shown. Each case is set up by a script run before
    the page's own: a device that had progress before 9.26 (so the first opening moves it), one with no IndexedDB, and
@@ -334,7 +401,7 @@ async function tour(page, label, opts = {}) {
   await layout(page, L("Stats"), opts);
   await tap(page, '.hdr .back[data-go="you"]');
   await tap(page, '.srow[data-go="settings"]:not([data-to])');
-  check(L("More settings opens Settings with all 13 options"), (await screen(page)) === "settings" && (await page.$$("select[data-set]")).length === 13);
+  check(L("More settings opens Settings with all 14 options"), (await screen(page)) === "settings" && (await page.$$("select[data-set]")).length === 14 && !!(await page.$('select[data-set="verbTenseCap"]'))); // from 9.31, Open new tenses up to
   await layout(page, L("Settings"), opts);
   await tap(page, '.hdr .back[data-go="you"]');
   await tap(page, '.srow[data-to="sec-flags"]');
@@ -1384,6 +1451,9 @@ async function readAloud(browser, origin) {
 
     /* Storage (from 9.26) */
     await storage(browser, origin);
+
+    /* The Verbs section's new screens (from 9.31) */
+    await verbsScreens(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

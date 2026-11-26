@@ -768,11 +768,33 @@ th { color: var(--muted); font-size: 13px; font-weight: 600; vertical-align: bot
 .conjtable span { display: inline-block; width: 4.5em; color: var(--muted); font-size: 14px; font-weight: 400; }
 .conjtable.subj span { width: 5.6em; white-space: nowrap; }
 .conjtable b { font-weight: 700; }
+u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 3px; } /* a form that breaks the regular pattern (from 9.31) */
+.vkey { margin: 4px 0 0; font-size: 13px; line-height: 1.4; color: var(--muted); }
 .vref { padding: 10px 16px; }
 .vref summary { min-height: 44px; padding: 4px 0; cursor: pointer; color: var(--fg); }
 .vref summary::marker { color: var(--muted); }
 .vref summary .it { font-size: 16.5px; font-weight: 600; }
 .vref .conjtable { margin-top: 2px; }
+.vref .vgo { margin: 6px 0 4px; }
+.group .vgo { margin: 0; }
+.tchips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; } /* Practise a tense (from 9.31) */
+.tchip { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-height: 52px; padding: 8px 14px; border-radius: 14px; background: var(--card); color: var(--fg); text-align: left; }
+.tchip-t { font-size: 15px; font-weight: 600; line-height: 1.25; }
+.tchip-n { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.vnews { padding: 12px 16px; font-size: 15px; line-height: 1.4; } /* the summary's Verbs part (from 9.31) */
+.vmiss { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; padding: 10px 16px; }
+.vmiss-t { min-width: 0; }
+.vmiss > button { flex: none; }
+.weak { display: flex; flex-direction: column; gap: 6px; } /* Verbs: weak spots on Stats (from 9.31) */
+.weak p { margin: 0; }
+.wk-h { margin: 8px 0 2px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.weak > .wk-h:first-child { margin-top: 0; }
+.wkbars { display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 6px 10px; }
+.wkrow { display: contents; }
+.wk-l { font-size: 14px; }
+.wk-n { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.wk-top { margin: 0; padding-left: 22px; font-size: 14.5px; line-height: 1.45; }
+.wk-top li + li { margin-top: 4px; }
 details > summary { cursor: pointer; }
 /* ---------- practice session ---------- */
 .sbar { display: flex; align-items: center; gap: 12px; }
@@ -18266,6 +18288,9 @@ const VERB_PACK = (() => {
 })();
 const isVerbUnit = (unitId) => !!(content && content.unitById[unitId] && content.unitById[unitId].mode === "verbs");
 const isSideUnit = (unitId) => { const u = content && content.unitById[unitId]; return !!(u && (u.mode === "flashcards" || u.mode === "verbs")); };
+// Grammar units, and from 9.31 the Verbs section: their sessions are balanced (planSession), each item's last kind of exercise is
+// remembered on the device (itapp.lasttype.v1) and an item missed often is introduced again (isTricky); a vocab pack's are not.
+const isBalancedUnit = (unitId) => !isSideUnit(unitId) || isVerbUnit(unitId);
 
 /* Unit u18: Colloquial Italian & slang (v4.3). */
 const SLANG_PACK = {
@@ -19096,7 +19121,7 @@ function idleJob(steps, done) {
 }
 
 function defaultProgress() {
-  return { v: 2, items: {}, days: {}, flags: {}, currentUnit: null, settings: { accents: "lenient", typos: true, goal: 30, newPerDay: 10, flipDir: "both", explain: "wrong", cardsPerSession: 25, newCardsPerSession: 15, fcDir: "it-en", lessonLength: 12, verbsPerSession: 12, verbNewPerSession: 3, verbUnlockBox: 5 }, settingsUpdatedAt: 0, updatedAt: 0 };
+  return { v: 2, items: {}, days: {}, flags: {}, currentUnit: null, settings: { accents: "lenient", typos: true, goal: 30, newPerDay: 10, flipDir: "both", explain: "wrong", cardsPerSession: 25, newCardsPerSession: 15, fcDir: "it-en", lessonLength: 12, verbsPerSession: 12, verbNewPerSession: 3, verbUnlockBox: 5, verbTenseCap: 7 }, settingsUpdatedAt: 0, updatedAt: 0 };
 }
 let progress = defaultProgress();
 let packs = {};      // imported packs by pack id
@@ -19466,7 +19491,7 @@ function countPlan() { // kept while the content is the same (buildContent drops
     if (it.unit === "vb") { // as vgUnlocked: the nearest earlier tense the verb has
       let before = null;
       for (let k = it.step - 1; k >= 0; k--) if (content.items[vgId(it.it, VG_TENSES[k])]) { before = pid(vgId(it.it, VG_TENSES[k])); break; }
-      verbs.push({ p, verb: it.it, before });
+      verbs.push({ p, verb: it.it, before, tense: it.tense, fam: it.fam, step: it.step });
     }
     every.add(p);
   }
@@ -19493,9 +19518,15 @@ function counts() {
   }
   let course = 0, courseLearned = 0;
   plan.course.ids.forEach((p, k) => { course += plan.course.n[k]; if ((recs[p] || none).box >= 5) courseLearned += plan.course.n[k]; });
-  const unlockBox = progress.settings.verbUnlockBox || 5, verbsStarted = new Set();
+  const unlockBox = progress.settings.verbUnlockBox || 5, cap = vgCap(), verbsStarted = new Set();
   let verbsNew = 0;
-  for (const v of plan.verbs) { const b = (recs[v.p] || none).box; if (b >= 1) verbsStarted.add(v.verb); if (b === 0 && (!v.before || (recs[v.before] || none).box >= unlockBox)) verbsNew++; }
+  const byTense = {}, byFam = {}; // for the focus sessions (from 9.31): per tense and per family, the verb tenses started and those that can open now
+  const tally = (o, k, b, open) => { const c = o[k] || (o[k] = { started: 0, open: 0 }); if (b >= 1) c.started++; if (open) c.open++; };
+  for (const v of plan.verbs) {
+    const b = (recs[v.p] || none).box, open = b === 0 && v.step <= cap && (!v.before || (recs[v.before] || none).box >= unlockBox); // within the ladder cap (from 9.31)
+    if (b >= 1) verbsStarted.add(v.verb); if (open) verbsNew++;
+    tally(byTense, v.tense, b, open); tally(byFam, v.fam, b, open);
+  }
   const vb = unit.vb || { learned: 0, total: 0, due: 0 }, flash = flashUnits().map(u => unit[u.id] || { due: 0, fresh: 0 });
   let learned = 0, started = 0, dueToday = 0, dueWeek = 0, mistakes = 0, anyLapses = false;
   const lapsed = [], tricky = [];
@@ -19522,7 +19553,7 @@ function counts() {
   falls(plan.review, "grammar"); flashUnits().forEach(u => falls((plan.units[u.id] || { ids: [] }).ids, "cards")); falls((plan.units.vb || { ids: [] }).ids, "verbs");
   return COUNTS = { progress, content, day, until, unit, due: plan.review.filter(p => isDueNow(recs[p] || none)).length, mistakes,
     coursePct: course ? Math.round(100 * courseLearned / course) : 0,
-    verbs: { verbs: verbsStarted.size, totalVerbs: VERB_GYM.length, learned: vb.learned, total: vb.total, due: vb.due, fresh: verbsNew },
+    verbs: { verbs: verbsStarted.size, totalVerbs: VERB_GYM.length, learned: vb.learned, total: vb.total, due: vb.due, fresh: verbsNew, byTense, byFam },
     flashDue: flash.reduce((n, c) => n + c.due, 0), flashNew: (flash.find(c => c.fresh) || { fresh: 0 }).fresh,
     learned, started, dueToday, dueWeek, items: plan.items, lapsed: lapsed.sort((a, b) => b[1] - a[1]).slice(0, 10), anyLapses,
     tricky: tricky.sort((a, b) => b[1] - a[1] || a[2] - b[2]).slice(0, 15), forecast };
@@ -19849,7 +19880,8 @@ function conjWrap(table, forms, tense) {
 }
 function conjRead(b) {
   const t = b.previousElementSibling; if (!t) return "";
-  return [...t.children].map(r => { const p = r.querySelector("span"), f = r.textContent.slice(p ? p.textContent.length : 0).trim(); return !f || f === "—" || f === "-" ? "" : b.dataset.conj === "bare" || !p ? f : p.textContent.trim() + " " + f; }).filter(Boolean).join("\n");
+  const said = (el) => [...el.childNodes].map(n => n.nodeType === 3 ? n.nodeValue : n.classList && n.classList.contains("vh") ? "" : said(n)).join(""); // not the words only a screen reader hears, such as "(irregular)"
+  return [...t.children].map(r => { const p = r.querySelector("span"), f = said(r).slice(p ? p.textContent.length : 0).trim(); return !f || f === "—" || f === "-" ? "" : b.dataset.conj === "bare" || !p ? f : p.textContent.trim() + " " + f; }).filter(Boolean).join("\n");
 }
 function itemLabel(it) {
   if (it.type === "grammar_mc") return it.prompt;
@@ -19861,6 +19893,7 @@ function itemLabel(it) {
   if (it.type === "spot") return spotAnswer(it);
   if (it.type === "reply") return it.line + " → " + arr(it.answer)[0];
   if (it.type === "endings") return endingsFull(it);
+  if (it.type === "vtense") return it.it + " · " + TENSE_LABEL[it.tense]; // a verb tense, not the verb (from 9.31: Stats lists tricky ones)
   return arr(it.it)[0];
 }
 /* The digits a clock item accepts. A 24-hour reading (le diciannove) or one with mezzogiorno / mezzanotte has one answer;
@@ -19908,7 +19941,7 @@ function makeExercise(item, r, force, opt) { // opt.noListen: never a listening 
     return ex;
   }
   switch (item.type) {
-    case "vtense": return verbGymExercise(ex, item, r, force);
+    case "vtense": return verbGymExercise(ex, item, r, force, opt);
     case "vocab": {
       const it = arr(item.it)[0], en = arr(item.en)[0];
       const isNoun = item.pos === "noun" && item.art;
@@ -20832,9 +20865,94 @@ function explainFor(ex, fb) {
   return out;
 }
 
+/* ---------- the regular pattern (from 9.31) ----------
+   What the -are, -ere and -ire endings give on an infinitive's stem, with the spelling rules that count as regular: -care and
+   -gare keep the hard sound (cerchi, pagherò), -ciare and -giare drop the i before e or i (mangi, mangerò), other -iare verbs
+   drop it before i unless it is stressed (studi, but invii, so both are accepted there), and -isc- verbs put -isc- in the
+   singular and loro of the presente, the congiuntivo presente and the commands. The one copy: tools/check-content.js loads it
+   to check the regular families, and the Verbs tables mark each form it doesn't give (vgIrregular). */
+const REG_END = {
+  are: { presente: ["o", "i", "a", "iamo", "ate", "ano"], imperfetto: ["avo", "avi", "ava", "avamo", "avate", "avano"], futuro: ["erò", "erai", "erà", "eremo", "erete", "eranno"], condizionale: ["erei", "eresti", "erebbe", "eremmo", "ereste", "erebbero"],
+    congiuntivo_presente: ["i", "i", "i", "iamo", "iate", "ino"], congiuntivo_imperfetto: ["assi", "assi", "asse", "assimo", "aste", "assero"], imperativo: [null, "a", "i", "iamo", "ate", "ino"] },
+  ere: { presente: ["o", "i", "e", "iamo", "ete", "ono"], imperfetto: ["evo", "evi", "eva", "evamo", "evate", "evano"], futuro: ["erò", "erai", "erà", "eremo", "erete", "eranno"], condizionale: ["erei", "eresti", "erebbe", "eremmo", "ereste", "erebbero"],
+    congiuntivo_presente: ["a", "a", "a", "iamo", "iate", "ano"], congiuntivo_imperfetto: ["essi", "essi", "esse", "essimo", "este", "essero"], imperativo: [null, "i", "a", "iamo", "ete", "ano"] },
+  ire: { presente: ["o", "i", "e", "iamo", "ite", "ono"], imperfetto: ["ivo", "ivi", "iva", "ivamo", "ivate", "ivano"], futuro: ["irò", "irai", "irà", "iremo", "irete", "iranno"], condizionale: ["irei", "iresti", "irebbe", "iremmo", "ireste", "irebbero"],
+    congiuntivo_presente: ["a", "a", "a", "iamo", "iate", "ano"], congiuntivo_imperfetto: ["issi", "issi", "isse", "issimo", "iste", "issero"], imperativo: [null, "i", "a", "iamo", "ite", "ano"] },
+};
+REG_END.isc = Object.assign({}, REG_END.ire, { presente: ["isco", "isci", "isce", "iamo", "ite", "iscono"], congiuntivo_presente: ["isca", "isca", "isca", "iamo", "iate", "iscano"], imperativo: [null, "isci", "isca", "iamo", "ite", "iscano"] });
+const REG_PP = { are: "ato", ere: "uto", ire: "ito", isc: "ito" }; // the regular participle
+function regJoin(stem, end, isAre) { // stem + ending, with the -are spelling rules: every spelling the rules allow
+  if (!isAre) return [stem + end];
+  if (/[cg]$/.test(stem) && /^[ei]/.test(end)) return [stem + "h" + end];
+  if (/[cg]i$/.test(stem) && /^[ei]/.test(end)) return [stem.slice(0, -1) + end];
+  if (/i$/.test(stem) && /^i/.test(end)) return end === "iamo" ? [stem.slice(0, -1) + end] : [stem.slice(0, -1) + end, stem + end];
+  return [stem + end];
+}
+function regForms(inf, conj, tense) { // the regular forms of a tense, per person (each a list of spellings; null for the imperativo's io), or null
+  const e = REG_END[conj] && REG_END[conj][tense];
+  return e ? e.map(x => x == null ? null : regJoin(inf.slice(0, -3), x, conj === "are")) : null;
+}
+/* Which forms of a verb the regular pattern doesn't give (from 9.31), for the dotted underline in its tables: { throughout,
+   marks: { tense: Set of persons } } (for the passato prossimo, the persons whose participle breaks the pattern: every one or
+   none, as the auxiliary is never marked). Worked out once per verb, when its first table is drawn.
+   - The pattern is regForms on the infinitive's stem, with its spelling rules and -isc- (for a verb whose io form takes it);
+     the participle's is -ato, -uto or -ito; a reflexive verb is judged without its pronouns (alzati as alza).
+   - -porre, -durre and -trarre verbs are judged on their longer old infinitive (proponere, producere, distraere), as their
+     family's note teaches (propongo, proponevo): on the short one every form would be marked.
+   - essere, avere and the verbs with built-in pronouns (andarsene, farcela, metterci) are irregular throughout: the table
+     says so once, under it, rather than underlining every form; so is any other verb whose marks would cover nine forms in
+     ten or more (fare, rifare, bere), where underlining would say no more than that. */
+const VG_THROUGHOUT = new Set(["aux", "pron"]);
+const VG_LONG_STEM = [[/porre$/, "ponere"], [/durre$/, "ducere"], [/trarre$/, "traere"]];
+const VG_IRR = new Map();
+function vgIrregular(verb) {
+  if (VG_IRR.has(verb)) return VG_IRR.get(verb);
+  const v = VERB_GYM.find(x => x.it === verb);
+  let out = null;
+  if (v && VG_THROUGHOUT.has(v.fam)) out = { throughout: true, marks: {} };
+  else if (v) {
+    const refl = /(ar|er|ir)si$/.test(v.it);
+    let base = refl ? v.it.replace(/(ar|er|ir)si$/, "$1e") : v.it;
+    for (const [re, long] of VG_LONG_STEM) if (re.test(base)) { base = base.replace(re, long); break; }
+    const bare = (f, t, p) => { // the form without its reflexive pronoun: mi alzo → alzo; alzati → alza, si alzi → alzi
+      let x = String(f).trim();
+      if (!refl) return x;
+      if (t === "imperativo" && p !== 2 && p !== 5) return x.replace(/(ti|ci|vi)$/, "");
+      return x.replace(/^(mi|ti|si|ci|vi) /, "");
+    };
+    const spell = (f) => String(f).split("/").filter((part, i) => i === 0 || !/^[aeio]$/.test(part)); // va'/vai: two forms; andato/a: one
+    const conj = /are$/.test(base) ? "are" : /ere$/.test(base) ? "ere" : /ire$/.test(base) ? (/isco$/.test(bare(v.f[0][0], "presente", 0)) ? "isc" : "ire") : null;
+    const marks = {};
+    if (conj) VG_TENSES.forEach((t, k) => {
+      const forms = v.f[k]; if (!forms) return;
+      const set = new Set();
+      if (t === "passato_prossimo") { if (!regJoin(base.slice(0, -3), REG_PP[conj], conj === "are").includes(v.pp)) forms.forEach((f, p) => { if (f !== "—") set.add(p); }); }
+      else { const reg = regForms(base, conj, t); if (reg) forms.forEach((f, p) => { if (f !== "—" && reg[p] && !spell(f).some(x => reg[p].includes(bare(x, t, p)))) set.add(p); }); }
+      if (set.size) marks[t] = set;
+    });
+    const all = v.f.filter(Boolean).flat().filter(f => f !== "—").length, n = Object.values(marks).reduce((k, x) => k + x.size, 0);
+    out = n >= 0.9 * all ? { throughout: true, marks: {} } : { throughout: false, marks };
+  }
+  VG_IRR.set(verb, out);
+  return out;
+}
+// Under a table: the legend where it has marks ("Underlined: breaks the pattern"), or, for a verb irregular throughout, a caption
+// saying so; "" otherwise.
+function vgKeyHtml(verb, tense) {
+  const r = vgIrregular(verb);
+  if (!r) return "";
+  if (r.throughout) return `<p class="vkey">${esc(verb)} is irregular throughout, so its forms aren't underlined one by one.</p>`;
+  return r.marks[tense] ? `<p class="vkey"><u class="irr">Underlined</u>: breaks the pattern.</p>` : "";
+}
 /* ---------- verb section ---------- */
 const vgId = (verb, tense) => "vg-" + verb + "-" + tense;
 function vgVerb(item) { return { it: item.it, en: item.en, group: item.group, forms: item.allForms, note: item.note }; }
+/* The ladder cap (from 9.31): Settings › Verbs › "Open new tenses up to", the last tense of the ladder that may open as new, by
+   its place (1 passato prossimo … 6 congiuntivo presente; 7, the default: all). A tense after it never comes up as new, in any
+   session, and isn't counted as new on Today, Units or the reference; one already started keeps its reviews. A setting like
+   the others, so it syncs. */
+const vgCap = () => { const c = progress.settings.verbTenseCap; return Number.isInteger(c) && c >= 1 && c <= 7 ? c : 7; };
+const vgWithinCap = (item) => item.step <= vgCap();
 function vgUnlocked(item) { // the verb's previous tense (skipping one it doesn't have) is learned
   for (let k = item.step - 1; k >= 0; k--) if (content.items[vgId(item.it, VG_TENSES[k])]) return rec(vgId(item.it, VG_TENSES[k])).box >= (progress.settings.verbUnlockBox || 5);
   return true;
@@ -20843,7 +20961,7 @@ function vgUnlocked(item) { // the verb's previous tense (skipping one it doesn'
 const vgPerson = (tense, p) => tense === "imperativo" ? ["io", "tu", "Lei", "noi", "voi", "Loro"][p] : /^congiuntivo/.test(tense) ? "che " + PERSONS[p] : PERSONS[p];
 const vgPersons = (item, tense) => { const f = tense ? item.allForms[tense] : item.forms; return f ? [0, 1, 2, 3, 4, 5].filter(p => f[p] && f[p] !== "—") : []; };
 function verbNewIds() {
-  const fresh = (content.byUnit.vb || []).filter(i => rec(i.id).box === 0 && vgUnlocked(i));
+  const fresh = (content.byUnit.vb || []).filter(i => rec(i.id).box === 0 && vgUnlocked(i) && vgWithinCap(i));
   const up = fresh.filter(i => i.step > 0).sort((a, b) => a.rank - b.rank || a.step - b.step);
   const nu = fresh.filter(i => i.step === 0).sort((a, b) => a.rank - b.rank);
   const out = [];
@@ -20854,19 +20972,26 @@ function vgAcc(item, p) { // the shown form plus any second accepted form (preve
   const a = item.alts && item.alts[p];
   return vgAccepted(item.forms[p], p, item.tense).concat(a ? vgAccepted(a, p, item.tense) : []);
 }
+const VG_ACCN = new WeakMap(); // vgAcc normalised, per item and person: the content alone decides it
+function vgAccN(item, p) { let m = VG_ACCN.get(item); if (!m) VG_ACCN.set(item, m = []); return m[p] || (m[p] = vgAcc(item, p).map(normalize)); }
 function vgAccepted(form, p, tense) { // the form, with its subject pronoun, and after che for the subjunctive; commands take no pronoun
   const vars = formVariants(form);
   if (tense === "imperativo") return vars;
   const all = vars.concat(PRON_PREFIX[p].flatMap(pr => vars.map(v => pr + " " + v)));
   return /^congiuntivo/.test(tense || "") ? all.concat(all.map(v => "che " + v)) : all;
 }
-function vgTableHtml(item, tense, marks) { // marks: {p: true} bolded
-  const forms = item.allForms[tense];
-  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + esc(f) + "</b>" : esc(f)}</div>`).join("") + `</div>`, forms, tense);
+function vgTableHtml(item, tense, marks) { // marks: {p: true} bolded; a form the regular pattern doesn't give is underlined (from 9.31)
+  const forms = item.allForms[tense], irr = vgIrregular(item.it), odd = irr && irr.marks[tense];
+  const u = (t) => `<u class="irr">${esc(t)}<span class="vh"> (irregular)</span></u>`;
+  const cell = (f, i) => !odd || !odd.has(i) ? esc(f) : tense === "passato_prossimo" ? f.replace(/^(.*\s)?(\S+)$/, (m, a, b) => esc(a || "") + u(b)) : u(f); // the passato prossimo: only its participle
+  return conjWrap(`<div class="conjtable${/^congiuntivo/.test(tense) ? " subj" : ""}">` + forms.map((f, i) => `<div><span>${esc(vgPerson(tense, i))}</span>${marks && marks[i] ? "<b>" + cell(f, i) + "</b>" : cell(f, i)}</div>`).join("") + `</div>`, forms, tense);
 }
+const VG_FORMS = new WeakMap(); // per verb (its allForms): each form's variants, normalised, in ladder order: [[tense, person, [variants]], …]
 function vgFormsElsewhere(item, form, exceptTense, exceptP) { // does this form also occur in another ladder tense / person?
+  let all = VG_FORMS.get(item.allForms);
+  if (!all) { all = []; for (const t of VG_TENSES) if (item.allForms[t]) item.allForms[t].forEach((f, p) => { if (f !== "—") all.push([t, p, formVariants(f).map(normalize)]); }); VG_FORMS.set(item.allForms, all); }
   const n = formVariants(form).map(normalize), hits = [];
-  for (const t of VG_TENSES) if (item.allForms[t]) item.allForms[t].forEach((f, p) => { if (f === "—") return; if ((t !== exceptTense || (exceptP != null && p !== exceptP)) && formVariants(f).some(x => n.includes(normalize(x)))) hits.push([t, p]); });
+  for (const [t, p, vs] of all) if ((t !== exceptTense || (exceptP != null && p !== exceptP)) && vs.some(x => n.includes(x))) hits.push([t, p]);
   return hits;
 }
 /* Indexes over the Verbs section, built once: which verbs share an English gloss, and which verbs a form belongs to. */
@@ -20893,8 +21018,17 @@ function vgMeaningAnswers(item, p) {
   for (const v of near) { const it2 = vgItem(v, item.tense); if (it2) alts.push({ forms: vgAcc(it2, p), word: v }); }
   return { accepted: vgAcc(item, p).concat(accepted.filter(a => !vgAcc(item, p).includes(a))), alts, others: same.filter(v => v !== item.it) };
 }
-// What the regular pattern (or the stem's spelling, kept as it is) would give: the classic wrong forms.
+// What the regular pattern (or the stem's spelling, kept as it is) would give: the classic wrong forms. The content alone
+// decides them, so each item's are worked out once per person (from 9.31, as Pick the form's options are now found before
+// the drill is drawn); a copy of the list is handed out.
+const VG_WRONG = new WeakMap();
 function vgWrongForms(item, p) {
+  let m = VG_WRONG.get(item);
+  if (!m) VG_WRONG.set(item, m = []);
+  if (!m[p]) m[p] = vgWrongFormsOf(item, p);
+  return m[p].slice();
+}
+function vgWrongFormsOf(item, p) {
   const out = [], t = item.tense, inf = item.it;
   const real = new Set(VG_TENSES.flatMap(x => item.allForms[x] || []).filter(f => f && f !== "—").flatMap(formVariants).map(normalize).concat(vgAcc(item, p).map(normalize)));
   const add = (f, why) => { if (f && !real.has(normalize(f)) && !vgOwners(f).size && !out.some(o => normalize(o.form) === normalize(f))) out.push({ form: f, why }); };
@@ -20984,9 +21118,11 @@ function vgPickOptions(item, p, vi, avoid, right) {
   const tl = TENSE_LABEL[item.tense], pl = (q) => vgPerson(item.tense, q), P = vgPersons(item);
   const asVar = (f) => { if (vi == null || !f) return f; const v = formVariants(f); return v[Math.min(vi, v.length - 1)]; };
   right = right || item.forms[p];
-  const acc = vgAcc(item, p).concat(arr(avoid).flatMap(t => item.allForms[t] && item.allForms[t][p] && item.allForms[t][p] !== "—" ? formVariants(item.allForms[t][p]) : [])).map(normalize);
+  const acc = new Set(vgAccN(item, p)); // each form normalised once (from 9.31: Pick the form's options are found before every draw)
+  for (const t of arr(avoid)) if (item.allForms[t] && item.allForms[t][p] && item.allForms[t][p] !== "—") formVariants(item.allForms[t][p]).forEach(f => acc.add(normalize(f)));
+  acc.add(normalize(right));
   const opts = [], notes = {};
-  const take = (f0, why) => { const f = asVar(f0); if (opts.length < 3 && f && !acc.includes(normalize(f)) && normalize(f) !== normalize(right) && !opts.some(o => normalize(o) === normalize(f))) { opts.push(f); notes[f] = why; } };
+  const take = (f0, why) => { if (opts.length >= 3) return; const f = asVar(f0); if (!f) return; const n = normalize(f); if (!acc.has(n)) { acc.add(n); opts.push(f); notes[f] = why; } };
   const wrong = vgWrongForms(item, p); if (wrong.length) take(wrong[0].form, wrong[0].why);
   const near = { futuro: "condizionale", condizionale: "futuro", passato_prossimo: "presente", imperfetto: "presente", presente: "imperfetto", imperativo: "presente", congiuntivo_presente: "presente", congiuntivo_imperfetto: "condizionale" }[item.tense];
   const nf = item.allForms[near] && item.allForms[near][p];
@@ -21013,7 +21149,7 @@ function vgCtxExercise(ex, item, s, box) {
     promptHtml: `<div class="vsl">${vsText(s, true)}</div><div class="hint sans">${esc(item.it)} · ${esc(vgPerson(item.tense, p))} · ${esc(tl)}</div><div class="hint sans">${esc(s.en)}</div>` };
   if (box <= 1) {
     const { opts, notes } = vgPickOptions(item, p, s.vi, s.also, s.variant);
-    const keep = opts.filter(o => !accepted.map(normalize).includes(normalize(o)));
+    const accN = new Set(accepted.map(normalize)), keep = opts.filter(o => !accN.has(normalize(o)));
     if (keep.length < 2) return false;
     Object.assign(ex, base, { kind: "recognition", mode: "options", optionNotes: notes, options: shuffle([s.variant].concat(keep)), correct: s.variant });
   } else Object.assign(ex, base, { kind: "production", mode: "typed", typos: false, accepted });
@@ -21059,7 +21195,36 @@ function vgFitExercise(ex, item, s, box) {
   else Object.assign(ex, { kind: "production", mode: "typed", typos: false, accepted: accepted.concat(alsoAcc.flatMap(a => a.forms)), mainAcc: accepted, alsoAcc });
   return true;
 }
-function verbGymExercise(ex, item, r, force) {
+/* What each drill can use for a verb-tense item, worked out once per item (the content alone decides it, so a new content
+   build makes new items and drops these): its persons, the persons whose form names the verb alone (Which verb?, the
+   tricky ones first: a stem that doesn't look like the infinitive's), whose form belongs to this tense alone (Which
+   tense?) and whose form no other person shares (Which person?). */
+const VG_DRILL = new WeakMap();
+function vgDrillPlan(item) {
+  let d = VG_DRILL.get(item);
+  if (d) return d;
+  const P = vgPersons(item), stem = item.it.replace(/(ar|er|ir|rr)(si|ci|ne|la|sene|cela)$|(are|ere|ire|rre)$/, "");
+  const inf = P.filter(p => { const o = vgOwners(item.forms[p]); return o.size === 1 && o.has(item.it); });
+  d = { P, inf, infTricky: inf.filter(p => !normalize(item.forms[p]).replace(/^(mi|ti|si|ci|vi|me|te|se|ce|ve) (ne |la |l'|n')?/, "").startsWith(normalize(stem))),
+    tenseid: P.filter(p => !vgFormsElsewhere(item, item.forms[p], item.tense, null).length),
+    person: P.filter(p => !item.forms.some((f, q) => q !== p && normalize(f) === normalize(item.forms[p]))) };
+  VG_DRILL.set(item, d);
+  return d;
+}
+const vgTry = (ex, fill) => { const t = Object.assign({}, ex); return fill(t) ? t : null; }; // a drill built on a copy: the copy, or null if it can't be built
+/* A verb-tense item's exercise. New (box 0): the New verb or New tense card. A follow-up: the whole table; a repeat after a
+   table with mistakes: the forms missed (force.persons). Otherwise one of the drills, by the chances below (from 9.31 a
+   pickKey table, so a session's hint, opt.avoid and opt.prefer, can steer it kind for kind, typed or not, as it steers a
+   grammar item). The chances are those of 9.20–9.30: at box 1 the full table 58%, Pick the form 16%, Verb form 12%, Which
+   tense? 8%, essere or avere? 6%, with Verb in a sentence taking 15% from the table's share where the tense has a sentence;
+   from box 2 the table 30%, Verb form 17%, From English 12%, Change the tense 12%, Which tense? 10%, Which verb? 8%,
+   essere or avere? 6%, Which person? 5%, with Verb in a sentence and Which tense fits? (box 3 and up) taking 12% each from
+   the others in proportion. A drill that can't be built for this item (no second tense started, a form other tenses share,
+   not the passato prossimo…) is never chosen: its chance goes where it always went, to Verb form (Which tense fits?'s to
+   the others in proportion, Verb in a sentence's at box 1 to the table), so the mix is as before. Whatever needs a random
+   choice to know whether it can be built (the person for Pick the form, the tense to change from, the sentence) is chosen
+   before the draw. */
+function verbGymExercise(ex, item, r, force, opt) {
   const box = r.box, tl = TENSE_LABEL[item.tense], fam = VERB_FAMILIES[item.fam] || ["", ""];
   const head = `${esc(item.it)} <span class="hint">· ${esc(tl)}</span>`;
   if (box === 0 && !force) {
@@ -21070,112 +21235,89 @@ function verbGymExercise(ex, item, r, force) {
         + (item.note && (item.step === 0 || item.tense === "passato_prossimo" || /futur|stem|particip|essere|avere/i.test(item.note)) ? `<p>${esc(item.note)}</p>` : "")
         + `<h3>${esc(tl.charAt(0).toUpperCase() + tl.slice(1))}</h3><p class="muted small">${esc(TENSE_USE[item.tense])}</p>`
         + (item.tense === "passato_prossimo" ? `<p class="small">Auxiliary: <b>${item.aux === "e" ? "essere" : "avere"}</b>${item.aux === "e" ? ", so the participle agrees with the subject (-o/-a, -i/-e)" : ", so the participle never changes"}.</p>` : "")
-        + vgTableHtml(item, item.tense)
+        + vgTableHtml(item, item.tense) + vgKeyHtml(item.it, item.tense)
         + (vs0 ? vsHtml(vs0, "vs-in") : "") // the tense in a sentence (from 9.20)
         + `<p class="muted small" style="margin-top:10px">${ex0}</p>`,
       shownAnswer: item.forms.join(", ") });
     return ex;
   }
-  const persons = force && force.persons;
-  const table = () => {
-    const cells = persons && persons.length ? persons.slice() : vgPersons(item);
-    Object.assign(ex, { type: persons ? "Verb table · the forms you missed" : "Verb table", typeKey: "vtable", kind: "production", mode: "table", cells, say: item.it,
+  const persons = force && force.persons, plan = vgDrillPlan(item), P = plan.P, pl = (p) => vgPerson(item.tense, p);
+  const said = (p) => item.tense === "imperativo" ? item.forms[p] : pl(p) + " " + item.forms[p]; // the answer read aloud: commands bare, other forms with their person
+  // a drill on one form asks for a person missed in this tense (itapp.vgmiss.v1) about half the time, and in Practise my weak
+  // spots (opt.persons) always, where it can; a table there asks only those persons (from 9.31)
+  const weak = opt && opt.persons && opt.persons.filter(p => P.includes(p)), missed = weak && weak.length ? weak : vgMissedPersons(item);
+  const choose = (list) => { const w = list.filter(p => missed.includes(p)); return w.length && (weak && weak.length || Math.random() < 0.5) ? pick(w) : pick(list); };
+  const chooseS = (list) => { const w = list.filter(x => missed.includes(x.p)); return w.length && (weak && weak.length || Math.random() < 0.5) ? pick(w) : pick(list); }; // a sentence, by its person
+  const table = (cells, label) => {
+    Object.assign(ex, { type: label || "Verb table", typeKey: "vtable", kind: "production", mode: "table", cells: cells && cells.length ? cells.slice() : P.slice(), say: item.it,
       promptHtml: head + `<div class="hint sans">${esc(arr(item.en)[0])}</div>`,
       accepted: item.forms.map((f, p) => vgAcc(item, p)), shownAnswer: item.forms.join(", "), answerInContext: item.it + ", " + tl + ": " + item.forms.join(", ") });
     return ex;
   };
-  if (persons || force === "production") return table();
+  if (persons || force === "production") return table(persons || (weak && weak.length ? weak : null), persons ? "Verb table · the forms you missed" : weak && weak.length ? "Verb table · your weak spots" : null);
   const started = VG_TENSES.filter(t => t === item.tense || rec(vgId(item.it, t)).box >= 1);
-  // From 9.20, where the tense has a sentence: Verb in a sentence takes 15% at box 1 (from the full table's share), and at box 2
-  // and up Verb in a sentence and Which tense fits? (box 3 and up) take 12% each, from the others in proportion; when neither
-  // can be built, the choice is drawn again as before.
-  const sents = verbSentences(item), r0 = Math.random();
-  const draw = (x) => box <= 1
-    ? (x < 0.58 ? "table" : x < 0.74 ? "pick" : x < 0.86 ? "spot" : x < 0.94 ? "tenseid" : "aux")
-    : (x < 0.3 ? "table" : x < 0.47 ? "spot" : x < 0.59 ? "meaning" : x < 0.71 ? "switch" : x < 0.79 ? "inf" : x < 0.89 ? "tenseid" : x < 0.94 ? "person" : "aux");
-  let choice = draw(r0);
-  if (sents.length && box <= 1 && r0 < 0.15) { if (vgCtxExercise(ex, item, pick(sents), box)) return ex; } // else the table, whose share it is
-  else if (sents.length && box >= 2) {
-    if (r0 < 0.24 && (r0 < 0.12 ? vgCtxExercise(ex, item, pick(sents), box) : vgFitExercise(ex, item, pick(sents.filter(x => x.clue)), box))) return ex;
-    choice = draw(r0 < 0.24 ? Math.random() : (r0 - 0.24) / 0.76); // the others in proportion; drawn again, as before, when neither could be built
-  }
-  const P = vgPersons(item), pl = (p) => vgPerson(item.tense, p);
-  const said = (p) => item.tense === "imperativo" ? item.forms[p] : pl(p) + " " + item.forms[p]; // the answer read aloud: commands bare, other forms with their person
-  if (choice === "pick") {
-    const p = pick(P), right = item.forms[p];
-    const { opts, notes } = vgPickOptions(item, p);
-    if (opts.length >= 2) {
-      Object.assign(ex, { type: "Pick the form", typeKey: "vpick", kind: "recognition", mode: "options", person: p, tense: item.tense, optionNotes: notes, say: item.it, sayAnswer: said(p),
-        promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
-        options: shuffle([right].concat(opts)), correct: right, shownAnswer: pl(p) + " " + right });
-      return ex;
-    }
-  }
-  if (choice === "meaning") {
-    const p = pick(P), m = vgMeaningAnswers(item, p);
-    Object.assign(ex, { type: "From English", typeKey: "vmeaning", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, others: m.others, sayAnswer: said(p),
-      promptHtml: `<span class="en">${esc(arr(item.en)[0])}</span> <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">type the Italian verb form</div>`,
-      accepted: m.accepted, alts: m.alts, shownAnswer: pl(p) + " " + item.forms[p] });
-    return ex;
-  }
-  if (choice === "switch" && started.length >= 2) {
-    const from = pick(started.filter(t => t !== item.tense)), both = P.filter(q => vgPersons(item, from).includes(q)), p = pick(both);
-    if (p != null && normalize(item.allForms[from][p]) !== normalize(item.forms[p])) {
-      Object.assign(ex, { type: "Change the tense", typeKey: "vswitch", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, from, say: item.allForms[from][p], sayAnswer: said(p),
-        promptHtml: `${esc(item.allForms[from][p])}<div class="hint sans">${esc(item.it)} · ${esc(pl(p))} · ${esc(TENSE_LABEL[from])} → <b>${esc(tl)}</b></div><div class="hint sans">same person, new tense</div>`,
-        accepted: vgAcc(item, p), shownAnswer: pl(p) + " " + item.forms[p], meaning: glossLine([item.it, item]) });
-      return ex;
-    }
-  }
-  if (choice === "inf") {
-    const ps = P.filter(p => { const o = vgOwners(item.forms[p]); return o.size === 1 && o.has(item.it); });
-    const stem = item.it.replace(/(ar|er|ir|rr)(si|ci|ne|la|sene|cela)$|(are|ere|ire|rre)$/, "");
-    const tricky = ps.filter(p => !normalize(item.forms[p]).replace(/^(mi|ti|si|ci|vi|me|te|se|ce|ve) (ne |la |l'|n')?/, "").startsWith(normalize(stem)));
-    const pool = tricky.length && Math.random() < 0.7 ? tricky : ps;
-    if (pool.length) {
-      const p = pick(pool);
+  const sents = verbSentences(item), R = "recognition", W = "production";
+  const T = {}, make = {}; // the drills this item can be given now: typeKey → [chance, kind], and how each is built
+  let spare = 0; // the chances of drills that can't be built here, which go to Verb form
+  const add = (k, w, kind, fill) => { T[k] = [w, kind]; make[k] = fill; };
+  const offer = (k, w, kind, ok, fill) => { if (ok) add(k, w, kind, fill); else spare += w; };
+  const pickEx = (p, { opts, notes }) => Object.assign(ex, { type: "Pick the form", typeKey: "vpick", kind: "recognition", mode: "options", person: p, tense: item.tense, optionNotes: notes, say: item.it, sayAnswer: said(p),
+    promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
+    options: shuffle([item.forms[p]].concat(opts)), correct: item.forms[p], shownAnswer: pl(p) + " " + item.forms[p] });
+  const tenseidEx = () => {
+    const p = pick(plan.tenseid), others = shuffle(started.filter(t => t !== item.tense)).slice(0, 3);
+    if (others.length < 2) { const nxt = VG_TENSES.filter(t => t !== item.tense && !others.includes(t) && item.allForms[t]); others.push(...nxt.slice(0, 2 - others.length)); }
+    return Object.assign(ex, { type: "Which tense?", typeKey: "vtenseid", kind: "recognition", mode: "options", person: p, tense: item.tense, say: item.forms[p], sayAnswer: said(p),
+      promptHtml: `${esc(item.forms[p])}<div class="hint sans">from ${esc(item.it)} · which tense is this?</div>`,
+      options: shuffle([item.tense].concat(others)).map(t => TENSE_LABEL[t]), correct: tl, shownAnswer: tl, meaning: glossLine([item.it, item]) });
+  };
+  const auxOk = item.tense === "passato_prossimo" && !item.both;
+  const auxEx = () => Object.assign(ex, { type: "essere or avere?", typeKey: "vaux", kind: "recognition", mode: "options", say: item.it, sayAnswer: said(P[0]),
+    promptHtml: `${esc(item.it)} <span class="hint">· passato prossimo</span><div class="hint sans">${esc(arr(item.en)[0])} · which auxiliary?</div>`,
+    options: ["avere", "essere"], correct: item.aux === "e" ? "essere" : "avere", shownAnswer: item.aux === "e" ? "essere" : "avere" });
+  const spotEx = () => { const p = choose(P); return Object.assign(ex, { type: "Verb form", typeKey: "vspot", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, say: item.it, sayAnswer: said(p),
+    promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
+    accepted: vgAcc(item, p), shownAnswer: pl(p) + " " + item.forms[p] }); };
+  if (box <= 1) {
+    const ctx = sents.length ? vgTry(ex, (t) => vgCtxExercise(t, item, chooseS(sents), box)) : null;
+    offer("vctx", 0.15, R, !!ctx, () => Object.assign(ex, ctx));
+    const wt = () => weak && weak.length ? table(weak, "Verb table · your weak spots") : table();
+    add("vtable", ctx ? 0.43 : 0.58, W, wt); // Verb in a sentence takes its share from the table's
+    const pp = choose(P), po = vgPickOptions(item, pp);
+    offer("vpick", 0.16, R, po.opts.length >= 2, () => pickEx(pp, po));
+    offer("vtenseid", 0.08, R, started.length >= 2 && plan.tenseid.length > 0, tenseidEx);
+    offer("vaux", 0.06, R, auxOk, auxEx);
+    add("vspot", 0.12 + spare, W, spotEx);
+  } else {
+    const clued = sents.filter(x => x.clue);
+    const fit = box >= 3 && clued.length && item.tense !== "imperativo" ? vgTry(ex, (t) => vgFitExercise(t, item, chooseS(clued), box)) : null;
+    const ctxW = sents.length ? 0.12 : 0, fitW = fit ? 0.12 : 0, m = 1 - ctxW - fitW; // the others in proportion
+    if (ctxW) add("vctx", ctxW, W, () => vgCtxExercise(ex, item, chooseS(sents), box));
+    if (fit) add("vfit", fitW, fit.kind === "recognition" ? R : W, () => Object.assign(ex, fit));
+    const wt = () => weak && weak.length ? table(weak, "Verb table · your weak spots") : table();
+    add("vtable", 0.30 * m, W, wt);
+    add("vmeaning", 0.12 * m, W, () => { const p = choose(P), mm = vgMeaningAnswers(item, p);
+      Object.assign(ex, { type: "From English", typeKey: "vmeaning", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, others: mm.others, sayAnswer: said(p),
+        promptHtml: `<span class="en">${esc(arr(item.en)[0])}</span> <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">type the Italian verb form</div>`,
+        accepted: mm.accepted, alts: mm.alts, shownAnswer: pl(p) + " " + item.forms[p] }); });
+    const from = started.length >= 2 ? pick(started.filter(t => t !== item.tense)) : null, both = from ? P.filter(q => vgPersons(item, from).includes(q)) : [], sp = both.length ? choose(both) : null;
+    offer("vswitch", 0.12 * m, W, sp != null && normalize(item.allForms[from][sp]) !== normalize(item.forms[sp]), () => Object.assign(ex, { type: "Change the tense", typeKey: "vswitch", kind: "production", mode: "typed", typos: false, tense: item.tense, person: sp, from, say: item.allForms[from][sp], sayAnswer: said(sp),
+      promptHtml: `${esc(item.allForms[from][sp])}<div class="hint sans">${esc(item.it)} · ${esc(pl(sp))} · ${esc(TENSE_LABEL[from])} → <b>${esc(tl)}</b></div><div class="hint sans">same person, new tense</div>`,
+      accepted: vgAcc(item, sp), shownAnswer: pl(sp) + " " + item.forms[sp], meaning: glossLine([item.it, item]) }));
+    offer("vinf", 0.08 * m, W, plan.inf.length > 0, () => { const p = pick(plan.infTricky.length && Math.random() < 0.7 ? plan.infTricky : plan.inf);
       Object.assign(ex, { type: "Which verb?", typeKey: "vinf", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, say: item.forms[p],
         promptHtml: `${esc(item.forms[p])}<div class="hint sans">which verb is this a form of? type the infinitive</div>`,
-        accepted: [item.it], shownAnswer: item.it, answerInContext: item.forms[p] + " → " + item.it, meaning: glossLine([item.it, item]) });
-      return ex;
-    }
-  }
-  if (choice === "aux" && item.tense === "passato_prossimo" && !item.both) {
-    Object.assign(ex, { type: "essere or avere?", typeKey: "vaux", kind: "recognition", mode: "options", say: item.it, sayAnswer: said(P[0]),
-      promptHtml: `${esc(item.it)} <span class="hint">· passato prossimo</span><div class="hint sans">${esc(arr(item.en)[0])} · which auxiliary?</div>`,
-      options: ["avere", "essere"], correct: item.aux === "e" ? "essere" : "avere", shownAnswer: item.aux === "e" ? "essere" : "avere" });
-    return ex;
-  }
-  if (choice === "tenseid" && started.length >= 2) {
-    const ps = shuffle(P).filter(p => !vgFormsElsewhere(item, item.forms[p], item.tense, null).length);
-    if (ps.length) {
-      const p = ps[0], others = shuffle(started.filter(t => t !== item.tense)).slice(0, 3);
-      if (others.length < 2) { const nxt = VG_TENSES.filter(t => t !== item.tense && !others.includes(t) && item.allForms[t]); others.push(...nxt.slice(0, 2 - others.length)); }
-      const opts = shuffle([item.tense].concat(others)).map(t => TENSE_LABEL[t]);
-      Object.assign(ex, { type: "Which tense?", typeKey: "vtenseid", kind: "recognition", mode: "options", person: p, tense: item.tense, say: item.forms[p], sayAnswer: said(p),
-        promptHtml: `${esc(item.forms[p])}<div class="hint sans">from ${esc(item.it)} · which tense is this?</div>`,
-        options: opts, correct: tl, shownAnswer: tl, meaning: glossLine([item.it, item]) });
-      return ex;
-    }
-  }
-  if (choice === "person") {
-    const ps = shuffle(P).filter(p => !item.forms.some((f, q) => q !== p && normalize(f) === normalize(item.forms[p])));
-    if (ps.length) {
-      const p = ps[0];
+        accepted: [item.it], shownAnswer: item.it, answerInContext: item.forms[p] + " → " + item.it, meaning: glossLine([item.it, item]) }); });
+    offer("vtenseid", 0.10 * m, R, started.length >= 2 && plan.tenseid.length > 0, tenseidEx);
+    offer("vperson", 0.05 * m, R, plan.person.length > 0, () => { const p = pick(plan.person);
       Object.assign(ex, { type: "Which person?", typeKey: "vperson", kind: "recognition", mode: "options", person: p, tense: item.tense, say: item.forms[p], sayAnswer: said(p),
         promptHtml: `${esc(item.forms[p])}<div class="hint sans">${esc(item.it)}, ${esc(tl)} · ${item.tense === "imperativo" ? "who is the command for?" : "who is the subject?"}</div>`,
-        options: P.map(pl), correct: pl(p), shownAnswer: pl(p), meaning: glossLine([item.it, item]) });
-      return ex;
-    }
+        options: P.map(pl), correct: pl(p), shownAnswer: pl(p), meaning: glossLine([item.it, item]) }); });
+    offer("vaux", 0.06 * m, R, auxOk, auxEx);
+    add("vspot", 0.17 * m + spare, W, spotEx);
   }
-  if (choice !== "table") {
-    const p = pick(P);
-    Object.assign(ex, { type: "Verb form", typeKey: "vspot", kind: "production", mode: "typed", typos: false, tense: item.tense, person: p, say: item.it, sayAnswer: said(p),
-      promptHtml: `${esc(item.it)} <span class="hint">· ${esc(pl(p))} · ${esc(tl)}</span><div class="hint sans">${esc(arr(item.en)[0])}</div>`,
-      accepted: vgAcc(item, p), shownAnswer: pl(p) + " " + item.forms[p] });
-    return ex;
-  }
-  return table();
+  make[pickKey(T, opt)]();
+  return ex;
 }
 function checkTable() {
   const q = current(), ex = q.ex; if (!ex || ex.mode !== "table") return;
@@ -21207,7 +21349,7 @@ function vgExplain(ex, fb, why, out) {
       if (same + more) why.push(`${same + more === 1 ? "The other right form is" : "The other right forms are"} under your answers${more ? "." : same === 1 ? "; it follows the same pattern." : "; they follow the same pattern."}`);
       if (!wrong.length) why.push(verbWhy(v, it.tense, 3));
       if (it.note) why.push(esc(it.note));
-      if (!wrong.length) out.table = vgTableHtml(it, it.tense);
+      if (!wrong.length) out.table = vgTableWithKey(it, it.tense);
       out.facts = `<b>${esc(fam[0])}:</b> ${esc(fam[1])}`;
       break;
     }
@@ -21218,7 +21360,7 @@ function vgExplain(ex, fb, why, out) {
       }
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vtenseid": {
@@ -21229,28 +21371,28 @@ function vgExplain(ex, fb, why, out) {
       why.push(esc(TENSE_CLUE[it.tense]));
       why.push(verbWhy(v, it.tense, ex.person));
       out.facts = esc(TENSE_USE[it.tense]);
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vaux": {
       if (it.aux === "e") why.push(it.fam === "refl" ? `${esc(it.it)} is reflexive, and every reflexive verb takes essere: the participle agrees with the subject (${esc(it.allForms.passato_prossimo[0])}).` : `${esc(it.it)} takes essere, like the verbs of going somewhere, staying, change of state, and happening or seeming (andare, restare, diventare, nascere, succedere, sembrare, piacere). The participle then agrees with the subject: ${esc(it.allForms.passato_prossimo[0])}, ${esc(it.allForms.passato_prossimo[3])}.`);
       else why.push(`${esc(it.it)} takes avere, like most verbs, and always verbs with a direct object (ho mangiato la pizza). With avere the participle doesn't change: ${esc(it.allForms.passato_prossimo[0])}, ${esc(it.allForms.passato_prossimo[3])}.`);
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, "passato_prossimo");
+      out.table = vgTableWithKey(it, "passato_prossimo");
       break;
     }
     case "vpick": {
       if (!fb.ok && fb.given && ex.optionNotes && ex.optionNotes[fb.given]) why.push(`<b>You chose ${esc(fb.given)}:</b> ${esc(ex.optionNotes[fb.given])}`);
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vmeaning": {
       why.push(`“${esc(arr(it.en)[0])}” is ${esc(it.it)}.` + (ex.others && ex.others.length ? ` ${ex.others.map(esc).join(", ")} ${ex.others.length === 1 ? "has" : "have"} that meaning too, so ${ex.others.length === 1 ? "its form is" : "their forms are"} right as well.` : ""));
       if (!fb.ok && fb.given) { const o = [...vgOwners(fb.given)].filter(x => x !== it.it); if (o.length) why.push(`<b>You wrote ${esc(fb.given)}:</b> that is a form of ${o.map(esc).join(" or ")}${o.some(x => vgItem(x, it.tense) && vgAcc(vgItem(x, it.tense), ex.person).map(normalize).includes(normalize(fb.given))) ? ", a different verb" : ""}.`); }
       why.push(verbWhy(v, it.tense, ex.person));
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vswitch": {
@@ -21258,7 +21400,7 @@ function vgExplain(ex, fb, why, out) {
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note && /futur|stem|particip|essere|avere/i.test(it.note)) why.push(esc(it.note));
       out.facts = esc(TENSE_USE[it.tense]);
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vinf": {
@@ -21271,7 +21413,7 @@ function vgExplain(ex, fb, why, out) {
       why.push(verbWhy(v, it.tense, ex.person));
       if (it.note) why.push(esc(it.note));
       out.facts = `<b>${esc(fam[0])}:</b> ${esc(fam[1])}`;
-      out.table = vgTableHtml(it, it.tense, { [ex.person]: true });
+      out.table = vgTableWithKey(it, it.tense, { [ex.person]: true });
       break;
     }
     case "vctx": case "vfit": {
@@ -21293,28 +21435,66 @@ function vgExplain(ex, fb, why, out) {
       if (sx.clue) why.push(`<b>${esc(sx.clue)}</b> points to ${esc(CLUE_POINTS[it.tense])}: ${esc(tl)}.`);
       why.push(verbWhy(v, it.tense, p));
       out.facts = esc(TENSE_USE[it.tense]);
-      out.table = vgTableHtml(it, it.tense, { [p]: true });
+      out.table = vgTableWithKey(it, it.tense, { [p]: true });
       break;
     }
     default: {
       if (it.note) why.push(esc(it.note));
-      out.table = vgTableHtml(it, it.tense);
+      out.table = vgTableWithKey(it, it.tense);
     }
   }
+}
+/* Focus sessions (from 9.31): Verbs practice aimed at one verb (Practise this verb, in its row of the reference), one tense
+   across the verbs (the tense chips) or one family (the button under each family's heading). The key is the infinitive, the
+   tense or the family. Each takes the matching verb tenses due (soonest first), then the others started (least known
+   first), then those that can open now, in the order of VERB_GYM (no more than a Verbs session's new ones), up to a
+   Verbs session's length; a tense that hasn't opened (vgUnlocked) never comes. buildSession then shuffles them. */
+const VG_FOCUS = { vverb: (i, k) => i.it === k, vtense: (i, k) => i.tense === k, vfam: (i, k) => i.fam === k };
+const vgOpens = (i) => rec(i.id).box === 0 && vgUnlocked(i) && vgWithinCap(i); // a new verb tense that can open now (within the ladder cap)
+function vgFocusName(kind, key) { return kind === "vtense" ? TENSE_LABEL[key] || key : kind === "vfam" ? (VERB_FAMILIES[key] || [key])[0] : key; }
+function vgFocusIds(kind, key) {
+  const per = progress.settings.verbsPerSession || 12, nNew = progress.settings.verbNewPerSession ?? 3, t = now();
+  const items = (content.byUnit.vb || []).filter(i => VG_FOCUS[kind](i, key));
+  const due = items.filter(i => isDue(i.id, t)).sort((a, b) => rec(a.id).due - rec(b.id).due);
+  const rest = items.filter(i => rec(i.id).box >= 1 && !isDue(i.id, t)).sort((a, b) => rec(a.id).box - rec(b.id).box || rec(a.id).due - rec(b.id).due);
+  const fresh = items.filter(vgOpens).sort((a, b) => a.rank - b.rank || a.step - b.step).slice(0, Math.min(nNew, per));
+  return uniqueByPid(due.concat(rest, fresh).map(i => i.id)).slice(0, per);
+}
+// A focus's button: disabled, with its reason beside it, when nothing of it is started and nothing can open yet (c: { started, open })
+function vgFocusBtn(kind, key, label, c, id) {
+  const shut = !c.started && !c.open;
+  return `<div class="secgo vgo"><button type="button" data-vfocus="${esc(kind + ":" + key)}"${shut ? ` disabled aria-describedby="${esc(id)}"` : ""}>${esc(label)}</button>`
+    + (shut ? `<p class="small muted" id="${esc(id)}">Nothing open yet: ${kind === "vverb" ? "its first tense opens in a Verbs session" : "a verb's tenses open one at a time, each once the one before it is learned"}.</p>` : "") + `</div>`;
+}
+function vgVerbFocus(v) { // the verb's tenses started, and whether its next one can open now
+  const c = { started: 0, open: 0 };
+  for (const i of verbTenses(v)) { if (rec(i.id).box >= 1) c.started++; else if (vgOpens(i)) c.open++; }
+  return c;
+}
+function tenseChipsHtml(st) { // Practise a tense: a chip per tense of the ladder, with how many verbs have it started
+  let shut = false;
+  const chips = VG_TENSES.map(t => {
+    const c = st.byTense[t] || { started: 0, open: 0 }, off = !c.started && !c.open; shut = shut || off;
+    return `<button type="button" class="tchip" data-vfocus="vtense:${esc(t)}"${off ? ` disabled aria-describedby="tchips-none"` : ""}><span class="tchip-t">${esc(TENSE_LABEL[t])}</span><span class="tchip-n">${fmtN(c.started)} started</span></button>`;
+  }).join("");
+  const cap = vgCap(), held = cap < 7 ? ` Tenses after the ${TENSE_LABEL[VG_TENSES[cap]]} don't open as new, as Settings has it.` : "";
+  return groupHtml("Practise a tense", `<div class="tchips">${chips}</div>` + (shut ? `<p class="small muted" id="tchips-none">A tense with nothing started is greyed out until a verb opens it: a verb's tenses open one at a time, each once the one before it is learned.${held}</p>` : ""));
 }
 function vgStatus(i) {
   const r = rec(i.id);
   if (r.box >= 1) return "box " + r.box + (r.box >= 5 ? " ✓" : "");
-  return vgUnlocked(i) ? "new" : "locked";
+  return !vgUnlocked(i) ? "locked" : vgWithinCap(i) ? "new" : "held back"; // held back: opened, but after the tense Settings opens up to
 }
 function renderVerbReference(u) {
   const st = counts().verbs;
   return unitHead(u) + `<p class="small muted">${st.totalVerbs} verbs · ${st.verbs} started · ${st.learned} of ${st.total} verb tenses learned</p>
   <button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`
+    + tenseChipsHtml(st)
     + groupHtml("Rules", `<div class="card notes">` + (u.notes || []).map(n => `<p>${esc(n)}</p>`).join("") + `</div>`)
     + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`
     + `<div class="results" id="refResults">${verbListHtml()}</div><button type="button" class="primary wide" data-start="verbs">Practise verbs</button>`;
 }
+const vgTableWithKey = (item, tense, marks) => vgTableHtml(item, tense, marks) + vgKeyHtml(item.it, tense);
 // Every verb is a row that opens to show its tables. The tables are drawn when a row is opened (the listener below),
 // since all of them together would take several seconds on a phone; a filter opens the rows it leaves, so they come drawn.
 const filterVerbs = (f) => VERB_GYM.filter(v => !f || verbText(v).includes(f)); // f normalised
@@ -21323,7 +21503,8 @@ function verbListHtml() {
   const famOrder = Object.keys(VERB_FAMILIES);
   const sorted = byVerb.slice().sort((a, b) => famOrder.indexOf(a.fam) - famOrder.indexOf(b.fam) || a.it.localeCompare(b.it));
   let h = "", fam = null, rows = "";
-  const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p><div class="card rows">${rows}</div>`); rows = ""; };
+  const byFam = counts().verbs.byFam;
+  const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p>` + vgFocusBtn("vfam", fam, "Practise this family", byFam[fam] || { started: 0, open: 0 }, "vfam-none-" + fam) + `<div class="card rows">${rows}</div>`); rows = ""; };
   for (const v of sorted) {
     if (v.fam !== fam) { flush(); fam = v.fam; }
     const summ = verbTenses(v).map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
@@ -21335,14 +21516,15 @@ function verbListHtml() {
 }
 const verbTenses = (v) => VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
 function verbTablesHtml(v) {
-  return verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
+  let key = ""; // the legend of its underlining, or the caption of a verb irregular throughout: once, under the first table it belongs to (from 9.31)
+  return vgFocusBtn("vverb", v.it, "Practise this verb", vgVerbFocus(v), "vverb-none-" + v.it) + verbTenses(v).map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + (key ? "" : (key = vgKeyHtml(v.it, i.tense))) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("")
     + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "");
 }
 document.addEventListener("toggle", (e) => { // toggle doesn't bubble, so this listens on the way down
   const d = e.target;
   if (!d.open || !d.matches("details.vref") || d.children.length > 1) return; // closed, another kind, or drawn already
   const v = VERB_GYM.find(x => x.it === d.dataset.verb); if (!v) return;
-  d.insertAdjacentHTML("beforeend", verbTablesHtml(v)); nbHyphens(d); markSaying();
+  d.insertAdjacentHTML("beforeend", verbTablesHtml(v)); nbHyphens(d); markSaying(); wire(d); // its Practise this verb
 }, true);
 
 /* ---------- sessions ---------- */
@@ -21371,6 +21553,10 @@ function sessionIds(kind, unitId) { // the items a session of this kind takes (b
     const fresh = verbNewIds().slice(0, Math.min(nNew, per));
     ids = dueIds("vb").slice(0, Math.max(0, per - fresh.length)).concat(fresh);
     if (ids.length < per) ids = ids.concat(shuffle((content.byUnit.vb || []).map(i => i.id).filter(id => !ids.includes(id) && rec(id).box >= 1)).slice(0, per - ids.length));
+  } else if (kind === "vweak") { // Practise my weak spots (from 9.31, on Stats)
+    ids = vgWeakIds();
+  } else if (VG_FOCUS[kind]) { // Practise this verb, a tense or a family (from 9.31)
+    ids = vgFocusIds(kind, unitId);
   } else if (kind === "section") { // Practise this section (from 9.6): its items due, then new (as many as today allows), then the rest, least known first
     const all = uniqueByPid(sectionItems(unitId)), t = now();
     const due = all.filter(id => isDue(id, t)).sort((a, b) => rec(a).due - rec(b).due);
@@ -21398,21 +21584,51 @@ function lessonOrder(unitId, ids) {
   for (const id of ids) { const at = itemSection(id), k = at && at.unit === unitId ? at.index : Infinity; if (by.has(k)) by.get(k).push(id); else by.set(k, [id]); }
   return [...by.keys()].sort((a, b) => a - b).flatMap(k => shuffle(by.get(k)));
 }
-const BALANCED = new Set(["continue", "unit", "section", "review", "wild", "hard", "mistakes"]); // grammar sessions: planSession chooses their exercises
+const BALANCED = new Set(["continue", "unit", "section", "review", "wild", "hard", "mistakes", "verbs", "vverb", "vtense", "vfam", "vweak"]); // grammar and (from 9.31) Verbs sessions, focus sessions included: planSession chooses their exercises
+// What every exercise of a session asks of makeExercise besides the plan's hint (from 9.31): in Practise my weak spots, a verb
+// tense's persons missed (a table asks only those; a drill on one form picks one of them). Set by buildSession for the
+// session being built, and by the running session's kind for its follow-ups and repeats, so follow-ups and repeats keep to them too.
+let BUILDING = null; // the kind of session being built, while buildSession runs
+const sessionHint = (item) => (BUILDING !== null ? BUILDING : session && session.kind) === "vweak" && item.type === "vtense" ? { persons: vgMissedPersons(item) } : undefined;
 function buildSession(kind, unitId) {
   const ids = shuffle(uniqueByPid(sessionIds(kind, unitId)));
-  const queue = BALANCED.has(kind) && !(kind === "unit" && isSideUnit(unitId)) ? planSession(ids)
-    : ids.map(id => ({ ex: makeExercise(content.items[id], rec(id)), repeat: false })).filter(q => q.ex); // a vocab pack or the Verbs section, as before
-  return { kind, unitId: kind === "continue" ? progress.currentUnit : unitId, queue, pos: 0, done: 0, total: queue.length, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false };
+  BUILDING = kind;
+  try { return buildQueue(kind, unitId, ids); } finally { BUILDING = null; }
 }
-/* Balanced sessions (from 9.5). Once a grammar session's items are picked and shuffled, each one's exercise is chosen with
+/* The Verbs part of a session's summary (from 9.31). As a session is built, each verb it holds is noted with the tenses
+   open or started and whether all of them are learned (vgVerbState); as it ends, the same again: a tense open now that
+   wasn't is a New tense open, a verb with every tense learned now that wasn't has learned them all. */
+function vgVerbState(verb) {
+  const ts = verbTenses(VERB_GYM.find(v => v.it === verb) || { it: verb });
+  return { open: ts.filter(i => rec(i.id).box >= 1 || vgOpens(i)).map(i => i.id), learned: ts.length > 0 && ts.every(i => rec(i.id).box >= 5) };
+}
+function vgSessionStart(queue) { const m = new Map(); for (const q of queue) if (q.ex && q.ex.item.type === "vtense" && !m.has(q.ex.item.it)) m.set(q.ex.item.it, vgVerbState(q.ex.item.it)); return m; }
+function vgSessionNews(s) { // { opened: [verb-tense items now open], learned: [verbs], missed: [verbs] }, in the order met
+  const out = { opened: [], learned: [], missed: [] };
+  for (const [verb, was] of s.vgStart || []) {
+    const now = vgVerbState(verb);
+    for (const id of now.open) if (!was.open.includes(id) && rec(id).box === 0) out.opened.push(content.items[id]);
+    if (now.learned && !was.learned) out.learned.push(verb);
+  }
+  for (const m of s.missed) if (m.item.type === "vtense" && !out.missed.includes(m.item.it)) out.missed.push(m.item.it);
+  return out;
+}
+function buildQueue(kind, unitId, ids) {
+  const queue = BALANCED.has(kind) && !(kind === "unit" && isSideUnit(unitId)) ? planSession(ids)
+    : ids.map(id => ({ ex: makeExercise(content.items[id], rec(id)), repeat: false })).filter(q => q.ex); // a vocab pack, as before
+  return { kind, unitId: kind === "continue" ? progress.currentUnit : unitId, queue, pos: 0, done: 0, total: queue.length, correct: 0, answered: 0, xp: 0, promoted: 0, missed: [], missedIds: new Set(), finished: false, vgStart: vgSessionStart(queue) };
+}
+/* Balanced sessions (from 9.5; Verbs sessions from 9.31). Once a grammar session's items are picked and shuffled, each one's exercise is chosen with
    the session in view, through makeExercise's hint (pickKey): avoid the kind of exercise (typeKey) the item was last shown
    with on this device (lastTypes), and the kind of the two exercises before it when they match; prefer kinds the session
    hasn't used yet. A hint keeps an exercise's kind (typed or not), so a session is typed as often as before. If the session
    still has fewer kinds than it should (four in 12 exercises; a third of the number in a shorter one), the items whose kinds
    come most often are asked once more, for a kind it lacks, typed or not. Then noTriples puts the exercises in order. A
-   tricky item is introduced again instead (isTricky). Follow-ups and repeats, added as the session runs, keep their rules. */
-const HINT_KEYS = ["flip", "meaning", "article", "plural", "agreement", "recall", "cloze", "bank", "translate", "listen"]; // the kinds a hint chooses between
+   tricky item is introduced again instead (isTricky): a verb tense's New tense card, called Look again, then its table. Follow-ups
+   and repeats, added as the session runs, keep their rules (a table with mistakes comes back as the forms missed). A vocab pack's
+   cards are drilled as they come. */
+const HINT_KEYS = ["flip", "meaning", "article", "plural", "agreement", "recall", "cloze", "bank", "translate", "listen", // the kinds a hint chooses between
+  "vtable", "vpick", "vspot", "vmeaning", "vswitch", "vinf", "vtenseid", "vperson", "vaux", "vctx", "vfit"]; // the Verbs section's (from 9.31)
 function planSession(ids) {
   const last = lastTypes(), out = [], used = new Map(), key = (q) => q.ex.typeKey;
   const count = (k, d) => used.set(k, (used.get(k) || 0) + d);
@@ -21420,10 +21636,14 @@ function planSession(ids) {
   for (const id of ids) {
     const item = content.items[id], r = rec(id);
     let q = null;
-    if (isTricky(id)) { const ex = makeExercise(item, Object.assign({}, r, { box: 0 })); if (ex) q = { ex: Object.assign(ex, { showWhy: true }), repeat: false, reintro: true }; }
+    if (isTricky(id)) {
+      const ex = makeExercise(item, Object.assign({}, r, { box: 0 }));
+      if (ex && ex.mode === "vintro") ex.type = "Look again · " + TENSE_LABEL[item.tense]; // not new: missed often, so its card comes again
+      if (ex) q = { ex: Object.assign(ex, { showWhy: true }), repeat: false, reintro: true };
+    }
     if (!q) {
       const n = out.length, run = n >= 2 && key(out[n - 1]) === key(out[n - 2]) ? key(out[n - 1]) : null;
-      const ex = makeExercise(item, r, undefined, isSideUnit(item.unit) ? undefined : { avoid: [last.get(pid(id)), run].filter(Boolean), prefer: unused() });
+      const ex = makeExercise(item, r, undefined, isBalancedUnit(item.unit) ? Object.assign({ avoid: [last.get(pid(id)), run].filter(Boolean), prefer: unused() }, sessionHint(item)) : undefined);
       if (ex) q = { ex, repeat: false };
     }
     if (q) { out.push(q); count(key(q), 1); }
@@ -21431,8 +21651,8 @@ function planSession(ids) {
   const kinds = () => [...used.values()].filter(Boolean).length, want = Math.min(4, Math.ceil(out.length / 3));
   for (const q of out.slice().sort((a, b) => used.get(key(b)) - used.get(key(a)))) {
     if (kinds() >= want) break;
-    if (q.reintro || isSideUnit(q.ex.item.unit) || used.get(key(q)) < 2) continue; // a kind used once would only be swapped for another
-    const ex = makeExercise(q.ex.item, rec(q.ex.item.id), undefined, { prefer: unused(), avoid: [key(q)], anyKind: true });
+    if (q.reintro || !isBalancedUnit(q.ex.item.unit) || used.get(key(q)) < 2) continue; // a kind used once would only be swapped for another
+    const ex = makeExercise(q.ex.item, rec(q.ex.item.id), undefined, Object.assign({ prefer: unused(), avoid: [key(q)], anyKind: true }, sessionHint(q.ex.item)));
     if (ex && !used.get(ex.typeKey)) { count(key(q), -1); q.ex = ex; count(key(q), 1); }
   }
   return noTriples(out, key);
@@ -21458,11 +21678,12 @@ function noTriples(list, key) {
   }
   return out;
 }
-/* The kind of exercise (typeKey) each grammar item was last answered with on this device (from 9.5), so that its next
-   exercise can be another kind where it has one: itapp.lasttype.v1, a list of [record id, typeKey] pairs, oldest first,
-   at most LAST_CAP of them. Kept out of progress, like itapp.theme.v1, so it never syncs and each device has its own.
-   Read once; every read and write is guarded, and a device that refuses to store it simply forgets. */
-const LS_LASTTYPE = "itapp.lasttype.v1", LAST_CAP = 2000;
+/* The kind of exercise (typeKey) each grammar item, and from 9.31 each verb tense, was last answered with on this device
+   (from 9.5), so that its next exercise can be another kind where it has one: itapp.lasttype.v1, a list of [record id,
+   typeKey] pairs, oldest first, at most LAST_CAP of them (2,000 until 9.30; from 9.31 4,000, as verb tenses share it: about
+   150 KB at the cap, measured by tools/test-sessions.js). Kept out of progress, like itapp.theme.v1, so it never syncs and
+   each device has its own. Read once; every read and write is guarded, and a device that refuses to store it simply forgets. */
+const LS_LASTTYPE = "itapp.lasttype.v1", LAST_CAP = 4000;
 let LAST_TYPES = null;
 function lastTypes() {
   if (LAST_TYPES) return LAST_TYPES;
@@ -21473,14 +21694,69 @@ function lastTypes() {
   } catch (e) { LAST_TYPES = new Map(); }
   return LAST_TYPES;
 }
-function noteType(ex) { // an answered exercise on a grammar item: remembered as the item's last kind
+function noteType(ex) { // an answered exercise on a grammar item or a verb tense: remembered as the item's last kind
   try {
-    if (!ex || !ex.typeKey || isSideUnit(ex.item.unit)) return;
+    if (!ex || !ex.typeKey || !isBalancedUnit(ex.item.unit)) return;
     const m = lastTypes(), id = pid(ex.item.id);
     m.delete(id); m.set(id, ex.typeKey);
     while (m.size > LAST_CAP) m.delete(m.keys().next().value);
     Store.set(LS_LASTTYPE, [...m]);
   } catch (e) { }
+}
+/* Weak spots in the Verbs section (from 9.31). Every verb form missed on this device is remembered: itapp.vgmiss.v1, a list
+   of [verb, tense (its place in VG_TENSES), person (0–5, as in the tables), times, last time missed], the cell missed last at
+   the end, at most VGMISS_CAP of them (about 65 KB at the cap, measured by tools/test-verbs.js), the oldest going first. A
+   cell is missed by a wrong cell of a Verb table (Don't know misses every cell asked) and by a wrong answer to a drill on one
+   form: Verb form, Pick the form, From English, Change the tense, Verb in a sentence and Which tense fits?. A later right
+   answer on the cell, outside a repeat (which comes moments after the answer was shown), takes one off its count, and at
+   nought it goes: weak spots heal. Stats shows them (Verbs: weak spots), Practise my weak spots drills them, and elsewhere a
+   drill on one form asks for a person missed in that tense about half the time. Kept out of progress, like
+   itapp.confusions.v1, so it never syncs and is never in a backup; read once; every read and write is guarded, and a device
+   that refuses to store it simply forgets. */
+const LS_VGMISS = "itapp.vgmiss.v1", VGMISS_CAP = 1500;
+const VG_ONE_FORM = new Set(["vspot", "vpick", "vmeaning", "vswitch", "vctx", "vfit"]); // the drills on one form whose miss is noted
+let VG_MISS = null;
+const vgMissKey = (verb, t, p) => verb + "\n" + t + "\n" + p;
+function vgMisses() { // key → [verb, tense, person, times, last], oldest first
+  if (VG_MISS) return VG_MISS;
+  VG_MISS = new Map();
+  try {
+    const v = Store.get(LS_VGMISS);
+    if (Array.isArray(v)) for (const e of v) if (Array.isArray(e) && e.length === 5 && typeof e[0] === "string" && e[0] && Number.isInteger(e[1]) && e[1] >= 0 && e[1] < VG_TENSES.length
+      && Number.isInteger(e[2]) && e[2] >= 0 && e[2] <= 5 && Number.isInteger(e[3]) && e[3] > 0 && Number.isFinite(e[4]) && e[4] >= 0) {
+      const k = vgMissKey(e[0], e[1], e[2]); VG_MISS.delete(k); VG_MISS.set(k, e.slice());
+    }
+    while (VG_MISS.size > VGMISS_CAP) VG_MISS.delete(VG_MISS.keys().next().value);
+  } catch (e) { VG_MISS = new Map(); }
+  return VG_MISS;
+}
+function noteVgMisses(item, wrong, right) { // persons missed (each counted once more) and persons answered right (each healed by one)
+  try {
+    const m = vgMisses(), t = VG_TENSES.indexOf(item.tense);
+    if (t < 0) return;
+    let changed = false;
+    for (const p of right) { const k = vgMissKey(item.it, t, p), e = m.get(k); if (!e) continue; changed = true; if (--e[3] <= 0) m.delete(k); }
+    for (const p of wrong) { const k = vgMissKey(item.it, t, p), e = m.get(k) || [item.it, t, p, 0, 0]; m.delete(k); e[3]++; e[4] = now(); m.set(k, e); changed = true; }
+    while (m.size > VGMISS_CAP) m.delete(m.keys().next().value);
+    if (changed) Store.set(LS_VGMISS, [...m.values()]);
+  } catch (e) { }
+}
+function noteVerbAnswer(ex, ok, repeat) { // after a Verbs exercise on forms: which cells it missed, and which it got right
+  if (!ex || ex.item.type !== "vtense") return;
+  if (ex.typeKey === "vtable") {
+    const cells = ex.lastCells || {}, wrong = ok ? [] : ex.cells.filter(p => !(cells[p] && cells[p].ok)), right = ex.cells.filter(p => !wrong.includes(p));
+    noteVgMisses(ex.item, wrong, repeat ? [] : right);
+  } else if (VG_ONE_FORM.has(ex.typeKey) && ex.person != null) noteVgMisses(ex.item, ok ? [] : [ex.person], ok && !repeat ? [ex.person] : []);
+}
+const vgMissedPersons = (item) => { // the persons missed in this verb tense, most missed first
+  const t = VG_TENSES.indexOf(item.tense), out = [];
+  for (const e of vgMisses().values()) if (e[0] === item.it && e[1] === t) out.push(e);
+  return out.sort((a, b) => b[3] - a[3] || b[4] - a[4]).map(e => e[2]);
+};
+function vgWeakIds() { // Practise my weak spots: the verb tenses with forms missed, most misses first, up to a Verbs session's length
+  const per = progress.settings.verbsPerSession || 12, by = new Map();
+  for (const e of vgMisses().values()) { const id = vgId(e[0], VG_TENSES[e[1]]); if (!content.items[id]) continue; const b = by.get(id) || { n: 0, last: 0 }; b.n += e[3]; b.last = Math.max(b.last, e[4]); by.set(id, b); }
+  return [...by.entries()].sort((a, b) => b[1].n - a[1].n || b[1].last - a[1].last).slice(0, per).map(([id]) => id);
 }
 /* Confusion memory (from 9.7). When a wrong answer is another item's right answer (cosa typed for "house", or the meaning of
    cosa chosen for casa), the pair is remembered on this device: itapp.confusions.v1, a list of [record id, record id, times]
@@ -21577,12 +21853,12 @@ function contextHtml(c) { // the sentence with the card's word in bold, its Engl
   const html = it.split(/(\s+)/).map(t => { if (/^\s*$/.test(t)) return esc(t); const n = ctxWords(t).length, hit = n && k < c.at + c.len && k + n > c.at; k += n; return hit ? t.replace(/^([^\p{L}\p{N}']*)(.*?)([^\p{L}\p{N}']*)$/u, (m, x, w, y) => `${esc(x)}<b>${esc(w)}</b>${esc(y)}`) : esc(t); }).join("");
   return `<div class="fb-ctx"><div><div class="it">${html}</div><div class="ctx-en">${esc(arr(c.s.en)[0])}</div></div>${sayBtn(it, "Listen to the sentence", "solo")}</div>`;
 }
-/* A tricky item (from 9.5): a grammar item with 4 or more lapses, at box 3 or below. Its next exercise in a session is its
-   introduction again (the flip card or first exercise, with its explanation), then the usual typed follow-up later in the
-   session. An introduction that isn't typed, on an item that has a typed exercise, only teaches: it counts as a repeat, and
+/* A tricky item (from 9.5): a grammar item (from 9.31 also a verb tense) with 4 or more lapses, at box 3 or below. Its next
+   exercise in a session is its introduction again (the flip card or first exercise, with its explanation; a verb tense's New
+   tense card), then the usual typed follow-up later in the session (a verb tense's whole table). An introduction that isn't typed, on an item that has a typed exercise, only teaches: it counts as a repeat, and
    the follow-up is the answer that moves the item. Stats lists up to 15 (counts().tricky). */
 const TRICKY_LAPSES = 4, TRICKY_BOX = 3;
-function isTricky(id) { const it = content.items[id], r = progress.items[pid(id)]; return !!(it && r && !isSideUnit(it.unit) && r.lapses >= TRICKY_LAPSES && r.box >= 1 && r.box <= TRICKY_BOX); }
+function isTricky(id) { const it = content.items[id], r = progress.items[pid(id)]; return !!(it && r && isBalancedUnit(it.unit) && r.lapses >= TRICKY_LAPSES && r.box >= 1 && r.box <= TRICKY_BOX); }
 function startSession(kind, unitId) {
   const s = buildSession(kind, unitId);
   if (!s.queue.length) { S.flash = "Nothing to practise right now."; S.scrollTo = S.screen === "home" ? null : "flash"; render(); return; }
@@ -21640,17 +21916,18 @@ function finishAnswer(ok, note, given, closest) {
   const teach = !!q.reintro && ex.kind === "recognition" && itemHasProduction(ex.item); // a tricky item's introduction: its follow-up is the answer that counts
   const out = applyResult(ex.item.id, ok, ex.kind, q.repeat || teach, ex.typeKey);
   noteType(ex);
+  noteVerbAnswer(ex, ok, q.repeat); // the Verbs section's weak spots (from 9.31)
   const other = ok ? null : confusedWith(ex, given), mixed = other ? { other, n: noteConfusion(ex.item.id, other.id) } : null;
   session.answered++;
   if (ok) session.correct++;
   if (!q.repeat) { session.xp += out.xp; if (out.promoted) session.promoted++; }
   if (!ok) {
-    session.queue.push({ ex: makeExercise(ex.item, rec(ex.item.id), ex.repeatForce), repeat: true, of: ex.item.id });
+    session.queue.push({ ex: makeExercise(ex.item, rec(ex.item.id), ex.repeatForce, sessionHint(ex.item)), repeat: true, of: ex.item.id });
     if (!session.missedIds.has(ex.item.id)) { session.missedIds.add(ex.item.id); session.missed.push({ item: ex.item, answer: ex.shownAnswer || ex.correct || "", it: missedItalian(ex), context: ex.answerInContext, why: explainFor(ex, { ok: false, given }).why }); }
   } else if ((wasNew || q.reintro) && !q.repeat && !q.followup && ex.kind === "recognition" && itemHasProduction(ex.item) && session.kind !== "flashcards") {
     // second pass in the same session: a production exercise for the item just introduced (or introduced again, if tricky)
     const at = Math.min(session.queue.length, session.pos + 3 + Math.floor(Math.random() * 4));
-    session.queue.splice(at, 0, { ex: makeExercise(ex.item, rec(ex.item.id), "production"), repeat: false, followup: true });
+    session.queue.splice(at, 0, { ex: makeExercise(ex.item, rec(ex.item.id), "production", sessionHint(ex.item)), repeat: false, followup: true });
   }
   S.feedback = { ok, note, given, closest, ex, res: out, intro: wasNew || !!q.reintro, mixed }; S.answeredAt = Date.now(); S.retry = null; S.flagOpen = false;
   render();
@@ -21689,6 +21966,7 @@ function continueSession() {
     }
     saveProgress();
     session.again = sessionIds(session.kind, session.kind === "continue" ? undefined : session.unitId).length > 0; // the summary's Another round
+    session.vgNews = vgSessionNews(session); // its Verbs part (from 9.31)
     S.screen = "summary";
   }
   render();
@@ -22235,12 +22513,24 @@ function renderSummary() {
   const s = session;
   const acc = s.answered ? Math.round(100 * s.correct / s.answered) : 0;
   const goal = progress.settings.goal || 30, xp = today().xp || 0;
-  return `<header class="hdr"><h1 class="title">Session complete</h1></header>
+  const focus = VG_FOCUS[s.kind] || s.kind === "vweak" ? `<p class="eyebrow sumfocus">Focus: ${s.kind === "vweak" ? "your weak spots" : esc(vgFocusName(s.kind, s.unitId))}</p>` : ""; // a focus session names its verb, tense or family
+  return `<header class="hdr"><div class="hdr-t">${focus}<h1 class="title">Session complete</h1></div></header>
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
   ${s.missed.length ? groupHtml("Missed", `<div class="card rows">` + s.missed.map(m => `<div class="mrow"><div class="it">${esc(m.it || m.context || m.answer)}${m.item.type === "grammar_mc" ? "" : sayBtn(m.it || m.context || m.answer)}</div>${m.item.type === "grammar_mc" || m.item.type === "sort" || m.item.type === "match" ? `<div class="small muted">${esc(m.item.prompt || "")}</div>` : m.item.type === "reply" ? `<div class="small muted">${esc(m.item.line)}</div>` : m.item.en ? `<div class="small muted">${esc(arr(m.item.en)[0])}</div>` : m.item.value != null ? `<div class="small muted">${esc(String(m.item.value))}</div>` : ""}${m.why && m.why.length ? `<div class="small">${m.why[m.why.length - 1]}</div>` : ""}</div>`).join("") + `</div>`) : `<p class="muted">No mistakes.</p>`}
+  ${verbNewsHtml(s.vgNews)}
   <div class="btnrow sumbtns"><button type="button" data-act="again"${s.again ? "" : ` disabled aria-describedby="again-none"`}>Another round</button><button type="button" class="primary" data-go="home">Back to Today</button></div>
   ${s.again ? "" : `<p class="small muted" id="again-none">Nothing left to practise in this kind of session right now.</p>`}`;
+}
+/* After a session with verb tenses in it (from 9.31): the tenses that opened, any verb that has now learned all its tenses, and
+   the verbs missed, each with Practise this verb: here, once the session is over, never in it, where it would end the session. */
+function verbNewsHtml(n) {
+  if (!n || !(n.opened.length || n.learned.length || n.missed.length)) return "";
+  const gloss = (verb) => arr((VERB_GYM.find(v => v.it === verb) || {}).en)[0] || "";
+  const lines = n.opened.map(i => `<div class="vnews">New tense open: <b>${esc(i.it)} · ${esc(TENSE_LABEL[i.tense])}</b></div>`)
+    .concat(n.learned.map(v => `<div class="vnews">Every tense learned: <b>${esc(v)}</b></div>`));
+  return (lines.length ? groupHtml("Verbs", `<div class="card rows">${lines.join("")}</div>`) : "")
+    + (n.missed.length ? groupHtml("Verbs you missed", `<div class="card rows">` + n.missed.map(v => `<div class="vmiss"><div class="vmiss-t"><span class="it">${esc(v)}</span> <span class="small muted">${esc(gloss(v))}</span></div><button type="button" data-vfocus="vverb:${esc(v)}">Practise this verb</button></div>`).join("") + `</div>`) : "");
 }
 function boxTag(id) { const r = rec(id); return r.box === 0 ? "" : ` <span class="box">box ${r.box}${r.box >= 5 ? " ✓" : ""}</span>`; }
 /* ---------- lessons ---------- */
@@ -22418,7 +22708,7 @@ function glossaryHtml(u) { // a unit's items, by kind, as the filter leaves them
   return h;
 }
 function rowHtml(i) {
-  if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableHtml(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
+  if (i.type === "vtense") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))} · ${esc(TENSE_LABEL[i.tense])}</span> <span class="box">${esc(vgStatus(i))}</span></div>` + vgTableWithKey(i, i.tense) + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "verb") return `<div><span class="itx">${esc(i.it)}</span>${sayBtn(i.it)} <span class="muted">${esc(arr(i.en).join(", "))}${i.group ? " · " + esc(i.group) : ""}</span> ${boxTag(i.id)}</div>` + Object.keys(i.forms).map(t => `<div class="small muted" style="margin-top:4px">${esc(t.replace(/_/g, " "))}</div>` + verbTableHtml(i, t)).join("") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "vocab" && i.pos === "noun" && i.art) return `<div><span class="itx">${esc(joinArt(i.art, arr(i.it)[0]))}</span>${sayBtn(joinArt(i.art, arr(i.it)[0]))} <span class="muted">${esc(enList(i).join(", "))}</span> ${boxTag(i.id)}</div><div class="small">${esc(joinArt(i.indef, arr(i.it)[0]))} · ${esc(joinArt(i.artPl, i.plural))}</div>` + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
   if (i.type === "vocab") return `<div><span class="itx">${esc(arr(i.it).join(", "))}</span>${sayBtn(arr(i.it).join(", "))} <span class="small muted">${esc(posLabel(i.pos, i.gender))}</span> ${boxTag(i.id)}</div><div>${esc(enList(i).join(", "))}</div>` + (Array.isArray(i.forms) ? `<div class="small muted">${esc(formsText(i.forms))}</div>` : "") + (i.note ? `<div class="small muted">${esc(i.note)}</div>` : "");
@@ -22536,8 +22826,23 @@ function renderStats() {
   ${lapsed.length ? table("Most missed", lapsed.map(([id, n]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapse${n === 1 ? "" : "s"}</td><td class="muted">box ${rec(id).box}</td></tr>`).join("")) : ""}
   ${tricky.length ? table("Tricky items", tricky.map(([id, n, box]) => `<tr><td>${esc(itemLabel(content.items[id]))}</td><td>${n} lapses</td><td class="muted">box ${box}</td></tr>`).join(""), `<p class="small muted" id="tricky-note">Missed ${TRICKY_LAPSES} times or more and not yet past box ${TRICKY_BOX}: each one starts again with its introduction and explanation the next time it comes up, then a typed follow-up.</p>`) : ""}
   ${anyLapses ? `<button type="button" class="wide" data-start="hard">Practise the most-missed items<small>the 15 items you have got wrong most often, across all units</small></button>` : ""}
+  ${content.unitById.vb ? weakSpotsHtml() : ""}
   ${days.length ? table("Recent days", days.map(d => `<tr><td>${d}</td><td>${progress.days[d].xp || 0} XP</td><td class="muted">${progress.days[d].new || 0} new</td></tr>`).join("")) : ""}
   ${byType.length ? table("Accuracy by exercise type, 30 days", byType.map(([k, v]) => `<tr><td>${esc(typeName[k] || k)}</td><td>${Math.round(100 * v[0] / v[1])}%</td><td class="muted">${v[0]}/${v[1]}</td></tr>`).join(""), `<p class="small muted">Weakest types first.</p>`) : ""}`;
+}
+/* Verbs: weak spots on Stats (from 9.31): the verb forms missed on this device (itapp.vgmiss.v1), by person and by tense as
+   bars, each with its label and number (the bar is never the only signal), the 8 cells missed most, and Practise my weak spots. */
+function weakSpotsHtml() {
+  const list = [...vgMisses().values()].filter(e => content.items[vgId(e[0], VG_TENSES[e[1]])]);
+  if (!list.length) return groupHtml("Verbs: weak spots", `<div class="card weak"><p class="small muted">None yet. Each verb form you get wrong is noted here, and drops off as you get it right again.</p></div>`
+    + `<button type="button" class="wide" data-start="vweak" disabled aria-describedby="weak-none">Practise my weak spots</button><p class="small muted" id="weak-none">Nothing to practise yet.</p>`);
+  const byP = [0, 0, 0, 0, 0, 0], byT = VG_TENSES.map(() => 0);
+  for (const e of list) { byP[e[2]] += e[3]; byT[e[1]] += e[3]; }
+  const bars = (title, rows) => { const top = Math.max(1, ...rows.map(r => r[1])); return `<h3 class="wk-h">${esc(title)}</h3><div class="wkbars">` + rows.map(([l, n]) => `<div class="wkrow"><span class="wk-l">${esc(l)}</span>${bar(100 * n / top, "bar6")}<span class="wk-n">${fmtN(n)}</span></div>`).join("") + `</div>`; };
+  const top = list.slice().sort((a, b) => b[3] - a[3] || b[4] - a[4]).slice(0, 8).map(e => { const t = VG_TENSES[e[1]], it = content.items[vgId(e[0], t)]; return `<li><b>${esc(vgPerson(t, e[2]))} · ${esc(e[0])} · ${esc(TENSE_LABEL[t])}:</b> ${esc(it.forms[e[2]])}, missed ${e[3]} time${e[3] === 1 ? "" : "s"}</li>`; }).join("");
+  return groupHtml("Verbs: weak spots", `<div class="card weak">` + bars("By person", PERSONS.map((l, i) => [l, byP[i]])) + bars("By tense", VG_TENSES.map((t, i) => [TENSE_LABEL[t], byT[i]]))
+    + `<h3 class="wk-h">Missed most</h3><ol class="wk-top">${top}</ol></div>`
+    + `<button type="button" class="wide" data-start="vweak">Practise my weak spots<small>the verb tenses you get wrong most, asking for the forms you miss</small></button>`);
 }
 /* The forecast on Stats (from 9.5): a column for each of the next 7 days, tomorrow first, as tall as the number of items
    that fall due that day (the number on top), then the same days by kind in a table. One series in the accent colour, so
@@ -22575,7 +22880,8 @@ function renderSettings() {
     + group("Verbs", [
       row("verbsPerSession", "Verb session length", [[8, "8 exercises"], [12, "12 exercises"], [16, "16 exercises"], [24, "24 exercises"]]),
       row("verbNewPerSession", "New verbs and tenses per session", [[1, "1"], [2, "2"], [3, "3"], [5, "5"], [8, "8"]]),
-      row("verbUnlockBox", "A verb's next tense opens at", [[5, "Box 5 (tense learned)"], [4, "Box 4 (sooner)"], [3, "Box 3 (much sooner)"]], "The box the tense before it has to reach.")]);
+      row("verbUnlockBox", "A verb's next tense opens at", [[5, "Box 5 (tense learned)"], [4, "Box 4 (sooner)"], [3, "Box 3 (much sooner)"]], "The box the tense before it has to reach."),
+      row("verbTenseCap", "Open new tenses up to", [[7, "All"], [6, "congiuntivo presente"], [5, "imperativo"], [4, "condizionale"], [3, "futuro"], [2, "imperfetto"], [1, "passato prossimo"]], "Tenses after this one never open as new. Ones you have started keep coming back for review.")]);
 }
 /* Your data's Storage card (from 9.26): where this device keeps what is saved (Store.status()), how much is saved and how
    much room is left (Store.usage(), asked for as the screen is drawn and filled in when it answers), whether the phone has
@@ -22886,6 +23192,7 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   root.querySelectorAll("[data-lsec]").forEach(b => b.onclick = (e) => { e.preventDefault(); const t = document.getElementById(b.dataset.lsec === "toc" ? "toclabel" : "lsec-" + b.dataset.lsec); if (t) t.scrollIntoView({ block: "start" }); });
   root.querySelectorAll("[data-unit]").forEach(b => b.onclick = () => { S.flash = null; startSession(isFlashUnit(b.dataset.unit) ? "flashcards" : isVerbUnit(b.dataset.unit) ? "verbs" : "unit", b.dataset.unit); });
   root.querySelectorAll("[data-practise]").forEach(b => b.onclick = () => { S.flash = null; startSession("section", b.dataset.practise); });
+  root.querySelectorAll("[data-vfocus]").forEach(b => b.onclick = () => { const [k, ...key] = b.dataset.vfocus.split(":"); S.flash = null; startSession(k, key.join(":")); }); // Practise this verb, a tense or a family
   root.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => answerOption(b.dataset.opt));
   root.querySelectorAll("[data-pick]").forEach(b => b.onclick = () => { S.bankPicked = (S.bankPicked || []).concat(Number(b.dataset.pick)); render(); });
   root.querySelectorAll("[data-unpick]").forEach(b => b.onclick = () => { const i = Number(b.dataset.unpick); S.bankPicked = (S.bankPicked || []).filter(x => x !== i); render(); });
@@ -23497,8 +23804,8 @@ Store.onError = (ok) => setSaveFailed(!ok);
 Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "data")) render(); };
 
 /* ---------- boot ---------- */
-const APP_VERSION = "9.30";
-const CHANGES = "A new grammar unit, The passive and the causative, comes after Building longer sentences: è stato fatto, viene chiuso, va fatto, faccio riparare la macchina, mi faccio tagliare i capelli and lasciami parlare, with a lesson and 194 items. Other lessons now link to it."; // this version's changes in one or two plain sentences, for What's new on Today
+const APP_VERSION = "9.31";
+const CHANGES = "Verbs practice is now balanced, and the Verbs page lets you practise one tense, verb or family. Stats shows the verb forms you miss most, tables underline irregular forms, Settings can stop new tenses opening, and the summary says which tenses opened."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());

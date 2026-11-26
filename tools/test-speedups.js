@@ -12,9 +12,12 @@
        the results drawn), a unit's glossary filter (five units, one of them 1,000 cards) and the Verbs
        filter, against searching every field afresh as 9.2 did.
     2. The Verbs reference: no tables drawn until a row is opened; every row, once opened, the same as
-       9.2 drew it (from 9.20 with each tense's example sentences under its table); a filter's rows drawn open, the same as 9.2's.
+       9.2 drew it (from 9.20 with each tense's example sentences under its table; from 9.31 with Practise this
+       verb first, and Practise this family under each family's heading, each worked out afresh); a filter's
+       rows drawn open, the same as 9.2's.
     3. Counts: with about 6,600 records saved (tools/lib/seed.js), every count Today, Units, Stats and You
-       show, from the cache, against 9.2's functions: when loaded, through the next 25 moments when time
+       show (from 9.31 also each tense's and family's verb tenses started and able to open, for the focus
+       sessions), from the cache, against 9.2's functions: when loaded, through the next 25 moments when time
        alone changes one (the cache kept just before each and worked out again at it), a day, a week and
        two months on, and after an answer, an undo, a setting, a sync merge, a backup loaded and a
        reset; and the numbers drawn on those screens.
@@ -86,15 +89,20 @@ function REFERENCE() {
   R.verbRow = (v, open) => {
     const items = VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
     const summ = items.map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
+    const focus = { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= (progress.settings.verbTenseCap || 7)).length }; // from 9.31, Practise this verb first
     return `<details class="vref"${open ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>`
-      + items.map(i => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense) + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("") // from 9.20, each tense's example sentences under its table
+      + vgFocusBtn("vverb", v.it, "Practise this verb", focus, "vverb-none-" + v.it)
+      + items.map((i, k) => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)
+        + (k === items.findIndex(x => vgKeyHtml(v.it, x.tense)) ? vgKeyHtml(v.it, i.tense) : "") // from 9.31, the legend of the underlining (or the caption of a verb irregular throughout) under the first table it belongs to
+        + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("") // from 9.20, each tense's example sentences under its table
       + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "") + `</details>`;
   };
   R.verbListHtml = (f) => {
     const famOrder = Object.keys(VERB_FAMILIES);
     const sorted = R.verbs(f).slice().sort((a, b) => famOrder.indexOf(a.fam) - famOrder.indexOf(b.fam) || a.it.localeCompare(b.it));
     let h = "", fam = null, rows = "";
-    const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p><div class="card rows">${rows}</div>`); rows = ""; };
+    const famFocus = (fam) => { const items = (content.byUnit.vb || []).filter(i => i.fam === fam); return { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= (progress.settings.verbTenseCap || 7)).length }; };
+    const flush = () => { if (fam !== null) h += groupHtml(esc(VERB_FAMILIES[fam][0]), `<p class="small muted">${esc(VERB_FAMILIES[fam][1])}</p>` + vgFocusBtn("vfam", fam, "Practise this family", famFocus(fam), "vfam-none-" + fam) + `<div class="card rows">${rows}</div>`); rows = ""; }; // from 9.31, Practise this family
     for (const v of sorted) { if (v.fam !== fam) { flush(); fam = v.fam; } rows += R.verbRow(v, f); }
     flush();
     if (!sorted.length) h += `<p class="muted">No verbs match.</p>`;
@@ -109,11 +117,14 @@ function REFERENCE() {
       unit[u.id] = { total: items.length, learned, started, pct: items.length ? Math.round(100 * learned / items.length) : 0, due: dueIds(u.id).length, fresh: newIds(u.id).length };
     }
     const all = Object.values(content.items).filter(i => isBuiltinPack(i.pack)), vi = content.byUnit.vb || [];
+    const cap = progress.settings.verbTenseCap || 7; // from 9.31, the ladder cap: a tense after it never opens as new
+    const by = (list, k) => { const o = {}; for (const i of list) { const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0 }); if (rec(i.id).box >= 1) c.started++; if (rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap) c.open++; } return o; };
     const ids = Object.keys(progress.items).filter(id => content.items[id]);
     return {
       unit, due: dueIds().length, mistakes: Object.keys(progress.items).filter(id => isRecentMistake(id)).length,
       coursePct: all.length ? Math.round(100 * all.filter(i => rec(i.id).box >= 5).length / all.length) : 0,
-      verbs: { verbs: new Set(vi.filter(i => rec(i.id).box >= 1).map(i => i.it)).size, totalVerbs: VERB_GYM.length, learned: vi.filter(i => rec(i.id).box >= 5).length, total: vi.length, due: dueIds("vb").length, fresh: verbNewIds().length },
+      verbs: { verbs: new Set(vi.filter(i => rec(i.id).box >= 1).map(i => i.it)).size, totalVerbs: VERB_GYM.length, learned: vi.filter(i => rec(i.id).box >= 5).length, total: vi.length, due: dueIds("vb").length, fresh: verbNewIds().length,
+        byTense: by(vi, "tense"), byFam: by(vi, "fam") }, // from 9.31, the focus sessions' counts: per tense and family, started and able to open now
       flashDue: flashDueIds().length, flashNew: flashNewIds().length,
       learned: Object.keys(progress.items).filter(id => content.items[id] && rec(id).box >= 5).length,
       started: ids.filter(id => rec(id).box >= 1).length,
