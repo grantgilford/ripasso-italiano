@@ -464,6 +464,97 @@ async function referenceUpgrade(browser, origin) {
   }
 }
 
+/* The Verb sprint (from 9.32): reached from Units' Verbs card and from the Verbs reference, in each layout, played by typing
+   with a stand-in for its clock (window.__t, moved by the test), so no check waits a minute; what it keeps, and leaving it. */
+async function sprint(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verb sprint, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await page.evaluate(() => { window.__t = 0; sprintClock.now = () => window.__t; Store.remove("itapp.vgmiss.v1"); VG_MISS = null; });
+    const kept = () => page.evaluate(async () => { await Store.flush(); return JSON.stringify([Store.get("itapp.sprint.v1"), Store.get("itapp.vgmiss.v1")]); });
+    const progressBefore = await savedProgress(page);
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-go="sprint"]'))) await tap(page, '.ulist [data-upick="vb"]');
+    await tap(page, '.ucard [data-go="sprint"]');
+    const opened = await page.evaluate(() => ({ screen: S.screen, tab: (document.querySelector('.tab[aria-current="page"]') || {}).dataset?.go, start: !!document.querySelector('[data-act="spStart"]:not([disabled])'), len: (document.querySelector('[data-splen][aria-pressed="true"]') || {}).dataset?.splen, text: document.querySelector(".sp-info").textContent }));
+    check(L("Units › Verbs › Sprint opens its screen: the length, the best (none yet) and Start"), opened.screen === "sprint" && opened.tab === "units" && opened.start && opened.len === "60" && /Best for 60 seconds: none yet/.test(opened.text), JSON.stringify(opened));
+    await layout(page, L("the sprint's first screen"), opts);
+    await tap(page, '.hdr .back');
+    check(L("…its back arrow returns to Units"), (await screen(page)) === "units");
+    await tap(page, '.ucard [data-ref="vb"]'); await tap(page, '.vtools [data-go="sprint"]');
+    check(L("the Verbs reference's Sprint opens it too"), (await screen(page)) === "sprint");
+    await tap(page, '[data-splen="90"]');
+    check(L("choosing 90 s says the best for 90 seconds"), await page.evaluate(() => document.querySelector('[data-splen="90"]').getAttribute("aria-pressed") === "true" && /Best for 90 seconds/.test(document.querySelector(".sp-info").textContent)));
+    await tap(page, '[data-splen="60"]');
+    await tap(page, '[data-act="spStart"]');
+    const run = await page.evaluate(() => ({ phase: SP && SP.phase, bar: !!document.querySelector(".tabbar"), focus: document.activeElement.id, clock: document.getElementById("spClock").textContent, prompt: document.getElementById("spPrompt").textContent, want: `${SP.cur.i.it} · ${vgPerson(SP.cur.i.tense, SP.cur.p)} · ${TENSE_LABEL[SP.cur.i.tense]}` }));
+    check(L("Start: the clock at 60, no tab bar, the field focused, and a prompt like “andare · noi · futuro”"), run.phase === "run" && !run.bar && run.focus === "spAnswer" && run.clock === "60" && run.prompt.startsWith(run.want), JSON.stringify(run));
+    await layout(page, L("a sprint under way"), opts);
+    // right, by typing
+    const right = await page.evaluate(() => SP.cur.i.forms[SP.cur.p]);
+    const first = await page.evaluate(() => SP.cur.i.it);
+    await page.evaluate(() => { window.__t = 4000; spTick(); });
+    await page.type("#spAnswer", right); await page.keyboard.press("Enter"); await settle(page);
+    const r1 = await page.evaluate(() => ({ score: document.getElementById("spScore").textContent, last: document.getElementById("spLast").textContent, focus: document.activeElement.id, value: document.getElementById("spAnswer").value, verb: SP.cur.i.it, clock: document.getElementById("spClock").textContent }));
+    check(L("a right answer typed with Enter: the score goes up and the next form comes at once, the field empty and still focused"), r1.score === "1 right" && r1.last.includes(right) && r1.focus === "spAnswer" && r1.value === "" && r1.verb !== first && r1.clock === "56", JSON.stringify(r1));
+    // an accent key types into the field
+    await page.click('.accentbar [data-ch="ò"]');
+    check(L("an accent key types into the sprint's field"), (await page.inputValue("#spAnswer")) === "ò");
+    await page.fill("#spAnswer", "");
+    // wrong, by typing
+    const missed = await page.evaluate(() => ({ form: SP.cur.i.forms[SP.cur.p], shown: vgPerson(SP.cur.i.tense, SP.cur.p) + " " + SP.cur.i.forms[SP.cur.p], why: (() => { const d = document.createElement("div"); d.innerHTML = spWhy(SP.cur); return d.textContent; })(), id: SP.cur.i.id, p: SP.cur.p }));
+    await page.type("#spAnswer", "zzz"); await page.keyboard.press("Enter"); await settle(page);
+    await page.evaluate(() => { window.__t = 34000; spTick(); }); await settle(page);
+    const w = await page.evaluate(() => { const f = document.querySelector(".spfix"); return { phase: SP.phase, title: f && f.querySelector(".fb-title").textContent, text: f && f.textContent.replace(/\u2011/g, "-"), /* the screen's non-breaking hyphens, as plain ones */ clock: document.getElementById("spClock").textContent, focus: document.activeElement.dataset.act, input: document.getElementById("spAnswer").disabled && document.getElementById("spAnswer").value }; });
+    check(L("a wrong answer: “Not quite” with ✕, the right form, what was typed and why, Next focused"), w.phase === "wrong" && w.title === "Not quite" && w.text.includes("Answer: " + missed.shown) && w.text.includes("You typed: zzz") && missed.why.length > 10 && w.text.includes(missed.why) && w.focus === "spNext" && w.input === "zzz", JSON.stringify(w));
+    check(L("…and the clock stops while it shows (still 56 thirty seconds later)"), w.clock === "56");
+    await layout(page, L("a sprint's wrong answer"), opts);
+    await page.keyboard.press("Enter"); await settle(page);
+    check(L("Enter moves on, the clock going again from where it stopped"), await page.evaluate(() => SP.phase === "run" && document.activeElement.id === "spAnswer" && Math.ceil(spLeft() / 1000) === 56));
+    await page.evaluate(() => { window.__t = 34000 + 57000; spTick(); }); await settle(page);
+    const done = await page.evaluate(() => ({ title: (document.querySelector("h1") || {}).textContent, bigs: [...document.querySelectorAll(".sumcard .big")].map(b => b.textContent), best: !!document.querySelector(".sp-best"), rows: [...document.querySelectorAll(".mrow")].map(r => r.textContent), bar: !!document.querySelector(".tabbar") }));
+    check(L("when the clock runs out: Time's up, 1 right, 50% accuracy, a new best, and the form missed with what was typed"), done.title === "Time's up" && done.bigs.join() === "1,50%,1" && done.best && done.rows.length === 1 && done.rows[0].includes(missed.form) && done.rows[0].includes("You typed zzz") && !done.bar, JSON.stringify(done));
+    const k = JSON.parse(await kept());
+    check(L("…the best kept on this device, and the form missed noted as a weak spot"), JSON.stringify(k[0]) === JSON.stringify({ 60: 1, len: 60 }) && Array.isArray(k[1]) && k[1].length === 1 && k[1][0][0] === missed.id.replace(/^vg-|-[a-z_]+$/g, "") && k[1][0][2] === missed.p, JSON.stringify(k));
+    check(L("…and saved progress is untouched"), (await savedProgress(page)) === progressBefore);
+    await layout(page, L("the sprint's end"), opts);
+    await tap(page, '[data-act="spPractise"]');
+    check(L("Practise these starts an ordinary Verbs session of the verb tense missed"), (await screen(page)) === "session" && await page.evaluate((id) => session.kind === "vsprint" && session.queue.every(q => q.ex.item.id === id), missed.id));
+    await page.evaluate(() => { session = null; S.screen = "reference"; S.refUnit = "vb"; render(); }); await settle(page);
+    // leaving mid-round keeps nothing: the back button, ✕, and the app put away
+    const before = await kept();
+    await tap(page, '.vtools [data-go="sprint"]'); await tap(page, '[data-act="spStart"]');
+    await page.fill("#spAnswer", "zzz"); await page.keyboard.press("Enter"); await settle(page);
+    await page.goBack(); await settle(page);
+    check(L("the back button mid-round leaves the sprint for the Verbs reference"), (await screen(page)) === "reference" && await page.evaluate("SP === null"));
+    await tap(page, '.vtools [data-go="sprint"]'); await tap(page, '[data-act="spStart"]'); await tap(page, '[data-act="spQuit"]');
+    check(L("✕ stops it, back on the first screen, saying nothing was kept"), await page.evaluate(() => S.screen === "sprint" && SP === null && /nothing from it was kept/.test(document.querySelector(".flash").textContent)));
+    await tap(page, '[data-act="spStart"]');
+    await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, get: () => true }); document.dispatchEvent(new Event("visibilitychange")); delete document.hidden; }); await settle(page);
+    check(L("putting the app away mid-round ends it too"), await page.evaluate(() => SP === null && /put away/.test(document.querySelector(".flash").textContent)));
+    check(L("…and none of the three kept anything"), (await kept()) === before);
+    // Settings, and a damaged value
+    await page.evaluate(() => { S.screen = "settings"; render(); }); await settle(page);
+    await page.selectOption("#s-sprintLen", "120");
+    await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
+    check(L("Settings › Verb sprint length chooses it too"), await page.evaluate(() => document.querySelector('[data-splen="120"]').getAttribute("aria-pressed") === "true"));
+    await saveText(page, "itapp.sprint.v1", "{\"60\": \"lots\", \"len\": 45"); await page.reload(); await page.waitForFunction(ready);
+    await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
+    check(L("a damaged itapp.sprint.v1 is harmless: 60 seconds, no best"), await page.evaluate(() => document.querySelector('[data-splen="60"]').getAttribute("aria-pressed") === "true" && /none yet/.test(document.querySelector(".sp-info").textContent)));
+    check(L("…and is never part of progress"), await page.evaluate(() => !/sprint/.test(JSON.stringify(progress)) && !/sprint/.test(backupText())));
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verb sprint checked, ${label}`);
+  }
+  { // room above the keyboard, at Pixel 8 size, as for every typed question
+    const { page, context } = await openApp(browser, origin, { width: 412, height: 915, scheme: "light" });
+    await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
+    await tap(page, '[data-act="spStart"]');
+    const bottom = await page.evaluate(() => Math.max(document.querySelector('[data-act="spCheck"]').getBoundingClientRect().bottom, document.querySelector('[data-act="spGiveup"]').getBoundingClientRect().bottom));
+    check(`Verb sprint: Don't know and Check end within the top 460 px at 412 × 915, above a Pixel 8's keyboard (${Math.round(bottom)})`, bottom <= 460);
+    await context.close();
+  }
+}
+
 /* Storage (from 9.26): Your data's Storage card and Today's notices about where progress is kept, in each layout.
    What the storage does is tools/test-storage.js's; this is how it is shown. Each case is set up by a script run before
    the page's own: a device that had progress before 9.26 (so the first opening moves it), one with no IndexedDB, and
@@ -1633,6 +1724,9 @@ async function readAloud(browser, origin) {
 
     /* The Verbs reference's squares, sort menu and Compare (from 9.32) */
     await referenceUpgrade(browser, origin);
+
+    /* The Verb sprint (from 9.32) */
+    await sprint(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

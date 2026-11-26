@@ -837,6 +837,19 @@ u.irr { text-decoration-line: underline; text-decoration-style: dotted; text-dec
 .vc.due::after { content: ""; position: absolute; top: -3px; right: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--fg); border: 2px solid var(--card); } /* due now: a dot on the corner, ringed in the card colour so it shows on every fill */
 .vmkey .vc.due::after { border-color: var(--bg); }
 .vmmore { height: 1px; }
+.sp-mid { flex-direction: row; align-items: baseline; gap: 8px; } /* the Verb sprint (9.32): a plain number for the seconds left */
+.sp-clock { font: 700 28px/1 var(--display); font-variant-numeric: tabular-nums; color: var(--fg); }
+.sp-mid .sbar-type { font-size: 14px; }
+.sp-last { margin: 0; min-height: 1.4em; font-size: 15px; line-height: 1.4; }
+.sp-ok { display: inline-flex; align-items: center; gap: 4px; color: var(--ok-title); font-weight: 600; }
+.spfix { --panel-text: var(--panel-text-bad); display: flex; flex-direction: column; gap: 8px; background: var(--bad-bg); }
+.spfix p { margin: 0; }
+.spfix .fb-icon { background: var(--bad); color: var(--bad-fg); }
+.spfix .fb-title { margin: 0; color: var(--bad-title); }
+.spfix .why { color: var(--panel-text); font-size: 15px; line-height: 1.5; }
+.sp-info { display: flex; flex-direction: column; gap: 4px; }
+.sp-info p, .sp-best { margin: 0; }
+.sp-best { display: flex; align-items: center; gap: 6px; color: var(--accent); font-weight: 600; }
 .vref-c { margin: 6px 0 2px; } /* the Verbs reference's closed rows: the map's squares (9.32) */
 .vcmp { margin: 2px 0 6px; } /* Compare, in an opened row (9.32) */
 .vcmp > summary { display: flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: 600; cursor: pointer; }
@@ -21565,7 +21578,7 @@ function vgStatus(i) {
 function renderVerbReference(u) {
   const st = counts().verbs;
   return unitHead(u) + `<p class="small muted">${fmtN(st.totalVerbs)} verbs · ${fmtN(st.verbs)} started · ${fmtN(st.learned)} of ${fmtN(st.total)} verb tenses learned</p>
-  <button type="button" class="primary wide" data-start="verbs">Practise verbs</button><div class="vtools"><button type="button" data-go="vmap">${icon("grid", 18)}Verb map</button></div>`
+  <button type="button" class="primary wide" data-start="verbs">Practise verbs</button><div class="vtools"><button type="button" data-go="vmap">${icon("grid", 18)}Verb map</button><button type="button" data-go="sprint">${icon("timer", 18)}Sprint</button></div>`
     + tenseChipsHtml(st)
     + groupHtml("Rules", `<div class="card notes">` + (u.notes || []).map(n => `<p>${esc(n)}</p>`).join("") + `</div>`)
     + `<label class="vh" for="refFilter">Filter the verbs</label><input type="text" id="refFilter" placeholder="Filter by verb, meaning or form…" value="${esc(S.refFilter || "")}" autocapitalize="off" autocorrect="off" spellcheck="false">`
@@ -21840,6 +21853,164 @@ function closeVmSheet() { // Close, a tap beside it, Escape and the back button:
   const b = v && app.querySelector(`[data-vmverb="${CSS.escape(v)}"]`); if (b) b.focus({ preventScroll: true });
   syncHistory(); // back closed it: the history entry that keeps the screen is put back
 }
+/* ---------- the Verb sprint (from 9.32) ----------
+   A timed round of single typed verb forms (S.screen "sprint"), from the Sprint button on the Verbs reference and on the
+   Verbs card on Units: side practice that never touches progress, the daily log or the streak (nothing here calls
+   applyResult, today() or saveProgress).
+   - The forms come from the verb tenses started at box 2 and up (box 1 and up while that gives fewer than 20), every person
+     of each, weighted: a tense started more recently (fewer answers so far, as the record has no date it was started) up to
+     three times, and a form missed before (itapp.vgmiss.v1) three to five times more; never the same verb twice running,
+     nor a form twice in a round until all have come.
+   - Enter checks, with the Accents setting as everywhere (checkAnswer). Right: straight on to the next, the field kept for
+     typing. Wrong (or Don't know): the clock stops, and the right form stays on screen with the first sentence of its
+     explanation (verbWhy) until Next or Enter.
+   - The length (60, 90 or 120 seconds) and the best score for each length are kept on this device: itapp.sprint.v1, as
+     { "60": 23, "90": 31, len: 60 }, never synced and never in a backup; a damaged value is ignored. When the clock runs
+     out, the round's misses are noted as weak spots in itapp.vgmiss.v1 and its right answers heal them, as anywhere else.
+   - Leaving mid-round (the back button, ✕, putting the app away) ends it, keeping nothing: no best and no weak spots.
+   - The end screen's Practise these starts an ordinary Verbs session of the verb tenses missed (kind "vsprint"), which
+     counts as any session does, asking the persons missed.
+   sprintClock is the round's clock, which a test replaces with one it moves on itself. */
+const LS_SPRINT = "itapp.sprint.v1", SP_LENGTHS = [60, 90, 120];
+const sprintClock = { now: () => performance.now() };
+let SP = null, SP_TIMER = 0; // the round, and the timer that shows the seconds left
+function spSaved() { // what itapp.sprint.v1 holds, anything damaged left out
+  const out = { best: {}, len: 60 };
+  try {
+    const v = Store.get(LS_SPRINT);
+    if (v && typeof v === "object" && !Array.isArray(v)) {
+      for (const n of SP_LENGTHS) { const b = v[n]; if (Number.isInteger(b) && b >= 0 && b <= 9999) out.best[n] = b; }
+      if (SP_LENGTHS.includes(v.len)) out.len = v.len;
+    }
+  } catch (e) { }
+  return out;
+}
+function spKeep(o) { const v = {}; for (const n of SP_LENGTHS) if (o.best[n] != null) v[n] = o.best[n]; v.len = o.len; try { Store.set(LS_SPRINT, v); } catch (e) { } }
+function spSetLength(n) { n = Number(n); if (!SP_LENGTHS.includes(n)) return; const o = spSaved(); o.len = n; spKeep(o); }
+function spPool() { // the verb tenses a sprint asks from
+  const vb = content.byUnit.vb || [], two = vb.filter(i => rec(i.id).box >= 2);
+  return { items: two.length >= 20 ? two : vb.filter(i => rec(i.id).box >= 1), from: two.length >= 20 ? 2 : 1 };
+}
+function spCells(items) { // every form of those tenses, each with its weight
+  const seen = items.map(i => rec(i.id).seenCount || 0), lo = Math.min(...seen), hi = Math.max(...seen), miss = vgMisses(), out = [];
+  items.forEach((i, k) => {
+    const recent = hi > lo ? 1 + 2 * (hi - seen[k]) / (hi - lo) : 1, t = VG_TENSES.indexOf(i.tense);
+    for (const p of vgPersons(i)) { const e = miss.get(vgMissKey(i.it, t, p)); out.push({ i, p, w: recent * (e ? 2 + Math.min(e[3], 3) : 1) }); }
+  });
+  return out;
+}
+function spPick(R) { // the next form: weighted, not the verb just asked, nor one already asked this round while others are left
+  const last = R.cur && R.cur.i.it;
+  let cells = R.cells.filter(c => !R.asked.has(c) && c.i.it !== last);
+  if (!cells.length) { R.asked.clear(); cells = R.cells.filter(c => c.i.it !== last); }
+  if (!cells.length) cells = R.cells;
+  let x = Math.random() * cells.reduce((s, c) => s + c.w, 0), pick = cells[cells.length - 1];
+  for (const c of cells) { x -= c.w; if (x < 0) { pick = c; break; } }
+  R.cur = pick; R.asked.add(pick);
+}
+const spLeft = () => !SP ? 0 : SP.phase === "run" ? Math.max(0, SP.left - (sprintClock.now() - SP.at)) : SP.left;
+const spShown = (c) => vgPerson(c.i.tense, c.p) + " " + c.i.forms[c.p]; // as the Verb form drill shows an answer
+function spWhy(c) { // the first sentence of the form's explanation (verbWhy gives it as HTML, escaped)
+  const w = String(verbWhy(vgVerb(c.i), c.i.tense, c.p) || "").trim(), m = w.match(/^.*?[.!?](?=\s+[A-Z(«“]|$)/);
+  return m ? m[0] : w;
+}
+function spStart() {
+  const pool = spPool(); if (!pool.items.length) return;
+  const len = spSaved().len;
+  SP = { len, left: len * 1000, at: sprintClock.now(), cells: spCells(pool.items), asked: new Set(), cur: null, right: 0, answered: 0, misses: [], rights: [], last: null, phase: "run" };
+  spPick(SP); S.spNote = null;
+  if (SP_TIMER) clearInterval(SP_TIMER);
+  SP_TIMER = setInterval(spTick, 250);
+  render();
+}
+function spTick() { // while the clock runs: the seconds left, and the end
+  if (!SP || SP.phase !== "run") return;
+  if (spLeft() <= 0) { spFinish(); return; }
+  const el = document.getElementById("spClock"); if (el) el.textContent = String(Math.ceil(spLeft() / 1000));
+}
+function spCheck(text, giveUp) {
+  const R = SP; if (!R || R.phase !== "run") return;
+  if (spLeft() <= 0) { spFinish(); return; } // the clock ran out first
+  text = String(text || "").trim();
+  if (!text && !giveUp) { const inp = document.getElementById("spAnswer"); if (inp) inp.focus(); return; }
+  const c = R.cur, res = giveUp ? { ok: false } : checkAnswer(text, vgAcc(c.i, c.p), { typos: false });
+  R.answered++;
+  if (res.ok) { R.right++; R.rights.push(c); R.last = { form: c.i.forms[c.p], note: res.note || "" }; spPick(R); spRedraw(); return; }
+  R.left = spLeft(); R.phase = "wrong"; R.misses.push({ c, given: text }); R.last = null; // the clock stops until Next
+  render();
+}
+function spNextForm() { const R = SP; if (!R || R.phase !== "wrong") return; R.phase = "run"; R.at = sprintClock.now(); spPick(R); render(); }
+function spFinish() { // the clock has run out: the misses noted as weak spots and the right answers healing them, the best kept
+  const R = SP; if (!R || R.phase === "done") return;
+  if (SP_TIMER) clearInterval(SP_TIMER);
+  SP_TIMER = 0; R.left = 0; R.phase = "done";
+  const key = (c) => vgMissKey(c.i.it, c.i.tense, c.p), missed = new Set(R.misses.map(m => key(m.c))), by = new Map();
+  const add = (c, k) => { const e = by.get(c.i) || { wrong: [], right: [] }; if (!e[k].includes(c.p)) e[k].push(c.p); by.set(c.i, e); };
+  R.misses.forEach(m => add(m.c, "wrong")); R.rights.forEach(c => { if (!missed.has(key(c))) add(c, "right"); });
+  for (const [i, e] of by) noteVgMisses(i, e.wrong, e.right);
+  const o = spSaved(); R.best = o.best[R.len]; R.newBest = R.right > 0 && R.right > (R.best == null ? -1 : R.best);
+  if (R.newBest) { o.best[R.len] = R.right; spKeep(o); }
+  render();
+}
+function spAbort(note) { // leaving mid-round: nothing is kept
+  if (SP_TIMER) clearInterval(SP_TIMER);
+  SP_TIMER = 0;
+  const was = !!SP && SP.phase !== "done";
+  SP = null; S.spNote = was && note ? note : null;
+  return was;
+}
+const spFrom = () => S.sprintFrom === "units" ? "units" : "reference";
+function spPromptHtml(c) { return `<span class="it">${esc(c.i.it)}</span> <span class="hint">· ${esc(vgPerson(c.i.tense, c.p))} · ${esc(TENSE_LABEL[c.i.tense])}</span><div class="hint sans">${esc(arr(c.i.en)[0] || "")}</div>`; }
+const spLastHtml = (R) => R.last ? `<span class="sp-ok">${icon("tick", 16, 2.6)}<span class="vh">Right: </span>${esc(R.last.form)}</span>${R.last.note ? ` <span class="muted">· ${esc(R.last.note)}</span>` : ""}` : "";
+function spRedraw() { // after a right answer: the next prompt, the score and the field emptied, in place, so the keyboard stays up
+  const R = SP, p = document.getElementById("spPrompt"), sc = document.getElementById("spScore"), l = document.getElementById("spLast"), inp = document.getElementById("spAnswer");
+  if (!p || !inp) { render(); return; }
+  p.innerHTML = spPromptHtml(R.cur); nbHyphens(p);
+  if (sc) sc.textContent = R.right + " right";
+  if (l) l.innerHTML = spLastHtml(R);
+  inp.value = ""; inp.focus();
+}
+function renderSprint() {
+  const R = SP, from = spFrom();
+  if (R && R.phase === "done") return spDoneHtml(R, from);
+  if (R) return spRunHtml(R);
+  const o = spSaved(), pool = spPool(), n = pool.items.length;
+  const seg = SP_LENGTHS.map(x => `<button type="button" data-splen="${x}" aria-pressed="${o.len === x}">${x} s</button>`).join("");
+  return `<div class="hgroup">${screenHead("Verb sprint", { back: from, backLabel: from === "units" ? "Units" : "Verbs", eyebrow: "Verbs" })}</div>`
+    + (S.spNote ? `<div class="card flash" role="status">${esc(S.spNote)}</div>` : "")
+    + `<p class="desc">Type as many verb forms as you can before the clock runs out. Enter checks. A wrong answer stops the clock and shows the right form, with why, until you tap Next.</p>`
+    + `<section class="group"><h2 class="eyebrow" id="splen-h">Length</h2><div class="seg" role="group" aria-labelledby="splen-h">${seg}</div></section>`
+    + `<div class="card sp-info"><p class="label">Best for ${o.len} seconds: ${o.best[o.len] != null ? fmtN(o.best[o.len]) : "none yet"}</p>`
+    + `<p class="small muted">${n ? `From the ${fmtN(n)} verb tense${n === 1 ? "" : "s"} you've started${pool.from === 2 ? " (box 2 and up)" : ""}, more often the forms you've missed and the tenses you started last.` : "Nothing to sprint on yet."}</p></div>`
+    + `<button type="button" class="primary wide" data-act="spStart"${n ? "" : ` disabled aria-describedby="sp-none"`}>Start</button>`
+    + (n ? "" : `<p class="small muted" id="sp-none">A sprint asks the verb tenses you've started: start a few in Verbs practice first.</p>`)
+    + `<p class="small muted">A sprint is side practice: it never changes your progress, your daily goal or your streak. Forms you miss are noted in Stats' Verbs: weak spots.</p>`;
+}
+function spRunHtml(R) {
+  const wrong = R.phase === "wrong", c = R.cur, m = wrong && R.misses[R.misses.length - 1];
+  let h = `<div class="sbar"><button type="button" class="iconbtn" data-act="spQuit" aria-label="Stop the sprint">${icon("close", 22, 2)}</button>`
+    + `<div class="sbar-mid sp-mid"><span class="sp-clock"><span id="spClock" role="timer" aria-label="Seconds left">${Math.ceil(spLeft() / 1000)}</span></span><span class="sbar-type">${wrong ? "Clock stopped" : "seconds left"}</span></div>`
+    + `<span class="scount" id="spScore">${R.right} right</span></div>`
+    + `<div class="sx"><div class="card prompt-card"><div class="prompt" id="spPrompt">${spPromptHtml(c)}</div></div>`;
+  if (!wrong) return h + `<p class="sp-last" id="spLast" role="status">${spLastHtml(R)}</p>`
+    + `<label class="field"><span class="vh">Your answer</span><input type="text" id="spAnswer" placeholder="Your answer" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" lang="it" enterkeyhint="go"></label>`
+    + accentBar() + `<div class="btnrow"><button type="button" data-act="spGiveup">Don't know</button><button type="button" class="primary" data-act="spCheck">Check</button></div></div>`;
+  return h + `<label class="field"><span class="vh">Your answer</span><input type="text" id="spAnswer" class="bad" disabled value="${esc(m.given)}" lang="it"></label>`
+    + `<section class="card spfix" aria-labelledby="spfix-t"><div class="fb-head"><span class="fb-icon">${icon("cross", 18, 2.6)}</span><h2 class="fb-title" id="spfix-t">Not quite</h2></div>`
+    + `<p class="fb-answer">Answer: <b>${esc(spShown(c))}</b></p>${m.given ? `<p class="why">You typed: ${esc(m.given)}</p>` : ""}<p class="why">${spWhy(c)}</p></section>`
+    + `<button type="button" class="primary wide" data-act="spNext">Next</button></div>`;
+}
+function spDoneHtml(R, from) {
+  const acc = R.answered ? Math.round(100 * R.right / R.answered) : 0, best = R.newBest ? R.right : R.best;
+  const rows = R.misses.map(m => `<div class="mrow"><div class="small muted">${esc(m.c.i.it)} · ${esc(vgPerson(m.c.i.tense, m.c.p))} · ${esc(TENSE_LABEL[m.c.i.tense])}</div><div class="it">${esc(m.c.i.forms[m.c.p])}${sayBtn(m.c.i.forms[m.c.p])}</div><div class="small muted">${m.given ? "You typed " + esc(m.given) : "Don't know"}</div></div>`).join("");
+  return `<header class="hdr"><div class="hdr-t"><p class="eyebrow">Verb sprint · ${R.len} seconds</p><h1 class="title">Time's up</h1></div></header>`
+    + `<div class="card sumcard"><div class="bigs"><div><span class="big">${R.right}</span><span class="small muted">right</span></div><div><span class="big">${acc}%</span><span class="small muted">accuracy (${R.right}/${R.answered})</span></div><div><span class="big">${best != null ? best : "–"}</span><span class="small muted">best for ${R.len} s</span></div></div>`
+    + (R.newBest ? `<p class="sp-best">${icon("tick", 18, 2.6)}A new best for ${R.len} seconds.</p>` : "") + `</div>`
+    + (R.misses.length ? groupHtml("Missed", `<div class="card rows">${rows}</div>`) : `<p class="muted">No misses: every answer was right.</p>`)
+    + `<div class="btnrow sumbtns">${R.misses.length ? `<button type="button" class="primary" data-act="spPractise">Practise these</button>` : ""}<button type="button"${R.misses.length ? "" : ` class="primary"`} data-act="spAgain">Another sprint</button></div>`
+    + (R.misses.length ? `<p class="small muted">Practise these starts an ordinary Verbs session of the verb tenses you missed, which counts as usual.</p>` : "")
+    + `<button type="button" class="quiet" data-act="spLeave">Back to ${from === "units" ? "Units" : "Verbs"}</button>`;
+}
 /* ---------- sessions ---------- */
 let S = { screen: "home" }; // ui state
 let session = null;
@@ -21868,6 +22039,8 @@ function sessionIds(kind, unitId) { // the items a session of this kind takes (b
     if (ids.length < per) ids = ids.concat(shuffle((content.byUnit.vb || []).map(i => i.id).filter(id => !ids.includes(id) && rec(id).box >= 1)).slice(0, per - ids.length));
   } else if (kind === "vweak") { // Practise my weak spots (from 9.31, on Stats)
     ids = vgWeakIds();
+  } else if (kind === "vsprint") { // the sprint's Practise these (from 9.32): the verb tenses it missed, their ids joined by commas
+    ids = String(unitId || "").split(",").filter(id => content.items[id] && content.items[id].unit === "vb");
   } else if (VG_FOCUS[kind]) { // Practise this verb, a tense or a family (from 9.31)
     ids = vgFocusIds(kind, unitId);
   } else if (kind === "section") { // Practise this section (from 9.6): its items due, then new (as many as today allows), then the rest, least known first
@@ -21897,12 +22070,12 @@ function lessonOrder(unitId, ids) {
   for (const id of ids) { const at = itemSection(id), k = at && at.unit === unitId ? at.index : Infinity; if (by.has(k)) by.get(k).push(id); else by.set(k, [id]); }
   return [...by.keys()].sort((a, b) => a - b).flatMap(k => shuffle(by.get(k)));
 }
-const BALANCED = new Set(["continue", "unit", "section", "review", "wild", "hard", "mistakes", "verbs", "vverb", "vtense", "vfam", "vweak"]); // grammar and (from 9.31) Verbs sessions, focus sessions included: planSession chooses their exercises
+const BALANCED = new Set(["continue", "unit", "section", "review", "wild", "hard", "mistakes", "verbs", "vverb", "vtense", "vfam", "vweak", "vsprint"]); // grammar and (from 9.31) Verbs sessions, focus sessions included: planSession chooses their exercises
 // What every exercise of a session asks of makeExercise besides the plan's hint (from 9.31): in Practise my weak spots, a verb
 // tense's persons missed (a table asks only those; a drill on one form picks one of them). Set by buildSession for the
 // session being built, and by the running session's kind for its follow-ups and repeats, so follow-ups and repeats keep to them too.
 let BUILDING = null; // the kind of session being built, while buildSession runs
-const sessionHint = (item) => (BUILDING !== null ? BUILDING : session && session.kind) === "vweak" && item.type === "vtense" ? { persons: vgMissedPersons(item) } : undefined;
+const sessionHint = (item) => ["vweak", "vsprint"].includes(BUILDING !== null ? BUILDING : session && session.kind) && item.type === "vtense" ? { persons: vgMissedPersons(item) } : undefined; // from 9.32 also a sprint's Practise these, whose misses are weak spots by then
 function buildSession(kind, unitId) {
   const ids = shuffle(uniqueByPid(sessionIds(kind, unitId)));
   BUILDING = kind;
@@ -22288,16 +22461,17 @@ function continueSession() {
 /* ---------- rendering ---------- */
 const app = document.getElementById("app");
 function render() {
-  const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou, vmap: renderVerbMap }[S.screen] || renderHome;
+  const fn = { home: renderHome, units: renderUnits, session: renderSession, summary: renderSummary, stats: renderStats, settings: renderSettings, data: renderData, reference: renderReference, lookup: renderLookup, rules: renderRules, you: renderYou, vmap: renderVerbMap, sprint: renderSprint }[S.screen] || renderHome;
   const key = S.screen === "reference" ? "reference:" + S.refUnit + ":" + (S.refTab || "lesson") : S.screen;
   const prev = S.viewKey, mem = S.scrollMem || (S.scrollMem = {});
   clearTimeout(typingTimer); typingDraw = null; // the whole screen is drawn now, with what has been typed so far
-  if (S.screen !== "units" && S.screen !== "reference" && S.screen !== "vmap") S.unitPick = null; // the card opened on Units lasts while you stay there or in its units (and the Verb map)
+  if (!["units", "reference", "vmap", "sprint"].includes(S.screen)) S.unitPick = null; // the card opened on Units lasts while you stay there or in its units (and the Verb map and the sprint)
   if (S.screen !== "vmap") S.vsheet = null; // the Verb map's sheet belongs to it
+  if (S.screen !== "sprint" && SP) spAbort(); // a sprint left by any way ends, keeping nothing
   if (VM_OBS) { VM_OBS.disconnect(); VM_OBS = null; } // the map's rows are drawn afresh, or it is left
   if (prev && prev !== key) { mem[prev] = window.scrollY; stopSaying(); } // speech belongs to the screen it started on
-  const bare = S.screen === "session" || S.screen === "summary"; // no tab bar while practising
-  app.className = S.screen === "session" ? "session" : bare ? "notabs" : "";
+  const bare = S.screen === "session" || S.screen === "summary" || (S.screen === "sprint" && !!SP); // no tab bar while practising (or sprinting)
+  app.className = S.screen === "session" || (S.screen === "sprint" && SP && SP.phase !== "done") ? "session" : bare ? "notabs" : "";
   const flash = S.flash && S.screen !== "home" && !bare ? `<div class="card flash" id="flash" role="status">${esc(S.flash)}</div>` : "";
   app.innerHTML = flash + fn() + (bare ? "" : tabBar()) + (S.screen === "session" && S.leaveAsk ? leaveSheetHtml() : "") + (S.screen === "session" && S.rule ? ruleSheetHtml() : "") + (S.vsheet ? vmSheetHtml() : "") + (S.rsheet ? reportSheetHtml() : "");
   if (S.screen !== "you" && S.screen !== "data") S.lastScreen = key + (S.screen === "session" && session ? ":" + session.kind + (session.unitId ? ":" + session.unitId : "") : ""); // an app problem's report names it
@@ -22449,7 +22623,7 @@ if (TTS) {
 }
 applySay();
 const TABS = [["home", "today", "Today"], ["units", "units", "Units"], ["rules", "book", "Rules"], ["lookup", "search", "Look up"], ["you", "you", "You"]];
-const TAB_OF = { reference: "units", vmap: "units", stats: "you", settings: "you", data: "you" };
+const TAB_OF = { reference: "units", vmap: "units", sprint: "units", stats: "you", settings: "you", data: "you" };
 function tabBar() {
   const cur = TAB_OF[S.screen] || S.screen;
   return `<nav class="tabbar" aria-label="Sections"><div class="tabbar-in">` + TABS.map(([go, ic, label]) => `<button type="button" class="tab" data-go="${go}"${cur === go ? ' aria-current="page"' : ""}>${icon(ic, 22)}<span>${label}</span></button>`).join("") + `</div></nav>`;
@@ -22593,7 +22767,7 @@ function unitRow(u, isOpen, isCur) {
   const todo = u.mode === "verbs" ? ((vs) => `${vs.fresh} new · ${vs.due} to review`)(counts().verbs) : `${st.fresh} new · ${st.due} to review`;
   if (isOpen) return `<div class="card ucard"><div class="urow">${badge}<div class="urow-t"><div class="urow-h"><span class="label">${name}</span><span class="ustat cur">${st.pct}%</span></div>
     <span class="small muted">${isCur ? "Current unit · " : ""}${todo}</span>${pack}${bar(st.pct)}</div></div>
-    <div class="ucard-btns"><button type="button" class="primary" data-unit="${esc(u.id)}">Practise</button>${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">${icon("book", 18)}Read lesson</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}${u.mode === "verbs" ? `<button type="button" data-go="vmap">${icon("grid", 18)}Verb map</button>` : ""}</div></div>`;
+    <div class="ucard-btns"><button type="button" class="primary" data-unit="${esc(u.id)}">Practise</button>${lessonOf(u) ? `<button type="button" data-ref="${esc(u.id)}" data-tab="lesson">${icon("book", 18)}Read lesson</button>` : `<button type="button" data-ref="${esc(u.id)}">Open unit</button>`}${u.mode === "verbs" ? `<button type="button" data-go="vmap">${icon("grid", 18)}Verb map</button><button type="button" data-go="sprint">${icon("timer", 18)}Sprint</button>` : ""}</div></div>`;
   const status = state === "done" ? `<span class="ustat done">${icon("tick", 14, 2.6)}Learned</span>` : state === "new" ? `<span class="ustat none">Not started</span>` : `<span class="ustat">${st.pct}%</span>`;
   const line = [isCur ? "Current unit" : "", u.description ? esc(u.description) : ""].filter(Boolean).join(" · ");
   return `<button type="button" class="card urow" data-upick="${esc(u.id)}">${badge}<span class="urow-t"><span class="urow-h"><span class="label">${name}</span>${status}</span>${line ? `<span class="small muted clamp1">${line}</span>` : ""}${pack}${state === "going" ? bar(st.pct) : ""}</span></button>`;
@@ -22829,7 +23003,7 @@ function renderSummary() {
   const s = session;
   const acc = s.answered ? Math.round(100 * s.correct / s.answered) : 0;
   const goal = progress.settings.goal || 30, xp = today().xp || 0;
-  const focus = VG_FOCUS[s.kind] || s.kind === "vweak" ? `<p class="eyebrow sumfocus">Focus: ${s.kind === "vweak" ? "your weak spots" : esc(vgFocusName(s.kind, s.unitId))}</p>` : ""; // a focus session names its verb, tense or family
+  const focus = VG_FOCUS[s.kind] || s.kind === "vweak" || s.kind === "vsprint" ? `<p class="eyebrow sumfocus">Focus: ${s.kind === "vweak" ? "your weak spots" : s.kind === "vsprint" ? "the forms your sprint missed" : esc(vgFocusName(s.kind, s.unitId))}</p>` : ""; // a focus session names its verb, tense or family
   return `<header class="hdr"><div class="hdr-t">${focus}<h1 class="title">Session complete</h1></div></header>
   <div class="card sumcard"><div class="bigs"><div><span class="big">${acc}%</span><span class="small muted">accuracy (${s.correct}/${s.answered})</span></div><div><span class="big">${s.xp}</span><span class="small muted">XP earned</span></div><div><span class="big">${s.promoted}</span><span class="small muted">items promoted</span></div></div>
   <div><div class="goal-h"><span>Today</span><b>${xp}/${goal} XP</b></div>${bar(100 * xp / goal, "bar6")}</div></div>
@@ -23197,7 +23371,8 @@ function renderSettings() {
       row("verbsPerSession", "Verb session length", [[8, "8 exercises"], [12, "12 exercises"], [16, "16 exercises"], [24, "24 exercises"]]),
       row("verbNewPerSession", "New verbs and tenses per session", [[1, "1"], [2, "2"], [3, "3"], [5, "5"], [8, "8"]]),
       row("verbUnlockBox", "A verb's next tense opens at", [[5, "Box 5 (tense learned)"], [4, "Box 4 (sooner)"], [3, "Box 3 (much sooner)"]], "The box the tense before it has to reach."),
-      row("verbTenseCap", "Open new tenses up to", [[7, "All"], [6, "congiuntivo presente"], [5, "imperativo"], [4, "condizionale"], [3, "futuro"], [2, "imperfetto"], [1, "passato prossimo"]], "Tenses after this one never open as new. Ones you have started keep coming back for review.")]);
+      row("verbTenseCap", "Open new tenses up to", [[7, "All"], [6, "congiuntivo presente"], [5, "imperativo"], [4, "condizionale"], [3, "futuro"], [2, "imperfetto"], [1, "passato prossimo"]], "Tenses after this one never open as new. Ones you have started keep coming back for review."),
+      ((len) => `<div class="setrow" id="set-sprintLen"><div class="setrow-m"><label for="s-sprintLen">Verb sprint length</label><select id="s-sprintLen" data-sprintlen>${SP_LENGTHS.map(n => `<option value="${n}"${n === len ? " selected" : ""}>${n} seconds</option>`).join("")}</select></div><p class="small muted hint">Kept on this device, like the best score for each length. A sprint never changes your progress.</p></div>`)(spSaved().len)]); // the sprint's length (from 9.32): per device, in itapp.sprint.v1
 }
 /* Your data's Storage card (from 9.26): where this device keeps what is saved (Store.status()), how much is saved and how
    much room is left (Store.usage(), asked for as the screen is drawn and filled in when it answers), whether the phone has
@@ -23490,7 +23665,11 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
     const g = b.dataset.go;
     S.flash = null; S.report = null; S.exportText = null; S.dataNote = null; S.summaryBox = null;
     if (g === "quit") { session = null; S.feedback = null; S.leaveAsk = false; S.rule = null; S.screen = "home"; }
-    else { if (g === "vmap" && S.screen !== "vmap") S.vmapFrom = S.screen === "units" ? "units" : "reference"; S.screen = g; } // the Verb map's back arrow returns where it was opened
+    else { // the Verb map's and the sprint's back arrows return where they were opened
+      if (g === "vmap" && S.screen !== "vmap") S.vmapFrom = S.screen === "units" ? "units" : "reference";
+      if (g === "sprint" && S.screen !== "sprint") { S.sprintFrom = S.screen === "units" ? "units" : "reference"; S.spNote = null; }
+      S.screen = g;
+    }
     S.scrollTo = b.dataset.to || null; // a You row can open a screen at one of its sections
     render();
   });
@@ -23539,6 +23718,8 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
     const go = card.querySelector("[data-unit]"); if (go) go.focus({ preventScroll: true });
   });
   root.querySelectorAll("[data-appearance]").forEach(b => b.onclick = () => setTheme(b.dataset.appearance));
+  root.querySelectorAll("[data-splen]").forEach(b => b.onclick = () => { spSetLength(b.dataset.splen); render(); }); // the sprint's length (from 9.32), on its screen
+  root.querySelectorAll("[data-sprintlen]").forEach(sel => sel.onchange = () => spSetLength(sel.value)); // …and in Settings
   root.querySelectorAll("[data-audio]").forEach(b => b.onclick = () => setAudio(b.dataset.audio));
   markSaying();
   if (root !== app) return;
@@ -23556,6 +23737,9 @@ function wire(root = app) { // root: the screen, or the part of it just drawn ag
   }
   const inp = document.getElementById("answer");
   if (inp && !S.feedback && !S.leaveAsk && !S.rsheet) { inp.focus(); }
+  const spa = document.getElementById("spAnswer"); // the sprint: Enter checks, and the accent keys type into the field
+  if (spa && !spa.disabled) { spa.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); spCheck(spa.value); } }; spa.onfocus = () => { S.focusId = "spAnswer"; }; if (!S.rsheet) spa.focus(); }
+  else if (S.screen === "sprint" && SP && SP.phase === "wrong") { const nx = app.querySelector('[data-act="spNext"]'); if (nx) nx.focus({ preventScroll: true }); } // Enter, or a tap, moves on
   const cellInputs = app.querySelectorAll("[data-cell]");
   cellInputs.forEach(c => c.onfocus = () => { S.focusId = c.id; });
   if (cellInputs.length && !S.feedback && !S.leaveAsk) cellInputs[0].focus();
@@ -23666,6 +23850,14 @@ function action(a) {
     case "rule": { const q = current(), at = q && itemSection(q.ex.item.id); if (at) showRule(at.unit, at.index); break; }
     case "ruleClose": closeRule(); break;
     case "vmClose": closeVmSheet(); break;
+    case "spStart": spStart(); break; // the Verb sprint (from 9.32)
+    case "spCheck": { const inp = document.getElementById("spAnswer"); spCheck(inp ? inp.value : ""); break; }
+    case "spGiveup": spCheck("", true); break;
+    case "spNext": spNextForm(); break;
+    case "spQuit": spAbort("Sprint stopped: nothing from it was kept."); render(); break;
+    case "spAgain": SP = null; spStart(); break;
+    case "spLeave": SP = null; S.screen = spFrom(); render(); break;
+    case "spPractise": { const ids = SP ? uniqueByPid(SP.misses.map(m => m.c.i.id)) : []; if (ids.length) { SP = null; S.flash = null; startSession("vsprint", ids.join(",")); } break; } // an ordinary Verbs session of the tenses missed
     case "applyUpdate": applyUpdate(); break;
     case "updateLater": S.updateLater = true; render(); break;
     case "checkUpdate": checkForUpdate(true); break;
@@ -24097,6 +24289,7 @@ window.addEventListener("popstate", () => {
 function goBack() {
   if (S.rsheet) { closeReport(); return; }
   if (S.vsheet) { closeVmSheet(); return; } // the Verb map's sheet closes first
+  if (S.screen === "sprint" && SP) { spAbort(); S.screen = spFrom(); render(); return; } // a sprint under way (or over) is left, keeping nothing more
   S.flash = null; S.report = null; S.exportText = null;
   if (S.screen === "session" && session) { if (S.rule) { closeRule(); return; } S.leaveAsk = !S.leaveAsk; render(); return; }
   if (S.screen === "home") { render(); return; }
@@ -24116,6 +24309,7 @@ function leaveSheetHtml() {
 let STARTED = false;
 function putAway() { if (!STARTED) return; Store.set(LS_PROGRESS, progress, true); Store.flush(); }
 document.addEventListener("visibilitychange", () => { if (document.hidden) { putAway(); clearTimeout(syncTimer); pushProgress(true); } });
+document.addEventListener("visibilitychange", () => { if (document.hidden && spAbort("The sprint ended when the app was put away: nothing from it was kept.") && S.screen === "sprint") render(); }); // a sprint under way ends
 window.addEventListener("pagehide", putAway);
 /* Another window of Ripasso (the installed app and a browser tab share the storage) has saved: Store has read the storage
    again and hands over that window's progress, which is merged with this one's as a copy from the cloud is (the newest
@@ -24135,7 +24329,7 @@ Store.onNotice = () => { if (STARTED && (S.screen === "home" || S.screen === "da
 
 /* ---------- boot ---------- */
 const APP_VERSION = "9.32";
-const CHANGES = "A new Verb map shows every verb's eight tenses at a glance, with filters to find any verb fast. The Verbs page shows each verb's tenses as small squares, sorts four ways and can compare two verbs side by side."; // this version's changes in one or two plain sentences, for What's new on Today
+const CHANGES = "A new Verb map shows every verb's tenses at a glance, and the Verbs page now shows them as squares, sorts four ways and compares two verbs. Verb sprint is a timed game of typed verb forms that never touches your progress."; // this version's changes in one or two plain sentences, for What's new on Today
 const REPORT_TO = { github: "grantgilford/ripasso-italiano", email: "" }; // where reports go (Your data and the answer panel): GitHub's issue forms of this repository, and an email address; a fork, or a new home for the project, changes this line
 function boot() { // once the saved data is in memory (Store.ready): nothing is drawn, and nothing saved, before it
   applyTheme(themePref());

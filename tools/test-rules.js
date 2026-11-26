@@ -36,6 +36,13 @@
        participle is regular and whether it agrees, and what the tense is for.
     3d. The agreement drill (agreementDrill, from 9.29): the adjective form and the gender the answer panel names, for
        a noun whose plural changes gender (il paio → le paia, l'uovo → le uova) and for ordinary ones.
+    3e. The Verb sprint (from 9.32): the verb tenses it asks (box 2 and up, or box 1 and up while that gives fewer
+       than 20; never a new one), never the same verb twice running; its clock (60 seconds, stopped while a wrong
+       answer's right form is shown, over at nought); an answer right with or without its pronoun, and the Accents
+       setting (parlero for parlerò, lenient and strict); Don't know; and what it keeps: progress exactly as it was (no
+       record, no day of the log, the same streak), the best per length in itapp.sprint.v1 (never lowered, a damaged
+       value ignored, a length other than 60, 90 or 120 refused), its misses as weak spots in itapp.vgmiss.v1 and a
+       right answer healing one; leaving mid-round keeps nothing.
 
   Then, unless --no-browser, in the real app (Playwright and Chromium, the clock fixed, the device in
   Europe/Tirane): Today and Stats show the streak with the goal met exactly, the new day arrives at
@@ -59,7 +66,11 @@ const tally = (from) => console.log(`  ${T.total - from} checks`);
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 const show = (x) => JSON.stringify(x);
 
-const app = openApp({ file, names: "verbWhy: typeof verbWhy === 'undefined' ? null : verbWhy, agreementDrill, explainFor" });
+const app = openApp({ file, names: "verbWhy: typeof verbWhy === 'undefined' ? null : verbWhy, agreementDrill, explainFor, Store, vgId, "
+  + "spStart: typeof spStart === 'undefined' ? null : spStart, spCheck: typeof spCheck === 'undefined' ? null : spCheck, spNextForm: typeof spNextForm === 'undefined' ? null : spNextForm, "
+  + "spTick: typeof spTick === 'undefined' ? null : spTick, spAbort: typeof spAbort === 'undefined' ? null : spAbort, spPool: typeof spPool === 'undefined' ? null : spPool, spPick: typeof spPick === 'undefined' ? null : spPick, "
+  + "spSaved: typeof spSaved === 'undefined' ? null : spSaved, spSetLength: typeof spSetLength === 'undefined' ? null : spSetLength, spLeft: typeof spLeft === 'undefined' ? null : spLeft, "
+  + "SP: () => typeof SP === 'undefined' ? null : SP, sprintClock: typeof sprintClock === 'undefined' ? {} : sprintClock, resetVgMiss: () => { if (typeof VG_MISS !== 'undefined') VG_MISS = null; }" });
 const content = app.content();
 console.log(`Rules test for ${path.basename(file)} (version ${app.version})`);
 
@@ -632,6 +643,89 @@ function agreementChecks() {
   tally(from);
 }
 
+/* ------------------------------------------------------------------ 3e. the Verb sprint */
+// Written out by hand: which verb tenses a sprint asks from, how its clock runs and stops, what an answer is checked against
+// (with the Accents setting), and what it keeps: a best score per length and the weak spots, never progress (from 9.32).
+function sprintChecks() {
+  section("3e. The Verb sprint: its forms, its clock, its answers and what it keeps (from 9.32)");
+  const from = T.total;
+  if (!app.spStart) { check("the sprint is in this version", false); return; }
+  const mem = {}, realGet = app.Store.get, realSet = app.Store.set; // a stand-in for the device's storage (Node keeps nothing)
+  app.Store.get = (k) => k in mem ? JSON.parse(mem[k]) : null; app.Store.set = (k, v) => { mem[k] = JSON.stringify(v); };
+  const clk = { t: 1000 }; app.sprintClock.now = () => clk.t;
+  try {
+    app.clock.t = T0; app.setRandom(seeded(5)); app.resetVgMiss();
+    const vb = content.byUnit.vb, presente = vb.filter(i => i.tense === "presente");
+    const put = (i, box, seen = 4) => { app.progress().items[app.pid(i.id)] = { box, due: T0 + DAY, lapses: 0, lastSeen: T0 - DAY, lastWrong: 0, seenCount: seen, lastRight: T0 - DAY }; };
+    // the forms it asks: box 2 and up, or box 1 and up while that gives fewer than 20
+    app.reset(); presente.slice(0, 10).forEach(i => put(i, 3)); presente.slice(10, 15).forEach(i => put(i, 1));
+    let pool = app.spPool().items.map(i => i.id).sort();
+    check("sprint: 10 verb tenses at box 2 and up are fewer than 20, so it asks the 15 started, box 1 too, and nothing new", same(pool, presente.slice(0, 15).map(i => i.id).sort()), show(pool));
+    presente.slice(15, 25).forEach(i => put(i, 2));
+    pool = app.spPool().items.map(i => i.id).sort();
+    check("sprint: with 20 at box 2 and up it asks only those", same(pool, presente.slice(0, 10).concat(presente.slice(15, 25)).map(i => i.id).sort()), show(pool.length));
+    // its clock, and an answer right
+    const before = JSON.stringify(app.progress()), streak0 = app.streak();
+    app.spSetLength(60); app.spStart();
+    let R = app.SP();
+    check("sprint: a 60-second round starts with 60 seconds", R.phase === "run" && R.left === 60000 && app.spLeft() === 60000);
+    let verbs = new Set(), last = null, twice = 0;
+    for (let k = 0; k < 40; k++) { app.spPick(R); if (R.cur.i.it === last) twice++; last = R.cur.i.it; verbs.add(R.cur.i.id); }
+    check("sprint: never the same verb twice running, and only the forms of the tenses in its pool", !twice && [...verbs].every(id => pool.includes(id)), show({ twice }));
+    clk.t += 5000;
+    check("sprint: five seconds on, 55 are left", app.spLeft() === 55000);
+    const cur = () => app.SP().cur, form = (c) => c.i.forms[c.p];
+    let c = cur(); app.spCheck(form(c));
+    check("sprint: the form typed right counts, and the next comes at once", app.SP().right === 1 && app.SP().answered === 1 && app.SP().phase === "run" && cur() !== c, show({ right: app.SP().right, phase: app.SP().phase }));
+    c = cur(); app.spCheck(vgPerson(c) + " " + form(c));
+    check("sprint: …with its subject pronoun too", app.SP().right === 2);
+    // the Accents setting: parlerò typed parlero
+    const fut = content.items[app.vgId("parlare", "futuro")];
+    app.SP().cur = { i: fut, p: 0, w: 1 }; app.progress().settings.accents = "lenient"; app.spCheck("parlero");
+    check("sprint: accents lenient: parlero for parlerò is right, with a note", app.SP().right === 3 && /parlerò/.test(app.SP().last.note), show(app.SP().last));
+    app.SP().cur = { i: fut, p: 0, w: 1 }; app.progress().settings.accents = "strict"; app.spCheck("parlero");
+    check("sprint: accents strict: parlero is wrong, and the clock stops", app.SP().phase === "wrong" && app.SP().right === 3 && app.SP().misses.length === 1, show({ phase: app.SP().phase }));
+    app.progress().settings.accents = "lenient";
+    const stopped = app.spLeft(); clk.t += 30000; app.spTick();
+    check("sprint: while the right form is shown the clock stays where it stopped, thirty seconds later", app.spLeft() === stopped && app.SP().phase === "wrong", show({ stopped, now: app.spLeft() }));
+    app.spNextForm(); clk.t += 10000;
+    check("sprint: Next starts it again where it stopped", app.SP().phase === "run" && app.spLeft() === stopped - 10000, show(app.spLeft()));
+    c = cur(); app.spCheck("", true);
+    check("sprint: Don't know counts as a miss, and stops the clock too", app.SP().phase === "wrong" && app.SP().misses.length === 2 && app.SP().answered === 5);
+    app.spNextForm();
+    clk.t += stopped; app.spTick();
+    R = app.SP();
+    check("sprint: when the clock reaches nought the round is over", R.phase === "done" && R.left === 0);
+    check("sprint: …and progress is exactly as before: no record, no day of the log, the same streak", JSON.stringify(app.progress()).replace(/"accents":"(lenient|strict)"/, "") === before.replace(/"accents":"(lenient|strict)"/, "") && app.streak() === streak0 && !Object.keys(app.progress().days).length);
+    const kept = app.spSaved();
+    check("sprint: the best for 60 seconds is kept on the device (3 right)", kept.best[60] === 3 && kept.len === 60 && R.newBest, show(mem["itapp.sprint.v1"]));
+    const miss = JSON.parse(mem["itapp.vgmiss.v1"] || "[]");
+    check("sprint: its misses are noted as weak spots, once each (parlerò, io; the one not known)", miss.length === 2 && miss.some(e => e[0] === "parlare" && e[1] === 3 && e[2] === 0 && e[3] === 1) && miss.some(e => e[0] === c.i.it && e[2] === c.p), show(miss));
+    // a right answer heals a weak spot; a worse round keeps the best; leaving mid-round keeps nothing
+    app.spStart(); app.SP().cur = { i: fut, p: 0, w: 1 }; app.spCheck("parlerò"); clk.t += 70000; app.spTick();
+    const healed = JSON.parse(mem["itapp.vgmiss.v1"]);
+    check("sprint: parlerò typed right in a later round heals that weak spot", !healed.some(e => e[0] === "parlare" && e[1] === 3 && e[2] === 0) && healed.length === 1, show(healed));
+    check("sprint: …and one right in a round doesn't lower the best of 3", app.spSaved().best[60] === 3 && !app.SP().newBest);
+    const was = mem["itapp.vgmiss.v1"], best = mem["itapp.sprint.v1"];
+    app.spStart(); c = cur(); app.spCheck("zzz"); app.spNextForm(); c = cur(); app.spCheck(form(c));
+    check("sprint: leaving mid-round ends it", app.spAbort("left") === true && app.SP() === null);
+    check("sprint: …keeping nothing: no weak spot and no best", mem["itapp.vgmiss.v1"] === was && mem["itapp.sprint.v1"] === best);
+    // the length, and a damaged value
+    app.spSetLength(90); app.spStart();
+    check("sprint: a 90-second round, the length kept with the bests", app.SP().left === 90000 && JSON.parse(mem["itapp.sprint.v1"]).len === 90 && JSON.parse(mem["itapp.sprint.v1"])["60"] === 3);
+    app.spAbort(); app.spSetLength(45);
+    check("sprint: a length other than 60, 90 or 120 is refused", app.spSaved().len === 90);
+    mem["itapp.sprint.v1"] = JSON.stringify({ 60: -3, 90: "lots", 120: 2.5, len: 45 });
+    check("sprint: a damaged value is ignored: no bests, and 60 seconds", same(app.spSaved(), { best: {}, len: 60 }));
+    mem["itapp.sprint.v1"] = "[1,2"; let ok = true; try { ok = same(app.spSaved(), { best: {}, len: 60 }); } catch (e) { ok = false; }
+    check("sprint: …and so is one that isn't even an object", ok);
+  } finally {
+    app.Store.get = realGet; app.Store.set = realSet; app.spAbort(); app.resetVgMiss(); app.reset(); app.clock.t = null; app.setRandom(seeded(1));
+  }
+  tally(from);
+}
+function vgPerson(c) { return ["io", "tu", "lui", "noi", "voi", "loro"][c.p]; } // a subject pronoun the answer may start with (lui for lui/lei)
+
 /* ------------------------------------------------------------------ 4. in the real app */
 async function browserChecks() {
   section("4. In the real app: the streak, midnight and a change of time zone (Chromium, the clock fixed)");
@@ -702,6 +796,7 @@ async function browserChecks() {
   checkerChecks();
   compoundChecks();
   agreementChecks();
+  sprintChecks();
   if (BROWSER) await browserChecks(); else console.log("\n(--no-browser: the checks in the real app were left out)");
   T.summary();
 })().catch(e => { T.stopped(e); T.summary(); });
