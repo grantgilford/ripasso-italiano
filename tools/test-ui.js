@@ -291,6 +291,278 @@ async function verbsScreens(browser, origin) {
   }
 }
 
+/* The Verb map (from 9.32): reached from Units' Verbs card and from the Verbs reference, in each layout, within the layout
+   rules; its tense rows, cells, filters, sorting and rows drawn as it scrolls; and the sheet a row opens. */
+async function verbMap(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verb map, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await page.evaluate(() => { // andare: presente learned, passato prossimo learned and due, so imperfetto can open and the rest are locked
+      const T = Date.now(), put = (t, box, due) => { progress.items[pid(vgId("andare", t))] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 5, lastRight: T - 864e5 }; };
+      put("presente", 6, T + 9 * 864e5); put("passato_prossimo", 5, T - 3600e3); saveProgress(); render();
+    });
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-go="vmap"]'))) await tap(page, '.ulist [data-upick="vb"]');
+    await tap(page, '.ucard [data-go="vmap"]');
+    check(L("Units › Verbs › Verb map opens the map, under the Units tab"), (await screen(page)) === "vmap" && (await page.getAttribute('.tab[aria-current="page"]', "data-go")) === "units");
+    const tenses = await page.evaluate(() => { const st = counts().verbs.byTense; return [...document.querySelectorAll("[data-vmtense]")].map(b => ({ t: b.dataset.vmtense, text: b.querySelector(".vmt-n").textContent + " | " + b.querySelector(".vmt-c").textContent, want: `${TENSE_LABEL[b.dataset.vmtense]} | learned ${fmtN(st[b.dataset.vmtense].learned)} of ${fmtN(st[b.dataset.vmtense].total)} · started ${fmtN(st[b.dataset.vmtense].started)}`, pressed: b.getAttribute("aria-pressed") })); });
+    check(L("a row for each of the eight tenses, in ladder order, each saying how many verbs have it learned and started"), tenses.length === 8 && tenses.map(x => x.t).join() === await page.evaluate("VG_TENSES.join()") && tenses.every(x => x.text === x.want && x.pressed === "false"), JSON.stringify(tenses.filter(x => x.text !== x.want).slice(0, 2)));
+    await layout(page, L("the Verb map"), opts);
+    const first = await page.evaluate(() => ({ rows: document.querySelectorAll(".vmrow").length, verbs: VERB_GYM.length }));
+    check(L("opening it draws only the first rows"), first.rows === 40 && first.rows < first.verbs, JSON.stringify(first));
+    await page.evaluate(() => { const b = document.querySelector('.vmrow[data-vmverb="andare"]'); b.scrollIntoView({ block: "center" }); });
+    const andare = await page.evaluate(() => { const b = document.querySelector('.vmrow[data-vmverb="andare"]'), r = b.getBoundingClientRect(); return { label: b.getAttribute("aria-label"), cells: [...b.querySelectorAll(".vc")].map(c => c.className.replace(/^vc /, "") + (c.textContent ? ":" + c.textContent : "")), h: r.height, hidden: b.querySelector(".vm-c").getAttribute("aria-hidden"), gloss: b.querySelector(".vm-g").textContent }; });
+    check(L("a verb's row: its cells in ladder order (learned with ✓, due with its mark, new, locked), and an aria-label that says them"), andare.label === "andare: presente learned; passato prossimo learned, due; imperfetto new; five locked" && andare.cells.join() === "b5:✓,b5 due:✓,open,lock,lock,lock,lock,lock" && andare.hidden === "true" && andare.gloss === "to go", JSON.stringify(andare));
+    check(L("…the whole row is the tap target, at least 44 px high"), andare.h >= 44, String(andare.h));
+    const boxRow = await page.evaluate(() => { const v = VERB_GYM.find(x => verbTenses(x).some(i => rec(i.id).box >= 1 && rec(i.id).box <= 4)), i = verbTenses(v).find(i => rec(i.id).box >= 1 && rec(i.id).box <= 4), k = VG_TENSES.indexOf(i.tense), b = document.querySelector(`.vmrow[data-vmverb="${v.it}"]`), c = b && b.querySelectorAll(".vc")[k], r = rec(i.id); return { ok: !!c && c.classList.contains("b" + r.box) && c.textContent === String(r.box) && c.classList.contains("due") === (r.due <= Date.now()) && b.getAttribute("aria-label").includes(`${TENSE_LABEL[i.tense]} box ${r.box}${r.due <= Date.now() ? ", due" : ""}`), v: v.it }; });
+    check(L("a tense in box 1–4 shows its box number, and says it"), boxRow.ok, boxRow.v);
+    // the status filter, with and without a tense
+    const due = await page.evaluate(() => { const t = Date.now(); return VERB_GYM.filter(v => verbTenses(v).some(i => rec(i.id).box >= 1 && rec(i.id).due <= t)).length; });
+    check(L("the Due chip counts the verbs with a tense due"), (await page.textContent('[data-vmstatus="due"] .fchip-n')) === String(due), await page.textContent('[data-vmstatus="due"]'));
+    await tap(page, '[data-vmstatus="due"]');
+    const dueRows = await page.evaluate(() => ({ pressed: document.querySelector('[data-vmstatus="due"]').getAttribute("aria-pressed"), labels: [...document.querySelectorAll(".vmrow")].map(b => b.getAttribute("aria-label")), sum: document.getElementById("vmSum").textContent }));
+    check(L("…and shows only those"), dueRows.pressed === "true" && dueRows.labels.length === Math.min(40, due) && dueRows.labels.every(x => x.includes(", due")) && dueRows.sum === `${due} of ${await page.evaluate("fmtN(VERB_GYM.length)")} verbs with a tense due`, JSON.stringify(dueRows).slice(0, 300));
+    await tap(page, '[data-vmtense="passato_prossimo"]');
+    const pp = await page.evaluate(() => { const t = Date.now(), want = VERB_GYM.filter(v => { const i = content.items[vgId(v.it, "passato_prossimo")]; return i && rec(i.id).box >= 1 && rec(i.id).due <= t; }).map(v => v.it); return { want, got: [...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb), pressed: document.querySelector('[data-vmtense="passato_prossimo"]').getAttribute("aria-pressed"), head: (document.querySelector(".vmh.on") || {}).textContent, sum: document.getElementById("vmSum").textContent }; });
+    check(L("tapping a tense makes Due mean that tense (its row pressed, its column marked)"), pp.pressed === "true" && pp.head === "pp" && pp.got.join() === pp.want.slice(0, 40).join() && /with the passato prossimo due$/.test(pp.sum), JSON.stringify(pp).slice(0, 300));
+    await tap(page, '[data-vmtense="passato_prossimo"]');
+    check(L("…and tapping it again goes back to any tense"), await page.evaluate(() => document.querySelector('[data-vmtense="passato_prossimo"]').getAttribute("aria-pressed") === "false" && !document.querySelector(".vmh.on") && /with a tense due$/.test(document.getElementById("vmSum").textContent)));
+    await tap(page, '[data-vmstatus="all"]');
+    // text, family and sort
+    await page.fill("#vmFilter", "andrò"); await until(() => page.evaluate(() => /matching/.test(document.getElementById("vmSum").textContent))); await settle(page);
+    const typed = await page.evaluate(() => ({ focus: document.activeElement.id, rows: [...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb), want: VERB_GYM.filter(v => verbText(v).includes(normalize("andrò"))).map(v => v.it) }));
+    check(L("typing a form finds its verb, redrawing only the results (the field keeps the focus)"), typed.focus === "vmFilter" && typed.rows.includes("andare") && typed.rows.join() === typed.want.join(), JSON.stringify(typed));
+    await page.fill("#vmFilter", ""); await until(() => page.evaluate(() => !/matching/.test(document.getElementById("vmSum").textContent)));
+    await page.selectOption("#vmFam", "isc"); await settle(page);
+    check(L("the family menu leaves that family's verbs"), await page.evaluate(() => { const r = [...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb); return r.length > 0 && r.length === VERB_GYM.filter(v => v.fam === "isc").length && r.every(x => VERB_GYM.find(v => v.it === x).fam === "isc"); }));
+    await page.selectOption("#vmFam", ""); await page.selectOption("#vmSort", "az"); await settle(page);
+    check(L("sorting A–Z"), await page.evaluate(() => { const r = [...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb); return r.join() === VERB_GYM.map(v => v.it).sort((a, b) => a.localeCompare(b, "it")).slice(0, 40).join(); }));
+    await page.selectOption("#vmSort", "weak"); await settle(page);
+    const weak = await page.evaluate(() => { const avg = (v) => { const b = verbTenses(v).map(i => rec(i.id).box).filter(x => x >= 1); return b.length ? b.reduce((a, x) => a + x, 0) / b.length : Infinity; }; const want = VERB_GYM.map((v, k) => [v, avg(v), k]).sort((a, b) => a[1] - b[1] || a[2] - b[2]).map(x => x[0].it); return { got: [...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb), want: want.slice(0, 40) }; });
+    check(L("sorting weakest first: the lowest average box among the tenses started, verbs with none started last"), weak.got.join() === weak.want.join(), JSON.stringify(weak).slice(0, 300));
+    await page.selectOption("#vmSort", "course"); await settle(page);
+    check(L("course order is the Verbs section's own"), await page.evaluate(() => [...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb).join() === VERB_GYM.slice(0, 40).map(v => v.it).join()));
+    const all = await until(async () => { await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight)); return page.evaluate(() => document.querySelectorAll(".vmrow").length === VERB_GYM.length); }, 20000);
+    check(L("the other rows are drawn as the grid scrolls near its end, every verb once"), all && await page.evaluate(() => new Set([...document.querySelectorAll(".vmrow")].map(b => b.dataset.vmverb)).size === VERB_GYM.length && !document.getElementById("vmMore")));
+    await layout(page, L("the Verb map, every row drawn"), opts);
+    // the sheet
+    await page.evaluate(() => document.querySelector('.vmrow[data-vmverb="andare"]').scrollIntoView({ block: "center" }));
+    const openSheet = async () => { await tap(page, '.vmrow[data-vmverb="andare"]'); return page.evaluate(() => !!document.getElementById("vmBg") && S.vsheet === "andare"); };
+    check(L("tapping a row opens its sheet"), await openSheet());
+    const sh = await page.evaluate(() => {
+      const bg = document.getElementById("vmBg"), k = bg.querySelector(".sheet"), r = k.getBoundingClientRect(), body = k.querySelector(".rs-body"), v = VERB_GYM.find(x => x.it === "andare");
+      const secs = [...k.querySelectorAll(".vms-t")];
+      return { inside: r.top >= 0 && r.bottom <= innerHeight + 0.5 && r.left >= 0 && r.right <= innerWidth + 0.5 && r.height <= innerHeight * 0.88 + 1, focus: k.contains(document.activeElement), inert: [...app.children].every(c => c === bg || c.inert),
+        title: k.querySelector("#vm-t").textContent, first: (body.querySelector("[data-vfocus]") || {}).dataset?.vfocus, secs: secs.length, want: verbTenses(v).length,
+        each: secs.every((s, n) => s.querySelector(".conjtable") && s.querySelector(`[data-vfocus="vtense:${verbTenses(v)[n].tense}"]`) && s.querySelector("h3").textContent.startsWith(TENSE_LABEL[verbTenses(v)[n].tense])),
+        status: secs[0] && secs[0].querySelector("h3").textContent, sentences: k.querySelectorAll(".fb-ctx").length, hasSentences: !!(VERB_SENTENCES.andare || []).length,
+        scrolls: getComputedStyle(body).overflowY, sideways: document.documentElement.scrollWidth > innerWidth + 1 || body.scrollWidth > body.clientWidth + 1,
+        small: [...k.querySelectorAll("button")].filter(b => b.offsetParent && (b.getBoundingClientRect().height < 43.5 || b.getBoundingClientRect().width < 43.5)).map(b => b.textContent || b.getAttribute("aria-label")) };
+    });
+    check(L("the sheet: within the screen, the focus inside it, the map behind out of reach"), sh.inside && sh.focus && sh.inert, JSON.stringify(sh));
+    check(L("…with Practise this verb first, then each tense with its status, its table and Practise this tense"), sh.title === "andare" && sh.first === "vverb:andare" && sh.secs === sh.want && sh.each && sh.status === "presente · learned", JSON.stringify(sh));
+    check(L("…the tense's example sentences, where they exist"), !sh.hasSentences || sh.sentences > 0, String(sh.sentences));
+    check(L("…scrolling inside it, never sideways, every control 44 px"), sh.scrolls === "auto" && !sh.sideways && !sh.small.length, JSON.stringify(sh.small));
+    await layout(page, L("the Verb map's sheet"), { zoomOnly: true });
+    const closed = async (how) => { await settle(page); return page.evaluate(() => ({ open: !!document.getElementById("vmBg") || !!S.vsheet, screen: S.screen, focus: document.activeElement && document.activeElement.dataset.vmverb, inert: [...app.children].some(c => c.inert) })); };
+    await tap(page, '[data-act="vmClose"]');
+    let c = await closed();
+    check(L("Close closes it, the focus back on the row"), !c.open && c.screen === "vmap" && c.focus === "andare" && !c.inert, JSON.stringify(c));
+    await openSheet(); await page.mouse.click(Math.round(width / 2), 6); c = await closed();
+    check(L("a tap beside it closes it"), !c.open && c.screen === "vmap" && c.focus === "andare", JSON.stringify(c));
+    await openSheet(); await page.keyboard.press("Escape"); c = await closed();
+    check(L("Escape closes it"), !c.open && c.screen === "vmap" && c.focus === "andare", JSON.stringify(c));
+    await openSheet(); await page.goBack(); c = await closed();
+    check(L("the back button closes it, staying on the map"), !c.open && c.screen === "vmap" && c.focus === "andare", JSON.stringify(c));
+    await page.goBack(); await settle(page);
+    check(L("…and back again returns to Units"), (await screen(page)) === "units");
+    // from the reference, and a focus session from the sheet
+    await tap(page, '.ucard [data-ref="vb"]');
+    await tap(page, '.vtools [data-go="vmap"]');
+    check(L("the Verbs reference's Verb map opens it too"), (await screen(page)) === "vmap");
+    await tap(page, '.hdr .back');
+    check(L("…and its back arrow returns to the Verbs reference"), (await screen(page)) === "reference" && (await page.evaluate("S.refUnit")) === "vb");
+    await tap(page, '.vtools [data-go="vmap"]');
+    await page.evaluate(() => document.querySelector('.vmrow[data-vmverb="andare"]').scrollIntoView({ block: "center" }));
+    await openSheet(); await tap(page, '#vmBg [data-vfocus="vtense:imperfetto"]');
+    check(L("the sheet's Practise this tense starts a session of that tense"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vtense" && session.unitId === "imperfetto" && !S.vsheet && !document.getElementById("vmBg")));
+    await page.evaluate(() => { session = null; S.screen = "vmap"; render(); }); await settle(page);
+    await page.evaluate(() => document.querySelector('.vmrow[data-vmverb="andare"]').scrollIntoView({ block: "center" }));
+    await openSheet(); await tap(page, '#vmBg [data-vfocus="vverb:andare"]');
+    check(L("…and Practise this verb one of the verb"), (await screen(page)) === "session" && await page.evaluate(() => session.kind === "vverb" && session.unitId === "andare"));
+    await page.evaluate(() => { session = null; S.screen = "home"; render(); }); await settle(page);
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verb map checked, ${label}`);
+  }
+}
+
+/* The Verbs reference's upgrade (from 9.32): the Verb map's squares in each closed row, the sort menu, and Compare in an
+   opened row, in each layout, within the layout rules. */
+async function referenceUpgrade(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verbs reference, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await page.evaluate(() => {
+      const T = Date.now(), put = (t, box, due) => { progress.items[pid(vgId("andare", t))] = { box, due, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: 5, lastRight: T - 864e5 }; };
+      put("presente", 6, T + 9 * 864e5); put("passato_prossimo", 5, T - 3600e3); saveProgress(); render();
+    });
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-ref="vb"]'))) await tap(page, '.ulist [data-upick="vb"]'); await tap(page, '.ucard [data-ref="vb"]');
+    const row = await page.evaluate(() => { const d = document.querySelector('details.vref[data-verb="andare"]'), s = d.querySelector("summary"); return { cells: [...s.querySelectorAll(".vref-c .vc")].map(c => c.className.replace(/^vc /, "") + (c.textContent ? ":" + c.textContent : "")), hidden: s.querySelector(".vref-c").getAttribute("aria-hidden"), say: (s.querySelector(".vh") || {}).textContent, lines: s.querySelectorAll("div.small").length, all: document.querySelectorAll("details.vref summary .vref-c").length === VERB_GYM.length }; });
+    check(L("each closed row shows the Verb map's squares in place of the line of statuses"), row.all && row.cells.join() === "b5:✓,b5 due:✓,open,lock,lock,lock,lock,lock" && row.hidden === "true" && !row.lines, JSON.stringify(row));
+    check(L("…while a screen reader still hears that line, with what is due"), /^presente box 6 ✓ · passato prossimo box 5 ✓, due · imperfetto new · futuro locked/.test(row.say || ""), row.say);
+    await layout(page, L("the reference with its squares"), opts);
+    // the sort menu
+    const order = async (how) => { await page.selectOption("#refSort", how); await settle(page); return page.evaluate(() => ({ rows: [...document.querySelectorAll("details.vref")].map(d => d.dataset.verb), heads: [...document.querySelectorAll("#refResults h2")].map(h => h.textContent), fam: document.querySelectorAll('#refResults [data-vfocus^="vfam:"]').length })); };
+    let o = await order("az");
+    check(L("sorting A–Z: one list, in alphabetical order, without the family headings"), o.heads.join() === "Verbs, A–Z" && !o.fam && o.rows.join() === await page.evaluate(() => VERB_GYM.map(v => v.it).sort((a, b) => a.localeCompare(b, "it")).join()), JSON.stringify(o.heads));
+    o = await order("course");
+    check(L("…in course order"), o.heads.join() === "Verbs, in course order" && o.rows.join() === await page.evaluate(() => VERB_GYM.map(v => v.it).join()));
+    o = await order("weak");
+    check(L("…weakest first: andare (two tenses learned) after the verbs started lower, before those not started"), o.heads.join() === "Verbs, weakest first" && await page.evaluate((rows) => { const avg = (v) => { const b = verbTenses(v).map(i => rec(i.id).box).filter(x => x >= 1); return b.length ? b.reduce((a, x) => a + x, 0) / b.length : Infinity; }; const a = rows.map(x => avg(VERB_GYM.find(v => v.it === x))); return a.every((x, k) => !k || x >= a[k - 1]) && Number.isFinite(a[0]) && a[a.length - 1] === Infinity; }, o.rows));
+    await page.fill("#refFilter", "andrò"); await until(() => page.evaluate(() => document.querySelectorAll("#refResults details.vref[open]").length > 0)); await settle(page);
+    check(L("…and a filter keeps the order chosen, redrawing only the results"), await page.evaluate(() => document.activeElement.id === "refFilter" && [...document.querySelectorAll("#refResults h2")].map(h => h.textContent).join() === "Verbs, weakest first" && !!document.querySelector('#refResults details.vref[data-verb="andare"][open] .conjtable')));
+    await page.fill("#refFilter", ""); await until(() => page.evaluate(() => !document.querySelector("#refResults details.vref[open]")));
+    o = await order("family");
+    check(L("…and by family again, with Practise this family under each heading"), o.fam === await page.evaluate("Object.keys(VERB_FAMILIES).length") && o.heads.length === o.fam);
+    // Compare
+    await page.evaluate(() => document.querySelector('details.vref[data-verb="sapere"]').scrollIntoView({ block: "start" }));
+    await tap(page, 'details.vref[data-verb="sapere"] summary');
+    check(L("an opened row has Compare with another verb, under Practise this verb, closed"), await page.evaluate(() => { const d = document.querySelector('details.vref[data-verb="sapere"] details.vcmp'); return !!d && !d.open && d.previousElementSibling.matches(".vgo") && d.children.length === 1; }));
+    await tap(page, 'details.vref[data-verb="sapere"] details.vcmp summary');
+    const sugg = await page.evaluate(() => [...document.querySelectorAll('details.vref[data-verb="sapere"] .vcmp-b > .fchips:not(.vcmp-hits) [data-vcmp]')].map(b => b.dataset.vcmp));
+    check(L("…offering the verb it is mixed up with first (sapere: conoscere), then those sharing a meaning"), sugg[0] === "conoscere" && await page.evaluate((s) => s.slice(1).every(x => arr(VERB_GYM.find(v => v.it === "sapere").en).some(e => (vgIndex().byGloss[normEn(e)] || []).includes(x))), sugg), JSON.stringify(sugg));
+    await tap(page, 'details.vref[data-verb="sapere"] [data-vcmp="conoscere"]');
+    const cmp = await page.evaluate(() => {
+      const out = document.querySelector('details.vref[data-verb="sapere"] .vcmp-out'), secs = [...out.querySelectorAll(".vcmp-t")];
+      const pres = secs[0], tables = pres ? [...pres.querySelectorAll(".conjtable")] : [];
+      const said = (el) => [...el.childNodes].map(n => n.nodeType === 3 ? n.nodeValue : n.classList.contains("vh") ? "" : said(n)).join(""); // without what only a screen reader hears
+      const bold = (t) => [...t.querySelectorAll("b")].map(said);
+      return { secs: secs.length, want: VG_TENSES.filter(t => vgItem("sapere", t) || vgItem("conoscere", t)).length, names: pres && [...pres.querySelectorAll(".vcmp-v")].map(x => x.textContent).join(), boldA: tables[0] && bold(tables[0]), boldB: tables[1] && bold(tables[1]), said: [...out.querySelectorAll(".conjtable b")].every(b => b.querySelector(":scope > .vh") && b.querySelector(":scope > .vh").textContent === " (differs)"),
+        stacked: tables.length === 2 && tables[1].getBoundingClientRect().top >= tables[0].getBoundingClientRect().bottom, pressed: document.querySelector('details.vref[data-verb="sapere"] [data-vcmp="conoscere"]').getAttribute("aria-pressed") };
+    });
+    check(L("…which shows both verbs' tables tense by tense, the chip pressed"), cmp.secs === cmp.want && cmp.names === "sapere,conoscere" && cmp.pressed === "true", JSON.stringify(cmp));
+    check(L("…the forms built differently in bold, on both sides, each with “(differs)” for a screen reader (sapete and conoscete, one ending on each stem, not)"), cmp.boldA.join() === "so,sai,sa,sappiamo,sanno" && cmp.boldB.join() === "conosco,conosci,conosce,conosciamo,conoscono" && cmp.said, JSON.stringify(cmp));
+    check(L("…one table under the other on a phone"), cmp.stacked);
+    await page.fill('details.vref[data-verb="sapere"] .vcmp-in', "potere"); await until(() => page.evaluate(() => !!document.querySelector('details.vref[data-verb="sapere"] .vcmp-hits [data-vcmp="potere"]')));
+    check(L("…another verb found by its name, the field keeping the focus"), await page.evaluate(() => document.activeElement.classList.contains("vcmp-in")));
+    await page.fill('details.vref[data-verb="sapere"] .vcmp-in', "to work"); await until(() => page.evaluate(() => !!document.querySelector('details.vref[data-verb="sapere"] .vcmp-hits [data-vcmp="lavorare"]')));
+    await page.evaluate(() => { document.querySelector('details.vref[data-verb="sapere"]').open = false; });
+    await page.evaluate(() => document.querySelector('details.vref[data-verb="parlare"]').scrollIntoView({ block: "start" }));
+    await tap(page, 'details.vref[data-verb="parlare"] summary'); await tap(page, 'details.vref[data-verb="parlare"] details.vcmp summary');
+    await page.fill('details.vref[data-verb="parlare"] .vcmp-in', "to work"); await until(() => page.evaluate(() => !!document.querySelector('details.vref[data-verb="parlare"] .vcmp-hits [data-vcmp="lavorare"]')));
+    await tap(page, 'details.vref[data-verb="parlare"] .vcmp-hits [data-vcmp="lavorare"]');
+    check(L("…and two verbs of one pattern (parlare, lavorare) show nothing in bold"), await page.evaluate(() => { const out = document.querySelector('details.vref[data-verb="parlare"] .vcmp-out'); return out.querySelectorAll(".vcmp-t").length === 8 && !out.querySelector(".conjtable b"); }));
+    await layout(page, L("the reference with a comparison open"), opts);
+    if (label === "390×844 light") {
+      await page.setViewportSize({ width: 700, height: 900 }); await settle(page);
+      check("Verbs reference, 700 px wide: Compare puts the two tables side by side", await page.evaluate(() => { const t = [...document.querySelector('details.vref[data-verb="parlare"] .vcmp-t').querySelectorAll(".conjtable")]; return t.length === 2 && Math.abs(t[0].getBoundingClientRect().top - t[1].getBoundingClientRect().top) < 2 && t[1].getBoundingClientRect().left > t[0].getBoundingClientRect().right; }));
+      await page.setViewportSize({ width, height }); await settle(page);
+    }
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verbs reference upgrade checked, ${label}`);
+  }
+}
+
+/* The Verb sprint (from 9.32): reached from Units' Verbs card and from the Verbs reference, in each layout, played by typing
+   with a stand-in for its clock (window.__t, moved by the test), so no check waits a minute; what it keeps, and leaving it. */
+async function sprint(browser, origin) {
+  for (const [width, height, scheme, label] of [[390, 844, "light", "390×844 light"], [390, 844, "dark", "390×844 dark"], [360, 740, "light", "360×740 light"], [360, 740, "dark", "360×740 dark"], [325, 703, "light", "120% text"]]) {
+    const L = (t) => `Verb sprint, ${label}: ${t}`, opts = label === "120% text" ? { zoomOnly: true } : {};
+    const { page, context } = await openApp(browser, origin, { width, height, scheme });
+    await page.evaluate(() => { window.__t = 0; sprintClock.now = () => window.__t; Store.remove("itapp.vgmiss.v1"); VG_MISS = null; });
+    const kept = () => page.evaluate(async () => { await Store.flush(); return JSON.stringify([Store.get("itapp.sprint.v1"), Store.get("itapp.vgmiss.v1")]); });
+    const progressBefore = await savedProgress(page);
+    await tap(page, '.tab[data-go="units"]'); await tap(page, '[data-useg="verbs"]'); if (!(await page.$('.ucard [data-go="sprint"]'))) await tap(page, '.ulist [data-upick="vb"]');
+    await tap(page, '.ucard [data-go="sprint"]');
+    const opened = await page.evaluate(() => ({ screen: S.screen, tab: (document.querySelector('.tab[aria-current="page"]') || {}).dataset?.go, start: !!document.querySelector('[data-act="spStart"]:not([disabled])'), len: (document.querySelector('[data-splen][aria-pressed="true"]') || {}).dataset?.splen, text: document.querySelector(".sp-info").textContent }));
+    check(L("Units › Verbs › Sprint opens its screen: the length, the best (none yet) and Start"), opened.screen === "sprint" && opened.tab === "units" && opened.start && opened.len === "60" && /Best for 60 seconds: none yet/.test(opened.text), JSON.stringify(opened));
+    await layout(page, L("the sprint's first screen"), opts);
+    await tap(page, '.hdr .back');
+    check(L("…its back arrow returns to Units"), (await screen(page)) === "units");
+    await tap(page, '.ucard [data-ref="vb"]'); await tap(page, '.vtools [data-go="sprint"]');
+    check(L("the Verbs reference's Sprint opens it too"), (await screen(page)) === "sprint");
+    await tap(page, '[data-splen="90"]');
+    check(L("choosing 90 s says the best for 90 seconds"), await page.evaluate(() => document.querySelector('[data-splen="90"]').getAttribute("aria-pressed") === "true" && /Best for 90 seconds/.test(document.querySelector(".sp-info").textContent)));
+    await tap(page, '[data-splen="60"]');
+    await tap(page, '[data-act="spStart"]');
+    const run = await page.evaluate(() => ({ phase: SP && SP.phase, bar: !!document.querySelector(".tabbar"), focus: document.activeElement.id, clock: document.getElementById("spClock").textContent, prompt: document.getElementById("spPrompt").textContent, want: `${SP.cur.i.it} · ${vgPerson(SP.cur.i.tense, SP.cur.p)} · ${TENSE_LABEL[SP.cur.i.tense]}` }));
+    check(L("Start: the clock at 60, no tab bar, the field focused, and a prompt like “andare · noi · futuro”"), run.phase === "run" && !run.bar && run.focus === "spAnswer" && run.clock === "60" && run.prompt.startsWith(run.want), JSON.stringify(run));
+    await layout(page, L("a sprint under way"), opts);
+    // right, by typing
+    // typed as a learner types it, one accepted answer (sono stato for the table's sono stato/a), never the table's own spelling
+    const { typed, form: right } = await page.evaluate(() => ({ typed: vgAcc(SP.cur.i, SP.cur.p)[0], form: SP.cur.i.forms[SP.cur.p] }));
+    const first = await page.evaluate(() => SP.cur.i.it);
+    await page.evaluate(() => { window.__t = 4000; spTick(); });
+    await page.type("#spAnswer", typed); await page.keyboard.press("Enter"); await settle(page);
+    const r1 = await page.evaluate(() => ({ score: document.getElementById("spScore").textContent, last: document.getElementById("spLast").textContent, focus: document.activeElement.id, value: document.getElementById("spAnswer").value, verb: SP.cur.i.it, clock: document.getElementById("spClock").textContent }));
+    check(L("a right answer typed with Enter: the score goes up and the next form comes at once, the field empty and still focused"), r1.score === "1 right" && r1.last.includes(right) && r1.focus === "spAnswer" && r1.value === "" && r1.verb !== first && r1.clock === "56", JSON.stringify(r1));
+    // an accent key types into the field
+    await page.click('.accentbar [data-ch="ò"]');
+    check(L("an accent key types into the sprint's field"), (await page.inputValue("#spAnswer")) === "ò");
+    await page.fill("#spAnswer", "");
+    // wrong, by typing
+    const missed = await page.evaluate(() => ({ form: SP.cur.i.forms[SP.cur.p], shown: vgPerson(SP.cur.i.tense, SP.cur.p) + " " + SP.cur.i.forms[SP.cur.p], why: (() => { const d = document.createElement("div"); d.innerHTML = spWhy(SP.cur); return d.textContent; })(), id: SP.cur.i.id, p: SP.cur.p }));
+    await page.type("#spAnswer", "zzz"); await page.keyboard.press("Enter"); await settle(page);
+    await page.evaluate(() => { window.__t = 34000; spTick(); }); await settle(page);
+    const w = await page.evaluate(() => { const f = document.querySelector(".spfix"); return { phase: SP.phase, title: f && f.querySelector(".fb-title").textContent, text: f && f.textContent.replace(/\u2011/g, "-"), /* the screen's non-breaking hyphens, as plain ones */ clock: document.getElementById("spClock").textContent, focus: document.activeElement.dataset.act, input: document.getElementById("spAnswer").disabled && document.getElementById("spAnswer").value }; });
+    check(L("a wrong answer: “Not quite” with ✕, the right form, what was typed and why, Next focused"), w.phase === "wrong" && w.title === "Not quite" && w.text.includes("Answer: " + missed.shown) && w.text.includes("You typed: zzz") && missed.why.length > 10 && w.text.includes(missed.why) && w.focus === "spNext" && w.input === "zzz", JSON.stringify(w));
+    check(L("…and the clock stops while it shows (still 56 thirty seconds later)"), w.clock === "56");
+    await layout(page, L("a sprint's wrong answer"), opts);
+    await page.keyboard.press("Enter"); await settle(page);
+    check(L("Enter moves on, the clock going again from where it stopped"), await page.evaluate(() => SP.phase === "run" && document.activeElement.id === "spAnswer" && Math.ceil(spLeft() / 1000) === 56));
+    await page.evaluate(() => { window.__t = 34000 + 57000; spTick(); }); await settle(page);
+    const done = await page.evaluate(() => ({ title: (document.querySelector("h1") || {}).textContent, bigs: [...document.querySelectorAll(".sumcard .big")].map(b => b.textContent), best: !!document.querySelector(".sp-best"), rows: [...document.querySelectorAll(".mrow")].map(r => r.textContent), bar: !!document.querySelector(".tabbar") }));
+    check(L("when the clock runs out: Time's up, 1 right, 50% accuracy, a new best, and the form missed with what was typed"), done.title === "Time's up" && done.bigs.join() === "1,50%,1" && done.best && done.rows.length === 1 && done.rows[0].includes(missed.form) && done.rows[0].includes("You typed zzz") && !done.bar, JSON.stringify(done));
+    const k = JSON.parse(await kept());
+    check(L("…the best kept on this device, and the form missed noted as a weak spot"), JSON.stringify(k[0]) === JSON.stringify({ 60: 1, len: 60 }) && Array.isArray(k[1]) && k[1].length === 1 && k[1][0][0] === missed.id.replace(/^vg-|-[a-z_]+$/g, "") && k[1][0][2] === missed.p, JSON.stringify(k));
+    check(L("…and saved progress is untouched"), (await savedProgress(page)) === progressBefore);
+    await layout(page, L("the sprint's end"), opts);
+    await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, get: () => true }); document.dispatchEvent(new Event("visibilitychange")); delete document.hidden; }); await settle(page);
+    check(L("putting the app away on the end screen keeps it"), await page.evaluate(() => SP && SP.phase === "done" && document.querySelector("h1").textContent === "Time's up"));
+    await tap(page, '[data-act="spPractise"]');
+    check(L("Practise these starts an ordinary Verbs session of the verb tense missed"), (await screen(page)) === "session" && await page.evaluate((id) => session.kind === "vsprint" && session.queue.every(q => q.ex.item.id === id), missed.id));
+    await page.evaluate(() => { session = null; S.screen = "reference"; S.refUnit = "vb"; render(); }); await settle(page);
+    // leaving mid-round keeps nothing: the back button, ✕, and the app put away
+    const before = await kept();
+    await tap(page, '.vtools [data-go="sprint"]'); await tap(page, '[data-act="spStart"]');
+    await page.fill("#spAnswer", "zzz"); await page.keyboard.press("Enter"); await settle(page);
+    await page.goBack(); await settle(page);
+    check(L("the back button mid-round leaves the sprint for the Verbs reference"), (await screen(page)) === "reference" && await page.evaluate("SP === null"));
+    await tap(page, '.vtools [data-go="sprint"]'); await tap(page, '[data-act="spStart"]'); await tap(page, '[data-act="spQuit"]');
+    check(L("✕ stops it, back on the first screen, saying nothing was kept"), await page.evaluate(() => S.screen === "sprint" && SP === null && /nothing from it was kept/.test(document.querySelector(".flash").textContent)));
+    await tap(page, '[data-act="spStart"]');
+    await page.evaluate(() => { Object.defineProperty(document, "hidden", { configurable: true, get: () => true }); document.dispatchEvent(new Event("visibilitychange")); delete document.hidden; }); await settle(page);
+    check(L("putting the app away mid-round ends it too"), await page.evaluate(() => SP === null && /put away/.test(document.querySelector(".flash").textContent)));
+    check(L("…and none of the three kept anything"), (await kept()) === before);
+    // Settings, and a damaged value
+    await page.evaluate(() => { S.screen = "settings"; render(); }); await settle(page);
+    await page.selectOption("#s-sprintLen", "120");
+    await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
+    check(L("Settings › Verb sprint length chooses it too"), await page.evaluate(() => document.querySelector('[data-splen="120"]').getAttribute("aria-pressed") === "true"));
+    await saveText(page, "itapp.sprint.v1", "{\"60\": \"lots\", \"len\": 45"); await page.reload(); await page.waitForFunction(ready);
+    await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
+    check(L("a damaged itapp.sprint.v1 is harmless: 60 seconds, no best"), await page.evaluate(() => document.querySelector('[data-splen="60"]').getAttribute("aria-pressed") === "true" && /none yet/.test(document.querySelector(".sp-info").textContent)));
+    check(L("…and is never part of progress"), await page.evaluate(() => !/sprint/.test(JSON.stringify(progress)) && !/sprint/.test(backupText())));
+    await page.evaluate(() => { const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (v, k) { if (k === "itapp.sprint.v1") throw new DOMException("no room", "QuotaExceededError"); return put.call(this, v, k); }; window.__t = 0; sprintClock.now = () => window.__t; });
+    await tap(page, '[data-act="spStart"]');
+    await page.fill("#spAnswer", await page.evaluate(() => vgAcc(SP.cur.i, SP.cur.p)[0])); await page.keyboard.press("Enter");
+    await page.evaluate(() => { window.__t = 61000; spTick(); }); await settle(page);
+    check(L("a device that refuses to store itapp.sprint.v1: the round still ends with its score, and no script error"), !page.errors.length && await page.evaluate(() => SP && SP.phase === "done" && SP.right === 1 && document.querySelector("h1").textContent === "Time's up"), page.errors.join("\n"));
+    check(L("no script errors"), !page.errors.length, page.errors.join("\n"));
+    await context.close();
+    console.log(`  Verb sprint checked, ${label}`);
+  }
+  { // room above the keyboard, at Pixel 8 size, as for every typed question
+    const { page, context } = await openApp(browser, origin, { width: 412, height: 915, scheme: "light" });
+    await page.evaluate(() => { S.screen = "sprint"; render(); }); await settle(page);
+    await tap(page, '[data-act="spStart"]');
+    const bottom = await page.evaluate(() => Math.max(document.querySelector('[data-act="spCheck"]').getBoundingClientRect().bottom, document.querySelector('[data-act="spGiveup"]').getBoundingClientRect().bottom));
+    check(`Verb sprint: Don't know and Check end within the top 460 px at 412 × 915, above a Pixel 8's keyboard (${Math.round(bottom)})`, bottom <= 460);
+    await context.close();
+  }
+}
+
 /* Storage (from 9.26): Your data's Storage card and Today's notices about where progress is kept, in each layout.
    What the storage does is tools/test-storage.js's; this is how it is shown. Each case is set up by a script run before
    the page's own: a device that had progress before 9.26 (so the first opening moves it), one with no IndexedDB, and
@@ -1454,6 +1726,15 @@ async function readAloud(browser, origin) {
 
     /* The Verbs section's new screens (from 9.31) */
     await verbsScreens(browser, origin);
+
+    /* The Verb map (from 9.32) */
+    await verbMap(browser, origin);
+
+    /* The Verbs reference's squares, sort menu and Compare (from 9.32) */
+    await referenceUpgrade(browser, origin);
+
+    /* The Verb sprint (from 9.32) */
+    await sprint(browser, origin);
   } catch (e) {
     results.stopped(e);
   } finally {

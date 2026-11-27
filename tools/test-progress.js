@@ -49,6 +49,12 @@
        problems the app noticed (itapp.errors.v1, the last 20) stay out of
        progress, the cloud and backups, and leave the saved progress exactly
        as it was.
+   12. The Verb sprint (from 9.32): a round played through the screen to its
+       end leaves the browser copy of progress, progress in memory, the
+       daily log, the streak and the cloud exactly as they were, keeping only
+       its best (itapp.sprint.v1) and the forms missed (itapp.vgmiss.v1) on
+       the device; and its Practise these is an ordinary session, which
+       counts and syncs.
 
   The storage formats are written out by hand (the cloud's here, the browser
   copy's in tools/lib/browser.js, which reads the database itself), not borrowed from the app,
@@ -775,6 +781,50 @@ async function runSession(page, start, maxSteps = 200) {
       check("…and appearing neither in progress nor in a backup", await page.evaluate(() => !/progress test (error|rejection)/.test(JSON.stringify(progress) + backupText()) && !("errors" in progress)));
       await page.evaluate(() => { S.screen = "data"; render(); action("clearErrors"); });
       check("clearing them removes only itapp.errors.v1", (await stored(page, "itapp.errors.v1")) === null && (await progressRows(page)) === textBefore);
+      await context.close();
+    }
+
+    /* 12. The Verb sprint (from 9.32): side practice, which never touches progress */
+    section("12. A Verb sprint leaves progress, the daily log, the streak and sync as they were");
+    {
+      const cloud = makeCloud();
+      const { page, context } = await newPage(browser, origin, { storage: { [LS_PROGRESS]: seed }, cloud });
+      await settleSync(page);
+      const since = async (fn) => { const n = cloud.writes.length; await fn(); await settleSync(page); return cloud.writes.slice(n); };
+      const mem = () => page.evaluate(() => JSON.stringify(progress));
+      const rowsBefore = await progressRows(page), memBefore = await mem(), docsBefore = canon([...cloud.docs.entries()].sort());
+      const look = () => page.evaluate(() => ({ streak: streak(), days: JSON.stringify(progress.days), today: dayKey(Date.now()) in progress.days }));
+      const before = await look();
+      const w = await since(async () => {
+        await page.evaluate(() => { window.__t = 0; sprintClock.now = () => window.__t; S.screen = "sprint"; render(); });
+        await page.click('[data-act="spStart"]');
+        for (const how of ["right", "wrong", "right", "right", "wrong"]) { // through the screen, by typing, as a learner would
+          const form = await page.evaluate(() => vgAcc(SP.cur.i, SP.cur.p)[0]); // an accepted answer, as a learner types it (sono stato for the table's sono stato/a)
+          await page.fill("#spAnswer", how === "right" ? form : "zzz"); await page.press("#spAnswer", "Enter");
+          if (how === "wrong") await page.click('[data-act="spNext"]');
+        }
+        await page.evaluate(() => { window.__t = 61000; spTick(); });
+      });
+      const sp = await page.evaluate(() => ({ phase: SP && SP.phase, right: SP && SP.right, answered: SP && SP.answered }));
+      check("a sprint is played through the screen to its end (3 right of 5)", sp.phase === "done" && sp.right === 3 && sp.answered === 5, JSON.stringify(sp));
+      check("…leaving the browser copy of progress exactly as it was", (await progressRows(page)) === rowsBefore);
+      check("…and progress in memory too: no record, no setting, no day of the log changed", (await mem()) === memBefore);
+      const after = await look();
+      check("…the same streak, and the daily log exactly as it was (today's entry as drawing Today left it, with no XP)", after.streak === before.streak && after.days === before.days, JSON.stringify({ before, after }).slice(0, 400));
+      check(`…writing nothing to the cloud (${w.join(", ") || "nothing"})`, !w.length && canon([...cloud.docs.entries()].sort()) === docsBefore);
+      const kept = { best: await stored(page, "itapp.sprint.v1"), miss: await stored(page, "itapp.vgmiss.v1") };
+      check("…keeping only its best (itapp.sprint.v1) and the forms missed (itapp.vgmiss.v1), on this device", kept.best && kept.best[60] === 3 && Array.isArray(kept.miss) && kept.miss.length === 2, JSON.stringify(kept));
+      check("…neither of which is in progress, a backup or the cloud", await page.evaluate(() => !/sprint|vgmiss/.test(JSON.stringify(progress) + backupText())) && ![...cloud.docs.keys()].some(k => /sprint|vgmiss/.test(k)) && !/zzz/.test(JSON.stringify([...cloud.docs.values()])));
+      // Practise these: an ordinary Verbs session, which counts
+      const missed = await page.evaluate(() => uniqueByPid(SP.misses.map(m => m.c.i.id)));
+      const w2 = await since(async () => {
+        await page.click('[data-act="spPractise"]');
+        await page.evaluate(() => { for (let n = 0; S.screen === "session" && n < 50; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } });
+      });
+      const counted = await page.evaluate((ids) => ({ seen: ids.every(id => rec(id).lastSeen > Date.now() - 60000), today: (progress.days[dayKey(Date.now())] || {}).xp || 0 }), missed);
+      check("Practise these starts an ordinary Verbs session of the verb tenses missed, which counts: their records and today's XP change", counted.seen && counted.today > 0, JSON.stringify(counted));
+      check(`…and reaches the cloud as any session does (${w2.length} documents written)`, w2.some(k => /^progress2\/s\d\d$/.test(k)) && w2.includes("progress2/meta"), w2.join(", "));
+      check("no script errors", !page.__errors, page.__errors);
       await context.close();
     }
   } catch (e) {

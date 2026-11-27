@@ -88,16 +88,23 @@ function REFERENCE() {
   // the Verbs reference's list, every row with its tables (renderVerbReference)
   R.verbRow = (v, open) => {
     const items = VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean);
-    const summ = items.map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}`).join(" · ");
+    const t = now(), summ = items.map(i => `${TENSE_LABEL[i.tense]} ${vgStatus(i)}${rec(i.id).box >= 1 && rec(i.id).due <= t ? ", due" : ""}`).join(" · "); // from 9.32 with ", due", for a screen reader beside the squares
     const focus = { started: items.filter(i => rec(i.id).box >= 1).length, open: items.filter(i => rec(i.id).box === 0 && vgUnlocked(i) && i.step <= (progress.settings.verbTenseCap || 7)).length }; // from 9.31, Practise this verb first
-    return `<details class="vref"${open ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><div class="small muted">${esc(summ)}</div></summary>`
-      + vgFocusBtn("vverb", v.it, "Practise this verb", focus, "vverb-none-" + v.it)
+    const head = `<details class="vref"${open ? " open" : ""}><summary><span class="it">${esc(v.it)}</span> <span class="muted">${esc(arr(v.en).join(", "))}</span><span class="vm-c vref-c" aria-hidden="true">${vmCells(v, t).html}</span><span class="vh">${esc(summ)}</span></summary>`; // from 9.32 the Verb map's squares, the line for a screen reader only
+    if (!open) return head + `</details>`; // closed: its tables are drawn when it is opened
+    return head + vgFocusBtn("vverb", v.it, "Practise this verb", focus, "vverb-none-" + v.it)
+      + `<details class="vcmp" data-cmp="${esc(v.it)}"><summary>Compare with another verb</summary></details>` // from 9.32, drawn when opened
       + items.map((i, k) => `<div class="small muted" style="margin-top:8px">${esc(TENSE_LABEL[i.tense])} · ${esc(vgStatus(i))}</div>` + vgTableHtml(i, i.tense)
         + (k === items.findIndex(x => vgKeyHtml(v.it, x.tense)) ? vgKeyHtml(v.it, i.tense) : "") // from 9.31, the legend of the underlining (or the caption of a verb irregular throughout) under the first table it belongs to
         + verbSentences(i).map(x => vsHtml(x, "vs-in")).join("")).join("") // from 9.20, each tense's example sentences under its table
       + (v.note ? `<div class="small muted" style="margin-top:6px">${esc(v.note)}</div>` : "") + `</details>`;
   };
-  R.verbListHtml = (f) => {
+  R.verbListHtml = (f, how = "family") => {
+    if (how !== "family") { // from 9.32: one list, in course order (the Verbs section's own), A–Z, or weakest first (the lowest average box of the tenses started; none started last; ties in course order)
+      const avg = (v) => { const b = VG_TENSES.map(t => content.items[vgId(v.it, t)]).filter(Boolean).map(i => rec(i.id).box).filter(x => x >= 1); return b.length ? b.reduce((a, x) => a + x, 0) / b.length : Infinity; };
+      const list = R.verbs(f).map((v, k) => [v, k]).sort(how === "az" ? (a, b) => a[0].it.localeCompare(b[0].it, "it") : how === "weak" ? (a, b) => avg(a[0]) - avg(b[0]) || a[1] - b[1] : (a, b) => a[1] - b[1]).map(x => x[0]);
+      return list.length ? groupHtml(esc("Verbs, " + { course: "in course order", az: "A–Z", weak: "weakest first" }[how]), `<div class="card rows">${list.map(v => R.verbRow(v, f)).join("")}</div>`) : `<p class="muted">No verbs match.</p>`;
+    }
     const famOrder = Object.keys(VERB_FAMILIES);
     const sorted = R.verbs(f).slice().sort((a, b) => famOrder.indexOf(a.fam) - famOrder.indexOf(b.fam) || a.it.localeCompare(b.it));
     let h = "", fam = null, rows = "";
@@ -118,7 +125,10 @@ function REFERENCE() {
     }
     const all = Object.values(content.items).filter(i => isBuiltinPack(i.pack)), vi = content.byUnit.vb || [];
     const cap = progress.settings.verbTenseCap || 7; // from 9.31, the ladder cap: a tense after it never opens as new
-    const by = (list, k) => { const o = {}; for (const i of list) { const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0 }); if (rec(i.id).box >= 1) c.started++; if (rec(i.id).box === 0 && vgUnlocked(i) && i.step <= cap) c.open++; } return o; };
+    const by = (list, k) => { const o = {}; for (const i of list) { // from 9.32 also every verb tense, those learned and those due (the Verb map's tense rows)
+      const c = o[i[k]] || (o[i[k]] = { started: 0, open: 0, learned: 0, total: 0, due: 0 }), r = rec(i.id);
+      c.total++; if (r.box >= 1) c.started++; if (r.box >= 5) c.learned++; if (r.box >= 1 && r.due <= t) c.due++; if (r.box === 0 && vgUnlocked(i) && i.step <= cap) c.open++;
+    } return o; };
     const ids = Object.keys(progress.items).filter(id => content.items[id]);
     return {
       unit, due: dueIds().length, mistakes: Object.keys(progress.items).filter(id => isRecentMistake(id)).length,
@@ -315,6 +325,9 @@ async function openApp(browser, origin, { seed = false, init = null } = {}) {
       const filtered = await page.evaluate((qs) => qs.filter(q => { S.refFilter = q; const d = document.createElement("div"), e = document.createElement("div"); d.innerHTML = verbListHtml().replace(/ data-verb="[^"]*"/g, ""); e.innerHTML = REF.verbListHtml(normalize(q)); return d.innerHTML !== e.innerHTML; }), ["andare", "essere", "to go", "isc", "fatto", "xyzzy"]);
       await page.evaluate(() => { S.refFilter = ""; });
       check("a filter's rows come open with their tables, as 9.2 drew them (6 filters)", !filtered.length, filtered.join(", "));
+      const sorted = await page.evaluate((qs) => ["family", "course", "az", "weak"].flatMap(how => qs.map(q => [how, q])).filter(([how, q]) => { S.refFilter = q; S.refSort = how; const d = document.createElement("div"), e = document.createElement("div"); d.innerHTML = verbListHtml().replace(/ data-verb="[^"]*"/g, ""); e.innerHTML = REF.verbListHtml(normalize(q), how); return d.innerHTML !== e.innerHTML; }).map(x => x.join(": ")), ["", "are", "to go", "xyzzy"]);
+      await page.evaluate(() => { S.refFilter = ""; S.refSort = "family"; });
+      check("the reference's four orders (by family, course order, A–Z, weakest first) list the rows as the plain code does, with and without a filter (9.32)", !sorted.length, sorted.join(", "));
       await page.evaluate(() => { S.refFilter = ""; render(); });
       await page.fill("#refFilter", "andare");
       await page.waitForTimeout(400);

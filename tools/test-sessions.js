@@ -63,6 +63,11 @@
        "New tense open: parlare · passato prossimo", "Every tense learned: guardare" and, under Verbs you
        missed, andare with Practise this verb, which starts a session of that verb; no answer panel in the
        session offers it.
+   11. The Verb sprint (from 9.32): with 30 tenses at box 2 and up and one at box 1, it asks only the 30;
+       over 6,000 forms never the same verb twice running; the tenses started more recently (fewer answers
+       so far) more than twice as often as the others, and a form missed before (itapp.vgmiss.v1) several
+       times as often as its neighbours. A round's Practise these starts a Verbs session ("vsprint") of
+       exactly the tenses missed, each exercise asking a person missed, and its summary names it.
 
   Changes nothing in index.html. Exits with code 1 if any check fails.
 */
@@ -645,6 +650,52 @@ const FINISH = () => { for (let n = 0; S.screen === "session" && n < 400; n++) {
       await page.click('.vmiss [data-vfocus="vverb:andare"]');
       const s2 = await page.evaluate(() => ({ screen: S.screen, kind: session && session.kind, unit: session && session.unitId, only: session && session.queue.every(q => q.ex.item.it === "andare") }));
       check("Practise this verb there starts a session of that verb", s2.screen === "session" && s2.kind === "vverb" && s2.unit === "andare" && s2.only, JSON.stringify(s2));
+      check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
+      await context.close();
+    }
+    /* 11. The Verb sprint's forms, and its Practise these */
+    {
+      const { page, context } = await open(browser, origin, { seed: false });
+      section("11. The Verb sprint: the forms it asks, and Practise these (from 9.32)");
+      const r = await page.evaluate(() => {
+        const T = Date.now(), put = (id, box, seen) => { progress.items[pid(id)] = { box, due: T + 864e5, lapses: 0, lastSeen: T - 864e5, lastWrong: 0, seenCount: seen, lastRight: T - 864e5 }; };
+        const pres = content.byUnit.vb.filter(i => i.tense === "presente").slice(0, 30);
+        pres.forEach((i, k) => put(i.id, 3, k < 15 ? 40 : 2)); // the first 15 answered 40 times, the last 15 twice: started more recently
+        put(content.byUnit.vb.find(i => i.it === pres[0].it && i.tense === "passato_prossimo").id, 1, 1); // box 1: left out, as 30 are at box 2 and up
+        saveProgress();
+        Store.set("itapp.vgmiss.v1", [[pres[20].it, 0, 3, 2, T]]); VG_MISS = null; // one weak spot: a recent tense's voi form
+        const cells = spCells(spPool().items), pool = new Set(cells.map(c => c.i.id));
+        const count = new Map(), recentHits = { old: 0, recent: 0 }; // 240 rounds of 25 forms, about what a minute holds: a form comes once a round until all have come, so the weights decide which come up
+        let twice = 0;
+        for (let round = 0; round < 240; round++) {
+          const R = { cells, asked: new Set(), cur: null }; let last = null;
+          for (let k = 0; k < 25; k++) { spPick(R); if (R.cur.i.it === last) twice++; last = R.cur.i.it; const key = R.cur.i.id + ":" + R.cur.p; count.set(key, (count.get(key) || 0) + 1); recentHits[pres.indexOf(R.cur.i) < 15 ? "old" : "recent"]++; }
+        }
+        const per = (i, p) => count.get(i.id + ":" + p) || 0, avg = (list, p) => list.reduce((s, i) => s + per(i, p), 0) / list.length;
+        return { size: pool.size, onlyBox2: [...pool].every(id => rec(id).box >= 2), twice, old: recentHits.old, recent: recentHits.recent,
+          weak: per(pres[20], 3), otherRecent: avg(pres.slice(15, 30).filter((_, k) => k !== 5), 3), oldOnes: avg(pres.slice(0, 15), 3) };
+      });
+      check(`the sprint asks the 30 tenses at box 2 and up, not one at box 1 (${r.size})`, r.size === 30 && r.onlyBox2, JSON.stringify(r));
+      check(`in 240 rounds of 25 forms, never the same verb twice running (${r.twice})`, r.twice === 0);
+      check(`the tenses started more recently come up more often (${r.recent} against ${r.old})`, r.recent > 2 * r.old, JSON.stringify(r));
+      check(`a form missed before comes up several times as often as its neighbours (${r.weak} against about ${Math.round(r.otherRecent)})`, r.weak > 2.5 * r.otherRecent && r.otherRecent > r.oldOnes, JSON.stringify(r));
+      // Practise these: a session of the verb tenses missed, asking the persons missed
+      const s = await page.evaluate(() => {
+        window.__t = 0; sprintClock.now = () => window.__t; Store.remove("itapp.vgmiss.v1"); VG_MISS = null;
+        S.screen = "sprint"; render(); spStart();
+        const missed = [];
+        for (let k = 0; k < 4; k++) { const c = SP.cur; missed.push([c.i.id, c.p]); spCheck("zzz"); spNextForm(); }
+        window.__t = 61000; spTick();
+        action("spPractise");
+        const ids = [...new Set(missed.map(m => m[0]))];
+        return { kind: session.kind, items: [...new Set(session.queue.map(q => q.ex.item.id))].sort(), want: ids.sort(),
+          persons: session.queue.every(q => q.ex.typeKey === "vtable" ? q.ex.cells.every(p => missed.some(m => m[0] === q.ex.item.id && m[1] === p)) : !VG_ONE_FORM.has(q.ex.typeKey) || missed.some(m => m[0] === q.ex.item.id && m[1] === q.ex.person)), // a table or a drill on one form asks a person missed (as Practise my weak spots does)
+          kinds: session.queue.map(q => q.ex.typeKey + ":" + (q.ex.typeKey === "vtable" ? q.ex.cells.join("") : q.ex.person)),
+          focus: (() => { for (let n = 0; S.screen === "session" && n < 100; n++) { if (!S.feedback) finishAnswer(true, "", ""); continueSession(); } return (document.querySelector(".sumfocus") || {}).textContent; })() };
+      });
+      check("Practise these starts a Verbs session of exactly the verb tenses the sprint missed", s.kind === "vsprint" && s.items.join() === s.want.join(), JSON.stringify(s));
+      check("…each table and drill on one form asking a person missed", s.persons, JSON.stringify(s));
+      check("…and its summary names it", s.focus === "Focus: the forms your sprint missed", s.focus);
       check("no script errors", !page.errors.length, page.errors.slice(0, 3).join("\n"));
       await context.close();
     }
